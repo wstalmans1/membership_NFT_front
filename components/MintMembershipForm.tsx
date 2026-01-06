@@ -1,23 +1,47 @@
 'use client';
 
-import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useState, useEffect } from 'react';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { uploadPhoto } from '@/lib/storage';
 import { createMetadata, updateMetadataWithTokenId, NFTMetadata } from '@/lib/metadata';
+import { CONTRACTS } from '@/config/contracts';
+import { MembershipNFT } from '@/abis/MembershipNFT';
+import { Constitution } from '@/abis/Constitution';
+import { formatEther, parseEther } from '@/lib/utils';
+import { encodeFunctionData, decodeEventLog } from 'viem';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface MintMembershipFormProps {
-  onMetadataReady: (metadata: NFTMetadata) => void;
+  onSuccess: () => void;
   onError: (error: string) => void;
+  onCancel: () => void;
 }
 
-export function MintMembershipForm({ onMetadataReady, onError }: MintMembershipFormProps) {
+export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembershipFormProps) {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     dateOfBirth: '',
     citizenship: 'World Citizen for Palestine',
     photo: null as File | null,
+    donationAmount: '',
+  });
+
+  // Get min donation
+  const { data: minDonation } = useReadContract({
+    address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
+    abi: Constitution,
+    functionName: 'minDonationWei',
+  });
+
+  // Mint contract calls
+  const { writeContract, data: hash } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,6 +61,101 @@ export function MintMembershipForm({ onMetadataReady, onError }: MintMembershipF
     }
   };
 
+  // Handle transaction hash when it becomes available
+  useEffect(() => {
+    async function handleTransactionHash() {
+      if (!hash || !publicClient || !address || !formData.name || !formData.photo) {
+        return;
+      }
+
+      console.log('✅ Transaction hash available from hook:', hash);
+      console.log('⏳ Waiting for transaction receipt...', hash);
+      
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log('✅ Transaction receipt received:', receipt);
+        
+        // Extract tokenId from event logs
+        try {
+          const decodedLogs = receipt.logs
+            .map((log) => {
+              try {
+                return decodeEventLog({
+                  abi: MembershipNFT,
+                  data: log.data,
+                  topics: log.topics,
+                });
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean);
+
+          const memberMintedEvent = decodedLogs.find(
+            (log: any) => log?.eventName === 'MemberMinted'
+          );
+
+          if (memberMintedEvent && memberMintedEvent.args) {
+            const tokenId = Number((memberMintedEvent.args as any).tokenId);
+            console.log('✅ Extracted tokenId:', tokenId);
+
+            // Upload photo and create metadata
+            const photoFileName = `token-${Date.now()}-${address.slice(2, 10)}.${formData.photo.name.split('.').pop()}`;
+            const photoUrl = await uploadPhoto(formData.photo, photoFileName);
+
+            const issuedDate = new Date().toISOString().split('T')[0];
+            
+            const metadata: NFTMetadata = {
+              name: `Honorary Citizenship #${formData.name}`,
+              description: `Honorary citizenship certificate for ${formData.name}`,
+              image: photoUrl,
+              attributes: [
+                { trait_type: 'Name', value: formData.name },
+                { trait_type: 'Date of Birth', value: formData.dateOfBirth || 'Not provided' },
+                { trait_type: 'Citizenship', value: formData.citizenship },
+                { trait_type: 'Issued Date', value: issuedDate },
+              ],
+              properties: {
+                ownerAddress: address,
+                name: formData.name,
+                dateOfBirth: formData.dateOfBirth || undefined,
+                citizenship: formData.citizenship,
+                issuedDate: issuedDate,
+                photoUrl: photoUrl,
+                photoFileName: photoFileName,
+              },
+            };
+
+            // Create metadata first, then update with tokenId
+            await createMetadata(address, metadata);
+            await updateMetadataWithTokenId(tokenId, address, metadata);
+            console.log('✅✅✅ Successfully updated metadata with tokenId:', tokenId);
+            
+            // Invalidate queries to refresh UI
+            queryClient.invalidateQueries();
+            
+            setIsMinting(false);
+            onSuccess();
+          } else {
+            console.warn('MemberMinted event not found in transaction logs');
+            onError('Mint successful, but could not extract tokenId. Please refresh the page.');
+            setIsMinting(false);
+          }
+        } catch (error) {
+          console.error('Error parsing event logs:', error);
+          onError('Mint successful, but failed to parse transaction. Please refresh the page.');
+          setIsMinting(false);
+        }
+      } catch (error: any) {
+        console.error('Error waiting for transaction receipt:', error);
+        onError(`Transaction sent but failed: ${error.message}`);
+        setIsMinting(false);
+      }
+    }
+
+    handleTransactionHash();
+  }, [hash, publicClient, address, formData, queryClient, onSuccess, onError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -55,48 +174,67 @@ export function MintMembershipForm({ onMetadataReady, onError }: MintMembershipF
       return;
     }
 
-    setIsUploading(true);
+    if (!formData.donationAmount) {
+      onError('Please enter a donation amount');
+      return;
+    }
+
+    const minDonationEth = minDonation ? formatEther(BigInt(minDonation.toString())) : '0';
+    const donationAmountEth = parseFloat(formData.donationAmount);
+    const minDonationFloat = parseFloat(minDonationEth);
+
+    if (donationAmountEth < minDonationFloat) {
+      onError(`Donation must be at least ${minDonationEth} ETH`);
+      return;
+    }
+
+    setIsMinting(true);
+    setError(null);
 
     try {
-      // Step 1: Upload photo to Supabase Storage
-      const photoFileName = `token-${Date.now()}-${address.slice(2, 10)}.${formData.photo.name.split('.').pop()}`;
-      const photoUrl = await uploadPhoto(formData.photo, photoFileName);
+      const amountWei = parseEther(formData.donationAmount);
 
-      // Step 2: Create metadata object
-      const issuedDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      
-      const metadata: NFTMetadata = {
-        name: `Honorary Citizenship #${formData.name}`,
-        description: `Honorary citizenship certificate for ${formData.name}`,
-        image: photoUrl, // Photo URL from Supabase Storage
-        attributes: [
-          { trait_type: 'Name', value: formData.name },
-          { trait_type: 'Date of Birth', value: formData.dateOfBirth || 'Not provided' },
-          { trait_type: 'Citizenship', value: formData.citizenship },
-          { trait_type: 'Issued Date', value: issuedDate },
-        ],
-        properties: {
-          ownerAddress: address,
-          name: formData.name,
-          dateOfBirth: formData.dateOfBirth || undefined,
-          citizenship: formData.citizenship,
-          issuedDate: issuedDate,
-          photoUrl: photoUrl,
-          photoFileName: photoFileName, // Store filename for deletion later
-        },
-      };
+      // Estimate gas first, then cap it at 15M to avoid RPC limits
+      let gasLimit: bigint | undefined;
+      if (publicClient) {
+        try {
+          const estimatedGas = await publicClient.estimateGas({
+            account: address as `0x${string}`,
+            to: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+            data: encodeFunctionData({
+              abi: MembershipNFT,
+              functionName: 'mint',
+            }),
+            value: amountWei,
+          });
+          gasLimit = estimatedGas > BigInt(15000000) ? BigInt(15000000) : estimatedGas;
+        } catch (estimateError: any) {
+          if (estimateError?.message?.includes('Already minted')) {
+            onError('You have already minted a membership NFT. Please refresh the page.');
+            setIsMinting(false);
+            return;
+          }
+          gasLimit = BigInt(15000000);
+        }
+      }
 
-      // Step 3: Save metadata to Supabase (without tokenId initially)
-      await createMetadata(address, metadata);
-
-      // Step 4: Call parent callback with metadata
-      onMetadataReady(metadata);
-
+      writeContract({
+        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+        abi: MembershipNFT,
+        functionName: 'mint',
+        value: amountWei,
+        ...(gasLimit && { gas: gasLimit }),
+      });
     } catch (error: any) {
-      console.error('Error preparing metadata:', error);
-      onError(error.message || 'Failed to prepare metadata. Please try again.');
-    } finally {
-      setIsUploading(false);
+      console.error('Mint error:', error);
+      if (error?.message?.includes('rejected') || error?.message?.includes('denied') || error?.code === 4001) {
+        onError('Transaction was rejected. Please try again and approve the transaction in your wallet.');
+      } else if (error?.message?.includes('Already minted')) {
+        onError('You have already minted a membership NFT. Please refresh the page.');
+      } else {
+        onError(error?.message || 'Failed to mint NFT. Please try again.');
+      }
+      setIsMinting(false);
     }
   };
 
@@ -166,13 +304,42 @@ export function MintMembershipForm({ onMetadataReady, onError }: MintMembershipF
         </p>
       </div>
 
-      <button
-        type="submit"
-        disabled={isUploading}
-        className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-      >
-        {isUploading ? 'Uploading...' : 'Continue to Mint'}
-      </button>
+      <div>
+        <label htmlFor="donationAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Donation Amount (ETH) <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="donationAmount"
+          type="number"
+          step="0.001"
+          min={minDonation ? formatEther(BigInt(minDonation.toString())) : '0'}
+          value={formData.donationAmount}
+          onChange={(e) => setFormData({ ...formData, donationAmount: e.target.value })}
+          placeholder={minDonation ? formatEther(BigInt(minDonation.toString())) : '0.0'}
+          required
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} ETH
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 px-4 py-3 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isUploading || isMinting || isConfirming}
+          className="flex-1 px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+        >
+          {isUploading || isMinting || isConfirming ? 'Processing...' : 'Mint Membership NFT'}
+        </button>
+      </div>
     </form>
   );
 }

@@ -371,10 +371,32 @@ export function ConstitutionPage() {
 
       {/* Contract Addresses */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Contract Addresses</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Contract Addresses</h2>
+          <div className="relative group">
+            <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+              <p className="mb-2 font-semibold">Contract Addresses</p>
+              <p className="text-gray-300">
+                These are the on-chain addresses of the DAO's smart contracts. All contracts are verified on Blockscout, allowing anyone to inspect the code and verify their functionality. Click any address to view it on the block explorer.
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="space-y-3 text-sm">
           <div className="py-2">
-            <span className="text-gray-600 dark:text-gray-400 block mb-1">Constitution:</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-600 dark:text-gray-400">Constitution:</span>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Constitution Contract</p>
+                  <p className="text-gray-300">
+                    Defines the core DAO parameters including minimum donation, spend caps, allowed recipients, and base URI. This contract acts as the source of truth for governance rules and treasury constraints.
+                  </p>
+                </div>
+              </div>
+            </div>
             <a
               href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.CONSTITUTION_PROXY}`}
               target="_blank"
@@ -385,7 +407,18 @@ export function ConstitutionPage() {
             </a>
           </div>
           <div className="py-2">
-            <span className="text-gray-600 dark:text-gray-400 block mb-1">Governor:</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-600 dark:text-gray-400">Governor:</span>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Governor Contract</p>
+                  <p className="text-gray-300">
+                    Manages the governance process: proposal creation, voting, and execution. Members create proposals here, vote on them, and successful proposals are queued for execution through the Timelock.
+                  </p>
+                </div>
+              </div>
+            </div>
             <a
               href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.GOVERNOR_PROXY}`}
               target="_blank"
@@ -396,7 +429,18 @@ export function ConstitutionPage() {
             </a>
           </div>
           <div className="py-2">
-            <span className="text-gray-600 dark:text-gray-400 block mb-1">Membership NFT:</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-600 dark:text-gray-400">Membership NFT:</span>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Membership NFT Contract</p>
+                  <p className="text-gray-300">
+                    Issues soulbound (non-transferable) membership NFTs to DAO members. Each NFT grants 1 vote in governance. Members mint NFTs by making a minimum donation to the treasury.
+                  </p>
+                </div>
+              </div>
+            </div>
             <a
               href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY}`}
               target="_blank"
@@ -407,7 +451,18 @@ export function ConstitutionPage() {
             </a>
           </div>
           <div className="py-2">
-            <span className="text-gray-600 dark:text-gray-400 block mb-1">Treasury:</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-600 dark:text-gray-400">Treasury:</span>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Treasury Executor Contract</p>
+                  <p className="text-gray-300">
+                    Manages DAO treasury funds and executes payouts. Enforces spend caps and recipient allowlists. All treasury operations must go through governance proposals and the Timelock.
+                  </p>
+                </div>
+              </div>
+            </div>
             <a
               href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.TREASURY_PROXY}`}
               target="_blank"
@@ -418,7 +473,18 @@ export function ConstitutionPage() {
             </a>
           </div>
           <div className="py-2">
-            <span className="text-gray-600 dark:text-gray-400 block mb-1">Timelock:</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-600 dark:text-gray-400">Timelock:</span>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Timelock Controller</p>
+                  <p className="text-gray-300">
+                    Adds a delay between proposal execution and actual execution. This gives members time to review and react to proposals before they take effect, providing an additional security layer.
+                  </p>
+                </div>
+              </div>
+            </div>
             <a
               href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.TIMELOCK}`}
               target="_blank"

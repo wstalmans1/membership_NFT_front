@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
-import { encodeFunctionData, decodeEventLog } from 'viem';
-import { parseEther, formatEther } from '@/lib/utils';
+import { formatEther } from '@/lib/utils';
 import { CONTRACTS } from '@/config/contracts';
 import { MembershipNFT } from '@/abis/MembershipNFT';
 import { Constitution } from '@/abis/Constitution';
 import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
-import { NFTMetadata, updateMetadataWithTokenId, deleteMetadata, getMetadata, getAllMembers } from '@/lib/metadata';
+import { NFTMetadata, deleteMetadata, getMetadata, getAllMembers } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
 import { HelpCircle } from 'lucide-react';
 
@@ -18,10 +17,6 @@ export function MembershipPage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
-  const [donationAmount, setDonationAmount] = useState('');
-  const [isMinting, setIsMinting] = useState(false);
-  const [metadataReady, setMetadataReady] = useState(false);
-  const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
@@ -79,11 +74,6 @@ export function MembershipPage() {
     functionName: 'minDonationWei',
   });
 
-  // Mint membership
-  const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
 
   // Delegation contract calls
   const { writeContract: writeDelegate, data: delegateHash, isPending: isDelegatePending } = useWriteContract();
@@ -109,238 +99,42 @@ export function MembershipPage() {
     query: { enabled: !!address && isMember },
   });
 
-  // Handle write errors from hook
-  useEffect(() => {
-    if (writeError) {
-      console.error('❌ WriteContract error from hook:', writeError);
-      const errorMessage = writeError.message || 'Unknown error';
-      if (errorMessage.includes('rejected') || errorMessage.includes('denied') || (writeError as any)?.code === 4001) {
-        setError('Transaction was rejected. Please try again and approve the transaction in your wallet.');
-      } else {
-        setError(`Transaction failed: ${errorMessage}. Please try again.`);
-      }
-      setIsMinting(false);
+  // Function to load all members
+  const loadAllMembers = async () => {
+    setIsLoadingMembers(true);
+    try {
+      const members = await getAllMembers();
+      setAllMembers(members);
+    } catch (err: any) {
+      console.error('Failed to load all members:', err);
+    } finally {
+      setIsLoadingMembers(false);
     }
-  }, [writeError]);
+  };
 
-  // Handle metadata ready callback from form
-  const handleMetadataReady = (preparedMetadata: NFTMetadata) => {
-    setMetadata(preparedMetadata);
-    setMetadataReady(true);
+  // Handle successful mint
+  const handleMintSuccess = () => {
     setShowForm(false);
     setError(null);
+    // Invalidate queries to refresh UI
+    queryClient.invalidateQueries();
+    
+    // Immediate refetch of members list (in case metadata update was fast)
+    loadAllMembers();
+    
+    // Refetch balance, tokenId, and members list after delays to ensure everything is synced
+    setTimeout(async () => {
+      await refetchBalance();
+      await refetchTokenId();
+      await loadAllMembers(); // Refetch members list again
+    }, 2000);
+    
+    // Final refetch after longer delay to ensure database propagation
+    setTimeout(async () => {
+      await loadAllMembers();
+    }, 5000);
   };
 
-  // Handle minting after metadata is ready
-  const handleMint = async () => {
-    if (!address || !minDonation || !metadata) {
-      setError('Please complete the metadata form first');
-      return;
-    }
-    
-    const minDonationBigInt = BigInt(minDonation.toString());
-    const amount = donationAmount || formatEther(minDonationBigInt);
-    const amountWei = parseEther(amount);
-    
-    if (amountWei < minDonationBigInt) {
-      setError(`Minimum donation is ${formatEther(minDonationBigInt)} ETH`);
-      return;
-    }
-
-    setIsMinting(true);
-    setError(null);
-    
-    try {
-      // Estimate gas first, then cap it at 15M to avoid RPC limits
-      let gasLimit: bigint | undefined;
-      if (publicClient) {
-        try {
-          const estimatedGas = await publicClient.estimateGas({
-            account: address as `0x${string}`,
-            to: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-            data: encodeFunctionData({
-              abi: MembershipNFT,
-              functionName: 'mint',
-            }),
-            value: amountWei,
-          });
-          // Cap at 15M (below MetaMask's 16.7M limit)
-          gasLimit = estimatedGas > BigInt(15000000) ? BigInt(15000000) : estimatedGas;
-          console.log('Estimated gas:', estimatedGas.toString(), 'Using:', gasLimit.toString());
-        } catch (estimateError) {
-          console.warn('Gas estimation failed, using default:', estimateError);
-          gasLimit = BigInt(15000000); // Fallback to 15M
-        }
-      }
-
-      console.log('🚀 Calling writeContract...');
-      console.log('🚀 WriteContract params:', {
-        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-        functionName: 'mint',
-        value: amountWei.toString(),
-        gas: gasLimit?.toString(),
-      });
-      
-      try {
-        // writeContract doesn't return a hash directly - it's available via the hook's 'hash' state
-        writeContract({
-          address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-          abi: MembershipNFT,
-          functionName: 'mint',
-          value: amountWei,
-          ...(gasLimit && { gas: gasLimit }),
-        });
-        console.log('✅ writeContract called, waiting for hash from hook...');
-      } catch (writeError: any) {
-        console.error('❌ writeContract error:', writeError);
-        // Check if user rejected the transaction
-        if (writeError?.message?.includes('rejected') || writeError?.message?.includes('denied') || writeError?.code === 4001) {
-          setError('Transaction was rejected. Please try again and approve the transaction in your wallet.');
-        } else {
-          setError(`Failed to send transaction: ${writeError?.message || 'Unknown error'}. Please try again.`);
-        }
-        setIsMinting(false);
-        return;
-      }
-      
-      // Transaction hash will be handled by useEffect above when it becomes available
-      console.log('✅ writeContract called. Transaction hash will be handled by useEffect when available.');
-    } catch (error: any) {
-      console.error('Mint error:', error);
-      // Check if error is "Already minted"
-      if (error.message?.includes('Already minted') || error.message?.includes('already minted')) {
-        setError('You have already minted a membership NFT. Please refresh the page to view it.');
-        // Refresh balance to show the NFT
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        setError(error.message || 'Failed to mint NFT. Please try again.');
-      }
-      setIsMinting(false);
-    }
-  };
-
-  // Handle transaction hash when it becomes available
-  useEffect(() => {
-    async function handleTransactionHash() {
-      if (!hash || !publicClient || !address || !metadata) {
-        return;
-      }
-
-      console.log('✅ Transaction hash available from hook:', hash);
-      console.log('⏳ Waiting for transaction receipt...', hash);
-      
-      try {
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        console.log('✅ Transaction receipt received:', receipt);
-        console.log('✅ Transaction status:', receipt.status);
-        console.log('✅ Number of logs:', receipt.logs.length);
-        
-        // Extract tokenId from event logs
-        try {
-          const decodedLogs = receipt.logs
-            .map((log) => {
-              try {
-                return decodeEventLog({
-                  abi: MembershipNFT,
-                  data: log.data,
-                  topics: log.topics,
-                });
-              } catch {
-                return null;
-              }
-            })
-            .filter(Boolean);
-
-          const memberMintedEvent = decodedLogs.find(
-            (log: any) => log?.eventName === 'MemberMinted'
-          );
-
-          console.log('📋 Decoded logs:', decodedLogs);
-          console.log('🔍 MemberMinted event found:', memberMintedEvent);
-
-          if (memberMintedEvent && memberMintedEvent.args) {
-            const tokenId = Number((memberMintedEvent.args as any).tokenId);
-            console.log('✅ Extracted tokenId:', tokenId);
-            console.log('✅ Updating metadata for address:', address);
-
-            // Update metadata with tokenId
-            try {
-              const { updateMetadataWithTokenId } = await import('@/lib/metadata');
-              const updatePromise = updateMetadataWithTokenId(tokenId, address, {
-                ...metadata,
-                properties: {
-                  ...metadata.properties,
-                  tokenId: tokenId,
-                },
-              });
-              
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Metadata update timed out after 30 seconds')), 30000)
-              );
-              
-              await Promise.race([updatePromise, timeoutPromise]);
-              console.log('✅✅✅ Successfully updated metadata with tokenId:', tokenId);
-              
-              // Show success message
-              setError(null);
-              
-              // Invalidate and refetch all contract queries to update the UI
-              console.log('🔄 Invalidating queries and refetching balance/tokenId...');
-              
-              // Invalidate all wagmi queries to force refresh
-              queryClient.invalidateQueries();
-              
-              // Refetch balance immediately
-              const balanceResult = await refetchBalance();
-              console.log('📊 Balance refetch result:', balanceResult);
-              
-              // Wait for blockchain state to propagate (blocks take ~12 seconds on Sepolia)
-              // Then refetch both balance and tokenId
-              setTimeout(async () => {
-                console.log('🔄 Refetching balance and tokenId after delay...');
-                await refetchBalance();
-                const tokenResult = await refetchTokenId();
-                console.log('📊 TokenId refetch result:', tokenResult);
-                console.log('✅ UI should now show the NFT');
-              }, 3000);
-              
-              setIsMinting(false);
-            } catch (updateError: any) {
-              console.error('Failed to update metadata:', updateError);
-              setError(`Mint successful, but failed to update metadata: ${updateError.message}. You can manually update it later.`);
-              setIsMinting(false);
-            }
-          } else {
-            console.warn('MemberMinted event not found in transaction logs');
-            setError('Mint successful, but could not extract tokenId. Please refresh the page.');
-            setIsMinting(false);
-          }
-        } catch (error) {
-          console.error('Error parsing event logs:', error);
-          setError('Mint successful, but failed to parse transaction. Please refresh the page.');
-          setIsMinting(false);
-        }
-      } catch (error: any) {
-        console.error('Error waiting for transaction receipt:', error);
-        setError(`Transaction sent but failed: ${error.message}`);
-        setIsMinting(false);
-      }
-    }
-
-    handleTransactionHash();
-  }, [hash, publicClient, address, metadata]);
-
-  // Reset form when minting is successful
-  useEffect(() => {
-    if (isSuccess) {
-      setIsMinting(false);
-      setMetadataReady(false);
-      setMetadata(null);
-      setShowForm(false);
-    }
-  }, [isSuccess]);
 
   // Handle delegation success
   useEffect(() => {
@@ -361,17 +155,6 @@ export function MembershipPage() {
 
   // Load all members on component mount
   useEffect(() => {
-    async function loadAllMembers() {
-      setIsLoadingMembers(true);
-      try {
-        const members = await getAllMembers();
-        setAllMembers(members);
-      } catch (err: any) {
-        console.error('Failed to load all members:', err);
-      } finally {
-        setIsLoadingMembers(false);
-      }
-    }
     loadAllMembers();
   }, []);
 
@@ -696,7 +479,7 @@ export function MembershipPage() {
           ) : (
             <div className="space-y-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Become a Member</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Join the DAO by minting a membership NFT</p>
                 <p className="text-gray-700 dark:text-gray-300">
                   Join the DAO by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} ETH</strong>
                 </p>
@@ -708,92 +491,28 @@ export function MembershipPage() {
                 </div>
               )}
 
-              {!showForm && !metadataReady && (
+              {!showForm && (
                 <button
                   onClick={() => setShowForm(true)}
                   className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
                 >
-                  Start Membership Application
+                  Mint Membership
                 </button>
               )}
 
-              {showForm && !metadataReady && (
+              {showForm && (
                 <div className="p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Membership Information
+                    Mint Membership NFT
                   </h3>
                   <MintMembershipForm
-                    onMetadataReady={handleMetadataReady}
+                    onSuccess={handleMintSuccess}
                     onError={setError}
-                  />
-                  <button
-                    onClick={() => {
+                    onCancel={() => {
                       setShowForm(false);
                       setError(null);
                     }}
-                    className="mt-4 w-full px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-
-              {metadataReady && metadata && (
-                <div className="space-y-4">
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <p className="text-green-800 dark:text-green-200 text-sm font-medium mb-2">
-                      ✓ Metadata prepared successfully
-                    </p>
-                    <p className="text-green-700 dark:text-green-300 text-xs">
-                      Your information has been saved. Complete your donation to mint your membership NFT.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label htmlFor="donation" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Donation Amount (ETH)
-                    </label>
-                    <input
-                      id="donation"
-                      type="number"
-                      step="0.001"
-                      min={minDonation ? formatEther(BigInt(minDonation.toString())) : '0'}
-                      value={donationAmount}
-                      onChange={(e) => setDonationAmount(e.target.value)}
-                      placeholder={minDonation ? formatEther(BigInt(minDonation.toString())) : '0.0'}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} ETH
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleMint}
-                    disabled={isPending || isConfirming || isMinting}
-                    className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    {isPending || isConfirming || isMinting ? 'Processing...' : 'Mint Membership NFT'}
-                  </button>
-
-                  {isSuccess && (
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <p className="text-green-800 dark:text-green-200 font-medium">Membership NFT minted successfully!</p>
-                      <p className="text-green-700 dark:text-green-400 text-sm mt-2">
-                        Your membership NFT has been created and your metadata has been linked.
-                      </p>
-                      {hash && (
-                        <a
-                          href={`https://eth-sepolia.blockscout.com/tx/${hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-700 dark:text-green-400 hover:underline text-sm mt-2 inline-block"
-                        >
-                          View transaction →
-                        </a>
-                      )}
-                    </div>
-                  )}
+                  />
                 </div>
               )}
             </div>

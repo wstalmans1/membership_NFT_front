@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { WalletConnect } from './WalletConnect';
+import { WalletButton } from './WalletButton';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: '/governance', label: 'Governance' },
   { href: '/treasury', label: 'Treasury' },
   { href: '/constitution', label: 'Constitution' },
+  { href: '/philosophy', label: 'Design Philosophy' },
 ];
 
 export function Navbar() {
@@ -25,23 +26,30 @@ export function Navbar() {
               Qawl DAO
             </Link>
             <div className="flex gap-4">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium transition-colors",
-                    pathname === item.href
-                      ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const isPhilosophy = item.href === '/philosophy';
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "px-3 py-2 text-sm font-medium transition-colors",
+                      isPhilosophy
+                        ? pathname === item.href
+                          ? "text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
+                          : "text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300"
+                        : pathname === item.href
+                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
-          <WalletConnect />
+          <WalletButton />
         </div>
       </div>
     </nav>
