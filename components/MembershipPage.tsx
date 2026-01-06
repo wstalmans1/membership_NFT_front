@@ -12,6 +12,7 @@ import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
 import { NFTMetadata, updateMetadataWithTokenId, deleteMetadata, getMetadata, getAllMembers } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
+import { HelpCircle } from 'lucide-react';
 
 export function MembershipPage() {
   const { address, isConnected } = useAccount();
@@ -393,18 +394,51 @@ export function MembershipPage() {
               
               {/* Voting Power & Delegation Status */}
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Voting Power Status</h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
+                  <div className="relative group">
+                    <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                      <p className="mb-2 font-semibold">Voting Power</p>
+                      <p className="text-gray-300">
+                        Your voting power determines how much weight your vote has in governance proposals. Each membership NFT grants 1 vote, but you must delegate your votes (to yourself or another address) to activate them.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Current Voting Power:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Current Voting Power:</span>
+                      <div className="relative group">
+                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Current Voting Power</p>
+                          <p className="text-gray-300">
+                            The number of votes you currently have available for voting on proposals. This is 0 until you delegate your votes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     <span className={`text-sm font-semibold ${votingPower && Number(votingPower) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {votingPower ? Number(votingPower).toLocaleString() : '0'} vote{votingPower && Number(votingPower) !== 1 ? 's' : ''}
                     </span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
+                      <div className="relative group">
+                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Delegation</p>
+                          <p className="text-gray-300">
+                            Delegation determines who can use your voting power. You can delegate to yourself (to vote directly) or to another address (to let them vote on your behalf). Delegation is required to activate your voting power.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
                       {currentDelegate && currentDelegate !== '0x0000000000000000000000000000000000000000' 
                         ? (currentDelegate.toLowerCase() === address?.toLowerCase() 
@@ -458,7 +492,18 @@ export function MembershipPage() {
                               }}
                               className="w-4 h-4 text-blue-600 dark:text-blue-400"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
+                              <div className="relative group">
+                                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                                  <p className="mb-2 font-semibold">Delegate to Myself</p>
+                                  <p className="text-gray-300">
+                                    This activates your voting power so you can vote directly on proposals. This is the most common choice for individual members.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           </label>
                         </div>
                         
@@ -471,7 +516,18 @@ export function MembershipPage() {
                               onChange={() => setDelegationMode('other')}
                               className="w-4 h-4 text-blue-600 dark:text-blue-400"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
+                              <div className="relative group">
+                                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                                  <p className="mb-2 font-semibold">Delegate to Another Address</p>
+                                  <p className="text-gray-300">
+                                    This allows another address (e.g., a trusted delegate or voting service) to vote on your behalf. They will use your voting power when voting on proposals.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           </label>
                         </div>
 

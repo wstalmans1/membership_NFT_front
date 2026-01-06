@@ -6,6 +6,7 @@ import { CONTRACTS } from '@/config/contracts';
 import { TreasuryExecutor } from '@/abis/TreasuryExecutor';
 import { Constitution } from '@/abis/Constitution';
 import { formatEther, parseEther, formatAddress } from '@/lib/utils';
+import { HelpCircle } from 'lucide-react';
 
 export function TreasuryPage() {
   const { address, isConnected } = useAccount();
@@ -84,19 +85,52 @@ export function TreasuryPage() {
       {/* Treasury Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Treasury Balance</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Treasury Balance</p>
+                <p className="text-gray-300">
+                  The total amount of ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} ETH
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Per-Transaction Cap</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Per-Transaction Cap</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Per-Transaction Cap</p>
+                <p className="text-gray-300">
+                  The maximum amount of ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} ETH
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Epoch Cap</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Epoch Cap</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Epoch Cap</p>
+                <p className="text-gray-300">
+                  The maximum total amount of ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} ETH
           </p>
@@ -114,9 +148,20 @@ export function TreasuryPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Execute Payout</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Recipient Address
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Recipient Address
+                </label>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Recipient Address</p>
+                    <p className="text-gray-300">
+                      The Ethereum address that will receive the payment. This address must be on the allowed recipients list (managed through governance) to receive funds from the treasury.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={recipient}

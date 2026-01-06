@@ -7,6 +7,7 @@ import { CONTRACTS } from '@/config/contracts';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatAddress } from '@/lib/utils';
 import { Address, encodeFunctionData, parseEther } from 'viem';
+import { HelpCircle } from 'lucide-react';
 
 export function GovernancePage() {
   const { address, isConnected } = useAccount();
@@ -536,19 +537,52 @@ export function GovernancePage() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Voting Delay</p>
+                  <p className="text-gray-300">
+                    The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
+                  </p>
+                </div>
+              </div>
+            </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
               {votingDelay ? `${Number(votingDelay)} blocks` : '...'}
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Voting Period</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Voting Period</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Voting Period</p>
+                  <p className="text-gray-300">
+                    The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
+                  </p>
+                </div>
+              </div>
+            </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
               {votingPeriod ? `${Number(votingPeriod)} blocks` : '...'}
             </p>
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Proposal Threshold</p>
+                  <p className="text-gray-300">
+                    The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
+                  </p>
+                </div>
+              </div>
+            </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
               {proposalThreshold ? proposalThreshold.toString() : '...'}
             </p>
@@ -561,32 +595,87 @@ export function GovernancePage() {
           <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
             <div className="flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-semibold">•</span>
-              <div>
-                <span className="font-medium text-gray-900 dark:text-white">Vote Types:</span> Members can vote <span className="font-medium">For</span>, <span className="font-medium">Against</span>, or <span className="font-medium">Abstain</span>
+              <div className="flex items-start gap-2 flex-1">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Vote Types:</span> Members can vote <span className="font-medium">For</span>, <span className="font-medium">Against</span>, or <span className="font-medium">Abstain</span>
+                </div>
+                <div className="relative group flex-shrink-0">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Vote Types</p>
+                    <p className="text-gray-300">
+                      <strong>For:</strong> You support the proposal. <strong>Against:</strong> You oppose the proposal. <strong>Abstain:</strong> You choose not to take a position, but your vote still counts toward quorum.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-semibold">•</span>
-              <div>
-                <span className="font-medium text-gray-900 dark:text-white">Voting Power:</span> Each membership NFT grants 1 vote. Votes must be delegated to activate voting power.
+              <div className="flex items-start gap-2 flex-1">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Voting Power:</span> Each membership NFT grants 1 vote. Votes must be delegated to activate voting power.
+                </div>
+                <div className="relative group flex-shrink-0">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Voting Power</p>
+                    <p className="text-gray-300">
+                      Each membership NFT grants 1 vote, but you must delegate your votes (to yourself or another address) before you can vote on proposals. Delegation activates your voting power.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-semibold">•</span>
-              <div>
-                <span className="font-medium text-gray-900 dark:text-white">Quorum:</span> {quorumNumerator ? `${Number(quorumNumerator)}%` : '...'} of total membership supply (calculated at proposal snapshot). Quorum includes <span className="font-medium">For</span> and <span className="font-medium">Abstain</span> votes.
+              <div className="flex items-start gap-2 flex-1">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Quorum:</span> {quorumNumerator ? `${Number(quorumNumerator)}%` : '...'} of total membership supply (calculated at proposal snapshot). Quorum includes <span className="font-medium">For</span> and <span className="font-medium">Abstain</span> votes.
+                </div>
+                <div className="relative group flex-shrink-0">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Quorum</p>
+                    <p className="text-gray-300">
+                      The minimum number of votes required for a proposal to be valid. Quorum is calculated as a percentage of total membership supply at the proposal snapshot. Both "For" and "Abstain" votes count toward quorum.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-semibold">•</span>
-              <div>
-                <span className="font-medium text-gray-900 dark:text-white">Proposal Success:</span> A proposal succeeds when <span className="font-medium">quorum is reached</span> AND <span className="font-medium">For votes exceed Against votes</span>.
+              <div className="flex items-start gap-2 flex-1">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Proposal Success:</span> A proposal succeeds when <span className="font-medium">quorum is reached</span> AND <span className="font-medium">For votes exceed Against votes</span>.
+                </div>
+                <div className="relative group flex-shrink-0">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Proposal Success</p>
+                    <p className="text-gray-300">
+                      A proposal succeeds only if both conditions are met: (1) enough members vote to reach quorum, and (2) "For" votes exceed "Against" votes. If either condition fails, the proposal is defeated.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-semibold">•</span>
-              <div>
-                <span className="font-medium text-gray-900 dark:text-white">Snapshot:</span> Voting power is determined at the proposal snapshot block (when voting starts), not at the time of voting.
+              <div className="flex items-start gap-2 flex-1">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Snapshot:</span> Voting power is determined at the proposal snapshot block (when voting starts), not at the time of voting.
+                </div>
+                <div className="relative group flex-shrink-0">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Snapshot</p>
+                    <p className="text-gray-300">
+                      The snapshot is the block number when voting starts. Your voting power is calculated based on your membership NFT ownership and delegation status at that specific block, not when you actually cast your vote. This prevents manipulation by buying/selling NFTs during voting.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2">
@@ -618,9 +707,20 @@ export function GovernancePage() {
 
           <form onSubmit={handleSubmitProposal} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Proposal Description *
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Proposal Description *
+                </label>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Proposal Description</p>
+                    <p className="text-gray-300">
+                      A clear description of what the proposal aims to achieve. This is required and will be visible to all members when voting.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -631,9 +731,20 @@ export function GovernancePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Target Contracts (optional, comma-separated addresses)
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Target Contracts (optional, comma-separated addresses)
+                </label>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Target Contracts</p>
+                    <p className="text-gray-300">
+                      The smart contract addresses that the proposal will interact with. Leave empty for description-only proposals (e.g., signaling proposals). If provided, you must also provide matching calldatas.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={targets}
@@ -646,9 +757,20 @@ export function GovernancePage() {
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Calldata (optional, comma-separated hex-encoded)
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Calldata (optional, comma-separated hex-encoded)
+                </label>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Calldata</p>
+                    <p className="text-gray-300">
+                      The encoded function calls (in hex format) that will be executed on each target contract if the proposal passes. Each calldata corresponds to one target address. Must match the number of targets provided.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 value={calldatas}
@@ -715,15 +837,33 @@ export function GovernancePage() {
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-semibold text-gray-900 dark:text-white">Proposal #{proposals.length - index}</h3>
                         <CopyableProposalId proposalId={proposal.id} />
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          proposal.state === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
-                          proposal.state === 'Succeeded' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' :
-                          proposal.state === 'Defeated' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300' :
-                          proposal.state === 'Executed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                          {proposal.state}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            proposal.state === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
+                            proposal.state === 'Succeeded' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' :
+                            proposal.state === 'Defeated' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300' :
+                            proposal.state === 'Executed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' :
+                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {proposal.state}
+                          </span>
+                          <div className="relative group">
+                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                              <p className="mb-2 font-semibold">Proposal State: {proposal.state}</p>
+                              <p className="text-gray-300">
+                                {proposal.state === 'Pending' && 'Voting has not started yet. Waiting for the voting delay period to pass.'}
+                                {proposal.state === 'Active' && 'Voting is currently open. Members can cast their votes now.'}
+                                {proposal.state === 'Succeeded' && 'The proposal passed! Quorum was reached and "For" votes exceeded "Against" votes. It can now be queued for execution.'}
+                                {proposal.state === 'Defeated' && 'The proposal failed. Either quorum was not reached or "Against" votes exceeded "For" votes.'}
+                                {proposal.state === 'Executed' && 'The proposal has been executed. All actions specified in the proposal have been carried out.'}
+                                {proposal.state === 'Canceled' && 'The proposal was canceled before voting ended.'}
+                                {proposal.state === 'Queued' && 'The proposal is queued for execution after the timelock delay period.'}
+                                {proposal.state === 'Expired' && 'The proposal expired before it could be executed.'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-2">{proposal.description}</p>
                       <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">

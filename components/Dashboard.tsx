@@ -9,6 +9,7 @@ import { Constitution } from '@/abis/Constitution';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { getTotalMembersCount } from '@/lib/metadata';
 import Link from 'next/link';
+import { HelpCircle } from 'lucide-react';
 
 export function Dashboard() {
   const { address, isConnected } = useAccount();
@@ -82,7 +83,18 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Total Members</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Members</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Total Members</p>
+                <p className="text-gray-300">
+                  The total number of unique addresses that have minted a membership NFT. Each member has one vote in governance proposals.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {isLoadingMembers ? '...' : totalMembers}
           </p>
@@ -92,14 +104,36 @@ export function Dashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Treasury Balance</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Treasury Balance</p>
+                <p className="text-gray-300">
+                  The total amount of ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals to allowed recipients.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} ETH
           </p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Active Proposals</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Proposals</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Active Proposals</p>
+                <p className="text-gray-300">
+                  The number of governance proposals currently in the voting period. Members can vote on active proposals to decide DAO actions.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{proposalCount}</p>
           <Link href="/governance" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
             View all →
@@ -107,7 +141,18 @@ export function Dashboard() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Your Status</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Your Status</h3>
+            <div className="relative group">
+              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Your Status</p>
+                <p className="text-gray-300">
+                  Indicates whether your connected wallet address has minted a membership NFT. Members can vote on proposals and participate in DAO governance.
+                </p>
+              </div>
+            </div>
+          </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {isMember ? 'Member' : 'Not a Member'}
           </p>
