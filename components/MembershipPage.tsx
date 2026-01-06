@@ -249,8 +249,43 @@ export function MembershipPage() {
                 )}
               </div>
 
-              {/* NFT Display Component - Now includes all info */}
-              <NFTDisplay tokenId={Number(tokenId)} ownerAddress={address!} />
+              {/* NFT Display Component with Update/Delete buttons */}
+              <div className="flex flex-col md:flex-row gap-4 items-start">
+                {/* NFT Card */}
+                <div className="flex-1">
+                  <NFTDisplay tokenId={Number(tokenId)} ownerAddress={address!} />
+                </div>
+                
+                {/* Update and Delete Buttons - Right side */}
+                {!showUpdateForm && !showDeleteConfirm && (
+                  <div className="flex flex-row md:flex-col gap-2 md:pt-0 pt-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const metadata = await getMetadata(Number(tokenId));
+                          if (metadata) {
+                            setCurrentMetadata(metadata);
+                            setShowUpdateForm(true);
+                          } else {
+                            setError('Could not load current metadata');
+                          }
+                        } catch (err: any) {
+                          setError(err.message || 'Failed to load metadata');
+                        }
+                      }}
+                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                    >
+                      Update
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {/* Voting Power & Delegation Status */}
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -476,35 +511,6 @@ export function MembershipPage() {
                 </div>
               </div>
 
-              {/* Update and Delete Buttons - Less Prominent */}
-              {!showUpdateForm && !showDeleteConfirm && (
-                <div className="flex gap-2 pt-2 justify-end">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const metadata = await getMetadata(Number(tokenId));
-                        if (metadata) {
-                          setCurrentMetadata(metadata);
-                          setShowUpdateForm(true);
-                        } else {
-                          setError('Could not load current metadata');
-                        }
-                      } catch (err: any) {
-                        setError(err.message || 'Failed to load metadata');
-                      }
-                    }}
-                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600"
-                  >
-                    Update
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600"
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
 
               {/* Update Form */}
               {showUpdateForm && currentMetadata && (
