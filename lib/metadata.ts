@@ -210,7 +210,7 @@ export async function getMetadata(tokenId: number): Promise<NFTMetadata | null> 
 }
 
 /**
- * Update metadata (GDPR Right to Rectification)
+ * Update metadata (allows users to update their personal information)
  * @param tokenId - The NFT token ID
  * @param ownerAddress - Ethereum address of the owner (for verification)
  * @param metadata - Updated metadata object
@@ -313,7 +313,7 @@ export async function updateMetadata(
 }
 
 /**
- * Delete metadata (GDPR Right to Erasure) - Hard delete
+ * Delete metadata (allows users to delete their personal information) - Hard delete
  * @param tokenId - The NFT token ID
  * @param ownerAddress - Ethereum address of the owner (for verification)
  */

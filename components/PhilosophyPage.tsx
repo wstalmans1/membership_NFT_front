@@ -43,7 +43,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">4. Progressive Decentralization</h3>
             <p className="text-gray-700 dark:text-gray-300">
               We acknowledge that complete decentralization may not be achievable immediately. We use upgradeable contracts to allow the DAO to evolve, 
-              and we make pragmatic choices (like using Supabase for GDPR-compliant metadata) while maintaining a path toward greater decentralization.
+              and we make pragmatic choices (like using Supabase for off-chain metadata storage) while maintaining a path toward greater decentralization.
             </p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Data Storage</h3>
             <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-4">
               <li><strong>On-Chain:</strong> Critical data (membership, voting, treasury) is stored on-chain for immutability and transparency.</li>
-              <li><strong>Supabase (Metadata):</strong> We use Supabase for NFT metadata and photos to enable GDPR compliance (update/delete rights) while maintaining a path to decentralization.</li>
+              <li><strong>Supabase (Metadata):</strong> We use Supabase for NFT metadata and photos stored off-chain, allowing users to update and delete their personal data while maintaining a path to decentralization.</li>
               <li><strong>Hybrid Approach:</strong> Combining on-chain immutability with off-chain flexibility for user data rights.</li>
             </ul>
           </div>
@@ -160,9 +160,9 @@ export function PhilosophyPage() {
         </div>
       </div>
 
-      {/* GDPR and Data Privacy */}
-      <div id="gdpr" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 scroll-mt-20">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">GDPR Compliance and Data Privacy</h2>
+      {/* Data Privacy and Storage */}
+      <div id="data-privacy" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 scroll-mt-20">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Data Privacy and Storage</h2>
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">What is Stored On-Chain</h3>
@@ -184,7 +184,7 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">What is Stored Off-Chain (Supabase)</h3>
             <p className="text-gray-700 dark:text-gray-300 mb-2">
-              The following personal information displayed on your membership card is stored in a GDPR-compliant database (Supabase) and can be updated or deleted:
+              The following personal information displayed on your membership card is stored in an off-chain database (Supabase) and can be updated or deleted:
             </p>
             <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-4">
               <li><strong>Your name:</strong> As displayed on the membership card</li>
@@ -194,7 +194,7 @@ export function PhilosophyPage() {
               <li><strong>Issued date:</strong> When the membership was created</li>
             </ul>
             <p className="text-gray-700 dark:text-gray-300 mt-3">
-              This off-chain data is linked to your on-chain token ID but stored separately to enable GDPR compliance. You can update or delete this information at any time through the membership management interface.
+              This off-chain data is linked to your on-chain token ID but stored separately to allow you to control your personal information. You can update or delete this information at any time through the membership management interface.
             </p>
             <p className="text-gray-700 dark:text-gray-300 mt-3">
               <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
@@ -202,25 +202,25 @@ export function PhilosophyPage() {
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">GDPR Rights</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Your Data Rights</h3>
             <p className="text-gray-700 dark:text-gray-300 mb-2">
-              As a member, you have the following rights regarding your personal data:
+              As a member, you have control over your personal data stored off-chain:
             </p>
             <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 ml-4">
-              <li><strong>Right to Access:</strong> You can view all your personal data through the membership interface</li>
-              <li><strong>Right to Rectification:</strong> You can update your name, date of birth, citizenship, and photo at any time</li>
-              <li><strong>Right to Erasure:</strong> You can delete your personal data (name, photo, etc.) from the database. Note: Your on-chain membership NFT and voting records cannot be deleted</li>
-              <li><strong>Right to Data Portability:</strong> You can export your data by viewing it in the interface</li>
+              <li><strong>Access:</strong> You can view all your personal data through the membership interface</li>
+              <li><strong>Update:</strong> You can update your name, date of birth, citizenship, and photo at any time</li>
+              <li><strong>Delete:</strong> You can delete your personal data (name, photo, etc.) from the database. Note: Your on-chain membership NFT and voting records cannot be deleted</li>
+              <li><strong>View:</strong> You can view your data at any time through the interface</li>
             </ul>
             <p className="text-gray-700 dark:text-gray-300 mt-3">
-              <strong>Important:</strong> Deleting your personal data from Supabase will remove it from the membership card display, but your on-chain membership NFT, voting power, and governance participation records will remain on the blockchain permanently. The NFT itself cannot be deleted or transferred (it's soulbound).
+              <strong>Important:</strong> Deleting your personal data from the off-chain database will remove it from the membership card display, but your on-chain membership NFT, voting power, and governance participation records will remain on the blockchain permanently. The NFT itself cannot be deleted or transferred (it's soulbound).
             </p>
           </div>
           
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Why This Hybrid Approach?</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              We use a hybrid approach combining on-chain and off-chain storage to balance transparency, immutability, and GDPR compliance. Critical governance data (membership, votes) must be immutable and transparent on-chain. Personal information (name, photo) needs to be updatable and deletable for GDPR compliance, so it's stored off-chain while remaining linked to your immutable on-chain membership NFT.
+              We use a hybrid approach combining on-chain and off-chain storage to balance transparency, immutability, and data privacy. Critical governance data (membership, votes) must be immutable and transparent on-chain. Personal information (name, photo) needs to be updatable and deletable, so it's stored off-chain while remaining linked to your immutable on-chain membership NFT.
             </p>
           </div>
         </div>
@@ -241,7 +241,7 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Metadata Decentralization</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              While we currently use Supabase for GDPR compliance, we're exploring decentralized alternatives that maintain data rights 
+              While we currently use Supabase for off-chain data storage, we're exploring decentralized alternatives that maintain user data control 
               (update/delete) while reducing centralization.
             </p>
           </div>

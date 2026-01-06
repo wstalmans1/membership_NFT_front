@@ -208,7 +208,7 @@ export function MembershipPage() {
           
           {isMember && tokenId ? (
             <div className="space-y-4">
-              {/* GDPR and Data Storage Notice */}
+              {/* Data Privacy and Storage Notice */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <button
                   onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
@@ -233,17 +233,17 @@ export function MembershipPage() {
                 {isPrivacyExpanded && (
                   <div className="mt-3 ml-11 space-y-2">
                     <p className="text-xs text-blue-800 dark:text-blue-300">
-                      The personal information shown on your membership card (name, photo, date of birth, citizenship) is stored off-chain in a GDPR-compliant database and can be updated or deleted at any time. Only your wallet address, token ID, and governance records are stored permanently on-chain.
+                      The personal information shown on your membership card (name, photo, date of birth, citizenship) is stored off-chain in a database and can be updated or deleted at any time. Only your wallet address, token ID, and governance records are stored permanently on-chain.
                     </p>
                     <p className="text-xs text-blue-800 dark:text-blue-300">
                       <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
                     </p>
                     <a
-                      href="/philosophy#gdpr"
+                      href="/philosophy#data-privacy"
                       onClick={(e) => e.stopPropagation()}
                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
                     >
-                      Learn more about GDPR compliance and data storage →
+                      Learn more about data privacy and storage →
                     </a>
                   </div>
                 )}
