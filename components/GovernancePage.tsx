@@ -55,13 +55,14 @@ export function GovernancePage() {
   // Check if user has voted on the expanded proposal (must be declared before useEffect that uses it)
   const [expandedProposal, setExpandedProposal] = useState<string | null>(null);
   const [showVotingForProposal, setShowVotingForProposal] = useState<string | null>(null);
-  const { data: hasVoted, refetch: refetchHasVoted } = useReadContract({
+  const { data: hasVotedData, refetch: refetchHasVoted } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'hasVoted',
     args: showVotingForProposal && address ? [BigInt(showVotingForProposal), address] : undefined,
     query: { enabled: !!showVotingForProposal && !!address },
   });
+  const hasVoted = hasVotedData as boolean | undefined;
 
   // Get voting delay and period
   const { data: votingDelay } = useReadContract({
@@ -122,8 +123,8 @@ export function GovernancePage() {
         console.log('Found proposal logs:', logs.length);
         if (logs.length > 0) {
           console.log('Sample log structure:', {
-            eventName: logs[0].eventName,
-            args: logs[0].args ? Object.keys(logs[0].args) : 'no args',
+            address: logs[0].address,
+            topics: logs[0].topics,
             blockNumber: logs[0].blockNumber?.toString(),
           });
         }
@@ -155,12 +156,17 @@ export function GovernancePage() {
                 data: log.data,
                 topics: log.topics,
               });
-              proposalId = decoded.args.proposalId as bigint;
-              proposer = decoded.args.proposer as Address;
-              description = decoded.args.description as string;
-              targets = decoded.args.targets as Address[];
-              voteStart = decoded.args.voteStart as bigint;
-              voteEnd = decoded.args.voteEnd as bigint;
+              if (!decoded.args || !Array.isArray(decoded.args)) {
+                console.error('Decoded log has no args or args is not an array:', decoded);
+                return null;
+              }
+              const args = decoded.args as any;
+              proposalId = args.proposalId as bigint;
+              proposer = args.proposer as Address;
+              description = args.description as string;
+              targets = args.targets as Address[];
+              voteStart = args.voteStart as bigint;
+              voteEnd = args.voteEnd as bigint;
             }
             
             // Map state enum to string (define before use)
@@ -208,12 +214,12 @@ export function GovernancePage() {
             let quorumResult: bigint | null = null;
             if (proposalSnapshot) {
               try {
-                quorumResult = await publicClient.readContract({
+                quorumResult = (await publicClient.readContract({
                   address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
                   abi: DAOGovernor,
                   functionName: 'quorum',
                   args: [proposalSnapshot],
-                });
+                })) as bigint;
               } catch (err) {
                 console.warn('Failed to fetch quorum:', err);
                 quorumResult = null;
@@ -1002,13 +1008,14 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
   });
 
   // Check if user has voted
-  const { data: hasVoted, refetch: refetchHasVoted } = useReadContract({
+  const { data: hasVotedData, refetch: refetchHasVoted } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'hasVoted',
     args: address ? [BigInt(proposalId), address] : undefined,
     query: { enabled: !!address && showVoting },
   });
+  const hasVoted = hasVotedData as boolean | undefined;
 
   const { writeContract: writeVote, data: voteHash, isPending: isVoting } = useWriteContract();
   const { isLoading: isVoteConfirming, isSuccess: isVoteConfirmed } = useWaitForTransactionReceipt({
@@ -1016,21 +1023,21 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
   });
 
   // Use direct contract read if available, otherwise fall back to initial votes
-  const voteCounts = directVoteCounts 
+  const voteCounts = directVoteCounts && Array.isArray(directVoteCounts)
     ? {
-        forVotes: directVoteCounts[1]?.toString() || '0',
-        againstVotes: directVoteCounts[0]?.toString() || '0',
-        abstainVotes: directVoteCounts[2]?.toString() || '0',
+        forVotes: (directVoteCounts[1] as bigint)?.toString() || '0',
+        againstVotes: (directVoteCounts[0] as bigint)?.toString() || '0',
+        abstainVotes: (directVoteCounts[2] as bigint)?.toString() || '0',
       }
     : initialVotes || { forVotes: '0', againstVotes: '0', abstainVotes: '0' };
 
   // Log vote counts and voting power for debugging
   useEffect(() => {
-    if (directVoteCounts) {
+    if (directVoteCounts && Array.isArray(directVoteCounts)) {
       console.log(`Direct vote counts for proposal ${proposalId}:`, {
-        againstVotes: directVoteCounts[0]?.toString(),
-        forVotes: directVoteCounts[1]?.toString(),
-        abstainVotes: directVoteCounts[2]?.toString(),
+        againstVotes: (directVoteCounts[0] as bigint)?.toString(),
+        forVotes: (directVoteCounts[1] as bigint)?.toString(),
+        abstainVotes: (directVoteCounts[2] as bigint)?.toString(),
       });
     }
     if (voteCountsError) {
@@ -1114,21 +1121,21 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
               <div className="flex gap-2">
                 <button
                   onClick={() => handleVote(1)}
-                  disabled={isVoting || isVoteConfirming || hasVoted}
+                  disabled={isVoting || isVoteConfirming || hasVoted === true}
                   className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
                 </button>
                 <button
                   onClick={() => handleVote(0)}
-                  disabled={isVoting || isVoteConfirming || hasVoted}
+                  disabled={isVoting || isVoteConfirming || hasVoted === true}
                   className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
                 </button>
                 <button
                   onClick={() => handleVote(2)}
-                  disabled={isVoting || isVoteConfirming || hasVoted}
+                  disabled={isVoting || isVoteConfirming || hasVoted === true}
                   className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}

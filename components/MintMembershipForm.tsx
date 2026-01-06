@@ -50,7 +50,7 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
   useEffect(() => {
     if (writeError) {
       console.error('❌ WriteContract error from hook:', writeError);
-      const errorMessage = writeError.message || writeError.shortMessage || 'Unknown error';
+      const errorMessage = writeError.message || (writeError as any).shortMessage || 'Unknown error';
       setIsMinting(false);
       
       // Check error code and message
@@ -249,12 +249,12 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
           console.log('⛽ Gas estimated:', gasLimit.toString());
         } catch (estimateError: any) {
           console.error('⛽ Gas estimation error:', estimateError);
-          if (estimateError?.message?.includes('Already minted') || estimateError?.shortMessage?.includes('Already minted')) {
+          if (estimateError?.message?.includes('Already minted') || (estimateError as any)?.shortMessage?.includes('Already minted')) {
             onError('You have already minted a membership NFT. Please refresh the page.');
             setIsMinting(false);
             return;
           }
-          if (estimateError?.message?.includes('insufficient funds') || estimateError?.shortMessage?.includes('insufficient')) {
+                if (estimateError?.message?.includes('insufficient funds') || (estimateError as any)?.shortMessage?.includes('insufficient')) {
             onError('Insufficient balance. Please ensure you have enough Sepolia ETH to cover the donation and gas fees.');
             setIsMinting(false);
             return;

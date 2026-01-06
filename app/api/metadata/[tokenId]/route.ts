@@ -12,10 +12,11 @@ import { getMetadata } from '@/lib/metadata';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tokenId: string } }
+  { params }: { params: Promise<{ tokenId: string }> }
 ) {
   try {
-    const tokenId = parseInt(params.tokenId);
+    const { tokenId: tokenIdParam } = await params;
+    const tokenId = parseInt(tokenIdParam);
 
     if (isNaN(tokenId) || tokenId <= 0) {
       return NextResponse.json(

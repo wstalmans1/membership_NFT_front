@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWatchContractEvent } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatEther } from '@/lib/utils';
 import { CONTRACTS } from '@/config/contracts';
@@ -25,6 +25,7 @@ export function MembershipPage() {
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [delegationReturnedNotification, setDelegationReturnedNotification] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -83,6 +84,12 @@ export function MembershipPage() {
   const { writeContract: writeDelegate, data: delegateHash, isPending: isDelegatePending } = useWriteContract();
   const { isLoading: isDelegateConfirming, isSuccess: isDelegateSuccess } = useWaitForTransactionReceipt({
     hash: delegateHash,
+  });
+
+  // Burn contract calls
+  const { writeContract: writeBurn, data: burnHash, isPending: isBurnPending } = useWriteContract();
+  const { isLoading: isBurnConfirming, isSuccess: isBurnSuccess } = useWaitForTransactionReceipt({
+    hash: burnHash,
   });
 
   // Get current delegation status
@@ -156,6 +163,46 @@ export function MembershipPage() {
       }, 5000);
     }
   }, [isDelegateSuccess, refetchDelegate, refetchVotingPower]);
+
+  // Watch for DelegationReturned events
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+    abi: MembershipNFT,
+    eventName: 'DelegationReturned',
+    onLogs(logs) {
+      logs.forEach((log: any) => {
+        if (log.args?.delegator && log.args.delegator.toLowerCase() === address?.toLowerCase()) {
+          setDelegationReturnedNotification(
+            `Your voting power has been returned because ${log.args.previousDelegate?.substring(0, 6)}...${log.args.previousDelegate?.substring(38)} burned their NFT. Your votes are now delegated to yourself.`
+          );
+          // Auto-hide after 10 seconds
+          setTimeout(() => setDelegationReturnedNotification(null), 10000);
+          // Refetch delegation and voting power
+          refetchDelegate();
+          refetchVotingPower();
+        }
+      });
+    },
+  });
+
+  // Handle burn success
+  useEffect(() => {
+    if (isBurnSuccess && burnHash) {
+      // Delete metadata from Supabase after successful burn
+      if (tokenId && address) {
+        deleteMetadata(Number(tokenId), address).catch((err) => {
+          console.error('Failed to delete metadata after burn:', err);
+          // Don't show error to user as NFT is already burned
+        });
+      }
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      // Refresh the page to show updated state
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    }
+  }, [isBurnSuccess, burnHash, tokenId, address]);
 
   // Load all members on component mount
   useEffect(() => {
@@ -539,43 +586,86 @@ export function MembershipPage() {
                 </div>
               )}
 
+              {/* Delegation Returned Notification */}
+              {delegationReturnedNotification && (
+                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-200 mb-1">
+                        Voting Power Returned
+                      </h3>
+                      <p className="text-sm text-green-800 dark:text-green-300">
+                        {delegationReturnedNotification}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDelegationReturnedNotification(null)}
+                      className="ml-4 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Delete Confirmation */}
               {showDeleteConfirm && (
                 <div className="mt-4 p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                   <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">
-                    Delete Membership?
+                    Burn Membership NFT?
                   </h3>
                   <p className="text-red-800 dark:text-red-300 mb-4">
-                    Are you sure you want to delete your membership metadata? This action cannot be undone. 
-                    Your NFT will remain on the blockchain, but all associated metadata (name, photo, etc.) will be permanently deleted.
+                    <strong>Warning:</strong> This will permanently burn your membership NFT and remove your voting power. This action cannot be undone.
                   </p>
+                  <ul className="text-red-800 dark:text-red-300 mb-4 space-y-2 text-sm list-disc list-inside">
+                    <li>Your NFT will be permanently destroyed</li>
+                    <li>Your voting power will be removed</li>
+                    <li>If others delegated to you, their voting power will be automatically returned to them</li>
+                    <li>Your membership metadata will be deleted</li>
+                    <li>You will be able to mint again after burning</li>
+                  </ul>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isDeleting}
+                      disabled={isDeleting || isBurnPending || isBurnConfirming}
                       className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={async () => {
+                        if (!address || !tokenId) {
+                          setError('Missing address or token ID');
+                          return;
+                        }
+
                         setIsDeleting(true);
+                        setError(null);
+
                         try {
-                          await deleteMetadata(Number(tokenId), address!);
-                          setShowDeleteConfirm(false);
-                          // Refresh the page
-                          window.location.reload();
+                          // Call burn() on the contract
+                          writeBurn({
+                            address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+                            abi: MembershipNFT,
+                            functionName: 'burn',
+                          });
                         } catch (err: any) {
-                          setError(err.message || 'Failed to delete membership');
+                          console.error('Burn error:', err);
+                          setError(err.message || 'Failed to initiate burn transaction');
                           setIsDeleting(false);
                         }
                       }}
-                      disabled={isDeleting}
+                      disabled={isDeleting || isBurnPending || isBurnConfirming}
                       className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
-                      {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+                      {isBurnPending ? 'Waiting for MetaMask...' : isBurnConfirming ? 'Burning NFT...' : isDeleting ? 'Processing...' : 'Burn NFT Permanently'}
                     </button>
                   </div>
+                  {(isBurnPending || isBurnConfirming) && (
+                    <p className="mt-3 text-xs text-red-700 dark:text-red-400">
+                      Transaction in progress. Please wait...
+                    </p>
+                  )}
                 </div>
               )}
             </div>
