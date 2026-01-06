@@ -7,6 +7,9 @@ import { TreasuryExecutor } from '@/abis/TreasuryExecutor';
 import { Constitution } from '@/abis/Constitution';
 import { formatEther, parseEther, formatAddress } from '@/lib/utils';
 import { HelpCircle } from 'lucide-react';
+import { BalanceCheck } from './BalanceCheck';
+import { OnboardingChecklist } from './OnboardingChecklist';
+import Link from 'next/link';
 
 export function TreasuryPage() {
   const { address, isConnected } = useAccount();
@@ -69,6 +72,9 @@ export function TreasuryPage() {
     }
   };
 
+  // Check if wallet extension is installed
+  const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
+
   return (
     <div className="space-y-8">
       <div>
@@ -76,9 +82,44 @@ export function TreasuryPage() {
         <p className="mt-2 text-gray-600 dark:text-gray-400">Manage DAO treasury and execute payouts</p>
       </div>
 
+      {/* Onboarding Checklist - Show if wallet not fully set up */}
+      {hasWalletExtension && <OnboardingChecklist />}
+
+      {/* Balance Check - Show if connected but low balance */}
+      {isConnected && <BalanceCheck />}
+
       {!isConnected && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <p className="text-yellow-800 dark:text-yellow-200">Please connect your wallet to view treasury information.</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <span className="text-xl">💰</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                Connect Your Wallet to View Treasury
+              </h3>
+              <p className="text-blue-800 dark:text-blue-300 mb-4">
+                Connect your wallet to view the DAO treasury balance, execute payouts, and manage funds. 
+                Treasury operations require governance approval. Check the checklist above if you need help setting up.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/getting-started"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
+                >
+                  Getting Started Guide →
+                </Link>
+                <Link
+                  href="/governance"
+                  className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm font-medium"
+                >
+                  View Governance →
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -92,13 +133,13 @@ export function TreasuryPage() {
               <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Treasury Balance</p>
                 <p className="text-gray-300">
-                  The total amount of ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals.
+                  The total amount of Sepolia ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals.
                 </p>
               </div>
             </div>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} ETH
+            {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -109,13 +150,13 @@ export function TreasuryPage() {
               <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Per-Transaction Cap</p>
                 <p className="text-gray-300">
-                  The maximum amount of ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
+                  The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
                 </p>
               </div>
             </div>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} ETH
+            {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -126,13 +167,13 @@ export function TreasuryPage() {
               <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Epoch Cap</p>
                 <p className="text-gray-300">
-                  The maximum total amount of ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
+                  The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
                 </p>
               </div>
             </div>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} ETH
+            {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
           </p>
           {epochDuration ? (
             <p className="text-xs text-gray-500 mt-1">
@@ -177,7 +218,7 @@ export function TreasuryPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Amount (ETH)
+                Amount (Sepolia ETH)
               </label>
               <input
                 type="number"
@@ -189,7 +230,7 @@ export function TreasuryPage() {
               />
               {amount && perTxCap && parseEther(amount) > BigInt(perTxCap.toString()) ? (
                 <p className="mt-1 text-xs text-red-600">
-                  Amount exceeds per-transaction cap of {formatEther(BigInt(perTxCap.toString()))} ETH
+                  Amount exceeds per-transaction cap of {formatEther(BigInt(perTxCap.toString()))} Sepolia ETH
                 </p>
               ) : null}
             </div>

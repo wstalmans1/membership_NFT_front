@@ -8,6 +8,9 @@ import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatAddress } from '@/lib/utils';
 import { Address, encodeFunctionData, parseEther } from 'viem';
 import { HelpCircle } from 'lucide-react';
+import { BalanceCheck } from './BalanceCheck';
+import { OnboardingChecklist } from './OnboardingChecklist';
+import Link from 'next/link';
 
 export function GovernancePage() {
   const { address, isConnected } = useAccount();
@@ -504,8 +507,17 @@ export function GovernancePage() {
     }
   };
 
+  // Check if wallet extension is installed
+  const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
+
   return (
     <div className="space-y-8">
+      {/* Onboarding Checklist - Show if wallet not fully set up */}
+      {hasWalletExtension && <OnboardingChecklist />}
+
+      {/* Balance Check - Show if connected but low balance */}
+      {isConnected && <BalanceCheck />}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Governance</h1>
@@ -527,8 +539,37 @@ export function GovernancePage() {
       </div>
 
       {!isConnected && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <p className="text-yellow-800 dark:text-yellow-200">Please connect your wallet to participate in governance.</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <span className="text-xl">🗳️</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                Connect Your Wallet to Participate in Governance
+              </h3>
+              <p className="text-blue-800 dark:text-blue-300 mb-4">
+                Connect your wallet to create proposals, vote on governance decisions, and help shape the future of the DAO. 
+                You'll need a membership NFT to participate. Check the checklist above for setup instructions.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/getting-started"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
+                >
+                  Getting Started Guide →
+                </Link>
+                <Link
+                  href="/membership"
+                  className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm font-medium"
+                >
+                  Get Membership NFT →
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -894,7 +935,7 @@ export function GovernancePage() {
 
                   {isExpanded && !canVote && proposal.state === 'Active' && (
                     <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-                      Please connect your wallet to vote on this proposal.
+                      Connect your wallet to vote on this proposal. Need help? <Link href="/getting-started" className="underline text-blue-600 dark:text-blue-400">See getting started guide</Link>.
                     </div>
                   )}
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { formatEther } from '@/lib/utils';
 import { Copy, ChevronDown, X, LogOut } from 'lucide-react';
+import Link from 'next/link';
 
 export function WalletButton() {
   const { address, isConnected } = useAccount();
@@ -70,12 +71,12 @@ export function WalletButton() {
         {/* Pill-shaped button */}
         <button
           onClick={() => setShowModal(!showModal)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-full hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors font-medium text-sm"
+          className="flex items-center gap-2.5 px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-full hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors font-medium text-sm"
         >
-          <span className="font-semibold">{balanceDisplay} ETH</span>
-          <span className="text-lg">🤑</span>
-          <span className="font-mono font-semibold">{truncatedAddress}</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${showModal ? 'rotate-180' : ''}`} />
+          <span className="font-semibold whitespace-nowrap">{balanceDisplay} Sepolia ETH</span>
+          <span className="text-lg flex-shrink-0">🤑</span>
+          <span className="font-mono font-semibold whitespace-nowrap">{truncatedAddress}</span>
+          <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${showModal ? 'rotate-180' : ''}`} />
         </button>
 
         {/* Modal */}
@@ -111,7 +112,7 @@ export function WalletButton() {
               {/* Balance */}
               <div className="text-center mb-6">
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  {balanceDisplay} ETH
+                  {balanceDisplay} Sepolia ETH
                 </p>
               </div>
 
@@ -180,9 +181,12 @@ export function WalletButton() {
 
   if (!wallet) {
     return (
-      <div className="text-xs text-gray-500 dark:text-gray-400 px-3 py-1.5">
+      <Link
+        href="/getting-started"
+        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline px-3 py-1.5 transition-colors"
+      >
         Install MetaMask or Brave Wallet
-      </div>
+      </Link>
     );
   }
 

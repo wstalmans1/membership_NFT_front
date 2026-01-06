@@ -147,13 +147,13 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Minimum Donation</p>
                   <p className="text-gray-300">
-                    The minimum amount of ETH required to mint a membership NFT. This donation goes directly to the DAO treasury.
+                    The minimum amount of Sepolia ETH required to mint a membership NFT. This donation goes directly to the DAO treasury.
                   </p>
                 </div>
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} ETH
+              {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -213,13 +213,13 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Per-Transaction Spend Cap</p>
                   <p className="text-gray-300">
-                    The maximum amount of ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
+                    The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
                   </p>
                 </div>
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {perTxSpendCap ? formatEther(BigInt(perTxSpendCap.toString())) : '...'} ETH
+              {perTxSpendCap ? formatEther(BigInt(perTxSpendCap.toString())) : '...'} Sepolia ETH
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -230,13 +230,13 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Epoch Spend Cap</p>
                   <p className="text-gray-300">
-                    The maximum total amount of ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
+                    The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
                   </p>
                 </div>
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {epochSpendCap ? formatEther(BigInt(epochSpendCap.toString())) : '...'} ETH
+              {epochSpendCap ? formatEther(BigInt(epochSpendCap.toString())) : '...'} Sepolia ETH
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">

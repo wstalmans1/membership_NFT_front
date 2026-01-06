@@ -10,6 +10,9 @@ import { DAOGovernor } from '@/abis/DAOGovernor';
 import { getTotalMembersCount } from '@/lib/metadata';
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
+import { WalletInstallGuide } from './WalletInstallGuide';
+import { OnboardingChecklist } from './OnboardingChecklist';
+import { BalanceCheck } from './BalanceCheck';
 
 export function Dashboard() {
   const { address, isConnected } = useAccount();
@@ -57,12 +60,60 @@ export function Dashboard() {
         <p className="mt-2 text-gray-600 dark:text-gray-400">Welcome to Qawl DAO</p>
       </div>
 
-      {!isConnected && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <p className="text-yellow-800 dark:text-yellow-200">Please connect your wallet to interact with the DAO.</p>
-          {!hasWalletExtension && (
-            <p className="text-yellow-700 dark:text-yellow-300 text-sm mt-2">Install MetaMask or Brave Wallet to continue.</p>
-          )}
+      {/* Wallet Installation Guide - Show if no wallet detected */}
+      {!hasWalletExtension && (
+        <WalletInstallGuide />
+      )}
+
+      {/* Onboarding Checklist - Show if wallet not fully set up */}
+      {hasWalletExtension && (
+        <OnboardingChecklist />
+      )}
+
+      {/* Balance Check - Show if connected but low balance */}
+      {isConnected && <BalanceCheck />}
+
+      {!isConnected && hasWalletExtension && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <span className="text-xl">🔗</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                Connect Your Wallet to Get Started
+              </h3>
+              <p className="text-blue-800 dark:text-blue-300 mb-4">
+                Connect your wallet to view your membership status, participate in governance, and interact with the DAO. 
+                Look for the wallet button in the top right corner.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/getting-started"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
+                >
+                  View Getting Started Guide →
+                </Link>
+                <span className="text-blue-700 dark:text-blue-400 text-sm self-center">
+                  Or check the checklist above for step-by-step instructions
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link to getting started guide */}
+      {!hasWalletExtension && (
+        <div className="text-center">
+          <Link
+            href="/getting-started"
+            className="inline-block px-4 py-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
+          >
+            View complete getting started guide →
+          </Link>
         </div>
       )}
 
@@ -70,7 +121,7 @@ export function Dashboard() {
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-blue-900 dark:text-blue-200 mb-2">Become a Member</h2>
           <p className="text-blue-700 dark:text-blue-300 mb-4">
-            Join the DAO by minting a membership NFT. Minimum donation: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} ETH
+            Join the DAO by minting a membership NFT. Minimum donation: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
           </p>
           <Link
             href="/membership"
@@ -111,13 +162,13 @@ export function Dashboard() {
               <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Treasury Balance</p>
                 <p className="text-gray-300">
-                  The total amount of ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals to allowed recipients.
+                  The total amount of Sepolia ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals to allowed recipients.
                 </p>
               </div>
             </div>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} ETH
+            {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
           </p>
         </div>
 
@@ -201,6 +252,13 @@ export function Dashboard() {
           >
             <h3 className="font-semibold text-gray-900 dark:text-white">Design Philosophy</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Learn about our design principles</p>
+          </Link>
+          <Link
+            href="/getting-started"
+            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+          >
+            <h3 className="font-semibold text-gray-900 dark:text-white">Getting Started</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">New to crypto? Start here</p>
           </Link>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WalletButton } from './WalletButton';
+import { NetworkStatus } from './NetworkStatus';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -12,6 +13,7 @@ const navItems = [
   { href: '/treasury', label: 'Treasury' },
   { href: '/constitution', label: 'Constitution' },
   { href: '/philosophy', label: 'Design Philosophy' },
+  { href: '/getting-started', label: 'Getting Started' },
 ];
 
 export function Navbar() {
@@ -49,10 +51,14 @@ export function Navbar() {
               })}
             </div>
           </div>
-          <WalletButton />
+          <div className="flex items-center gap-4">
+            <NetworkStatus />
+            <WalletButton />
+          </div>
         </div>
       </div>
     </nav>
   );
 }
+
 
