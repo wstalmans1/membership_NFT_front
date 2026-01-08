@@ -1,16 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatAddress } from '@/lib/utils';
-import { Address, encodeFunctionData, parseEther, keccak256, toBytes, stringToBytes, pad, toHex, encodePacked } from 'viem';
+import { Address, BaseError, ContractFunctionRevertedError, encodeFunctionData, parseEther, keccak256, toBytes, stringToBytes, pad, toHex, encodePacked, decodeEventLog } from 'viem';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import Link from 'next/link';
+
+const formatViemError = (err: unknown) => {
+  if (err instanceof BaseError) {
+    const revertError = err.walk((cause) => cause instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | undefined;
+    if (revertError?.reason) {
+      return `Execution reverted: ${revertError.reason}`;
+    }
+    if (revertError?.data?.errorName) {
+      return `Execution reverted: ${revertError.data.errorName}`;
+    }
+    if (revertError?.shortMessage) {
+      return revertError.shortMessage;
+    }
+    if (err.shortMessage) {
+      return err.shortMessage;
+    }
+  }
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as { message?: string }).message);
+  }
+  return 'Failed to execute proposal. Please try again.';
+};
 
 export function GovernancePage() {
   const { address, isConnected } = useAccount();
@@ -24,11 +46,15 @@ export function GovernancePage() {
   const [isVotingRulesExpanded, setIsVotingRulesExpanded] = useState(false);
   const [queuedProposalIds, setQueuedProposalIds] = useState<Set<string>>(new Set());
   const [queuedProposalETAs, setQueuedProposalETAs] = useState<Map<string, number>>(new Map());
+  const [queueingProposalId, setQueueingProposalId] = useState<string | null>(null);
+  const [executingProposalId, setExecutingProposalId] = useState<string | null>(null);
+  const [executedProposalIds, setExecutedProposalIds] = useState<Set<string>>(new Set());
+  const lastExecuteHashRef = useRef<string | undefined>(undefined);
 
   const { writeContract, data: hash, isPending, isError } = useWriteContract();
   const { writeContract: writeVote, data: voteHash, isPending: isVoting, isError: isVoteError } = useWriteContract();
   const { writeContract: writeQueue, data: queueHash, isPending: isQueueing } = useWriteContract();
-  const { writeContract: writeExecute, data: executeHash, isPending: isExecuting } = useWriteContract();
+  const { writeContract: writeExecute, data: executeHash, isPending: isExecuting, error: executeError } = useWriteContract();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
   
@@ -47,6 +73,14 @@ export function GovernancePage() {
   const { isLoading: isExecuteConfirming, isSuccess: isExecuteConfirmed } = useWaitForTransactionReceipt({
     hash: executeHash,
   });
+
+  useEffect(() => {
+    if (executeError) {
+      console.error('Execute transaction error:', executeError);
+      setError(formatViemError(executeError));
+      setExecutingProposalId(null);
+    }
+  }, [executeError]);
 
   // Log vote transaction receipt when confirmed
   useEffect(() => {
@@ -466,46 +500,124 @@ export function GovernancePage() {
     }
   }, [isConfirmed, refetchProposals]);
 
-  // Handle queue confirmation - calculate ETA when queue is confirmed
+  // Handle queue confirmation - fetch actual ETA from contract when queue is confirmed
   useEffect(() => {
-    if (isQueueConfirmed && queueHash && publicClient) {
-      // Calculate ETA: current timestamp + timelock delay (3 blocks = ~36 seconds on Sepolia)
-      const timelockDelaySeconds = 36; // 3 blocks * 12 seconds per block
-      const eta = Math.floor(Date.now() / 1000) + timelockDelaySeconds;
-      
-      // Update ETA for all queued proposals (we'll refine this when we can identify the specific proposal)
-      // For now, update the most recently queued proposal
-      setQueuedProposalETAs(prev => {
-        const newMap = new Map(prev);
-        // Find the proposal that was queued (it should be in queuedProposalIds)
-        queuedProposalIds.forEach(proposalId => {
-          newMap.set(proposalId, eta);
+    if (isQueueConfirmed && queueHash && publicClient && queueingProposalId) {
+      const fetchActualETA = async () => {
+        try {
+          // Wait a moment for the transaction to be mined and state to update
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Fetch the actual proposalEta from the contract
+          const proposalEta = await publicClient.readContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'proposalEta',
+            args: [BigInt(queueingProposalId)],
+          });
+
+          if (proposalEta && typeof proposalEta === 'bigint' && proposalEta > 0n) {
+            const etaTimestamp = Number(proposalEta);
+            const currentTime = Math.floor(Date.now() / 1000);
+            const timeUntilEta = etaTimestamp - currentTime;
+            
+            console.log('Fetched actual proposalEta:', {
+              etaTimestamp,
+              currentTime,
+              timeUntilEta,
+              proposalId: queueingProposalId,
+              willShowReady: timeUntilEta <= 0
+            });
+            
+            // Only set ETA if it's in the future (at least 5 seconds from now)
+            // If ETA is in the past or too close, something is wrong - use a fallback
+            if (timeUntilEta < 5) {
+              console.warn('WARNING: proposalEta is too close to now or in the past! Using fallback estimate.', {
+                etaTimestamp,
+                currentTime,
+                timeUntilEta
+              });
+              // Use fallback estimate
+              const timelockDelaySeconds = 36; // 3 blocks * 12 seconds per block
+              const fallbackEta = currentTime + timelockDelaySeconds;
+              setQueuedProposalETAs(prev => {
+                const newMap = new Map(prev);
+                newMap.set(queueingProposalId, fallbackEta);
+                return newMap;
+              });
+            } else {
+              setQueuedProposalETAs(prev => {
+                const newMap = new Map(prev);
+                newMap.set(queueingProposalId, etaTimestamp);
+                return newMap;
+              });
+            }
+          } else {
+            // Fallback: use estimate if contract hasn't updated yet
+            const timelockDelaySeconds = 36; // 3 blocks * 12 seconds per block
+            const eta = Math.floor(Date.now() / 1000) + timelockDelaySeconds;
+            setQueuedProposalETAs(prev => {
+              const newMap = new Map(prev);
+              newMap.set(queueingProposalId, eta);
+              return newMap;
+            });
+            console.log('Using estimated ETA (contract not updated yet):', eta);
+          }
+        } catch (err) {
+          console.error('Error fetching proposalEta:', err);
+          // Fallback: use estimate if fetch fails
+          const timelockDelaySeconds = 36;
+          const eta = Math.floor(Date.now() / 1000) + timelockDelaySeconds;
+          setQueuedProposalETAs(prev => {
+            const newMap = new Map(prev);
+            newMap.set(queueingProposalId, eta);
+            return newMap;
+          });
+        }
+
+        setQueuedProposalIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(queueingProposalId);
+          return newSet;
         });
-        return newMap;
-      });
-      
-      setSuccess('Proposal scheduled successfully! It will be ready to execute after the safety delay period.');
-      setTimeout(() => {
-        refetchProposals();
+        setQueueingProposalId(null);
+        
+        setSuccess('Proposal scheduled successfully! It will be ready to execute after the safety delay period.');
         setTimeout(() => {
-          setSuccess(null);
-        }, 3000);
-      }, 2000);
+          refetchProposals();
+          setTimeout(() => {
+            setSuccess(null);
+          }, 3000);
+        }, 2000);
+      };
+
+      fetchActualETA();
     }
-  }, [isQueueConfirmed, queueHash, publicClient, queuedProposalIds, refetchProposals]);
+  }, [isQueueConfirmed, queueHash, publicClient, queueingProposalId, refetchProposals]);
 
   // Handle execute confirmation
   useEffect(() => {
     if (isExecuteConfirmed) {
+      if (executeHash && executeHash !== lastExecuteHashRef.current && executingProposalId) {
+        setExecutedProposalIds(prev => new Set(prev).add(executingProposalId));
+        setExecutingProposalId(null);
+        lastExecuteHashRef.current = executeHash;
+      }
       setSuccess('Proposal executed successfully! All changes have been applied.');
+      // Immediately refetch proposals to update state
+      refetchProposals();
+      // Refetch multiple times with delays to ensure state has updated on-chain
+      setTimeout(() => {
+        refetchProposals();
+      }, 2000);
       setTimeout(() => {
         refetchProposals();
         setTimeout(() => {
           setSuccess(null);
         }, 3000);
-      }, 2000);
+      }, 5000);
     }
-  }, [isExecuteConfirmed, refetchProposals]);
+  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchProposals]);
 
   // Clean up tracking when proposal state updates to Queued - use actual ETA from contract
   useEffect(() => {
@@ -637,8 +749,7 @@ export function GovernancePage() {
 
       console.log('Queueing proposal:', { proposalId: proposal.id, targets, values, calldatas, descriptionHash });
       
-      // Mark proposal as being queued immediately to prevent button reappearance
-      setQueuedProposalIds(prev => new Set(prev).add(proposal.id));
+      setQueueingProposalId(proposal.id);
       
       writeQueue({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
@@ -649,12 +760,7 @@ export function GovernancePage() {
     } catch (err: any) {
       console.error('Error queueing proposal:', err);
       setError(err.message || 'Failed to queue proposal. Please try again.');
-      // Remove from queued set if queueing failed
-      setQueuedProposalIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(proposal.id);
-        return newSet;
-      });
+      setQueueingProposalId(null);
     }
   };
 
@@ -692,11 +798,11 @@ export function GovernancePage() {
             args: [BigInt(proposal.id)],
           });
 
-          if (proposalEta && proposalEta > 0n) {
+          if (proposalEta && typeof proposalEta === 'bigint' && proposalEta > 0n) {
             const currentBlock = await publicClient.getBlock();
             const currentTimestamp = BigInt(currentBlock.timestamp);
             
-            if (proposalEta > currentTimestamp) {
+            if (typeof proposalEta === 'bigint' && proposalEta > currentTimestamp) {
               const secondsRemaining = Number(proposalEta - currentTimestamp);
               const minutesRemaining = Math.floor(secondsRemaining / 60);
               setError(`Proposal is queued but the timelock delay hasn't passed yet. Please wait ${minutesRemaining > 0 ? `${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''} and ${secondsRemaining % 60} second${secondsRemaining % 60 !== 1 ? 's' : ''}` : `${secondsRemaining} second${secondsRemaining !== 1 ? 's' : ''}`} before executing.`);
@@ -723,6 +829,7 @@ export function GovernancePage() {
       
       // Skip gas estimation - it fails when execution would revert anyway
       // Use a safe default gas limit and let the execution fail with a clear error if needed
+      setExecutingProposalId(proposal.id);
       writeExecute({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
@@ -732,7 +839,8 @@ export function GovernancePage() {
       });
     } catch (err: any) {
       console.error('Error executing proposal:', err);
-      setError(err.message || 'Failed to execute proposal. Please try again.');
+      setError(formatViemError(err));
+      setExecutingProposalId(null);
     }
   };
 
@@ -1141,12 +1249,12 @@ export function GovernancePage() {
               const isVoting = votingProposalId === proposal.id;
               const canVote = proposal.state === 'Active' && isConnected;
               const isQueued = proposal.state === 'Queued' || queuedProposalIds.has(proposal.id);
-              const isBeingQueued = (isQueueing || isQueueConfirming) && queuedProposalIds.has(proposal.id);
+              const isLocallyExecuted = executedProposalIds.has(proposal.id);
 
               return (
                 <div 
                   key={proposal.id} 
-                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
+                  className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
                   onClick={() => setExpandedProposal(isExpanded ? null : proposal.id)}
                 >
                   <div className="flex justify-between items-start">
@@ -1223,7 +1331,7 @@ export function GovernancePage() {
                   <VoteCountsWithDirectRead proposalId={proposal.id} initialVotes={proposal.votes} canVote={canVote} />
 
                   {/* Schedule Execution button for Succeeded proposals - Hide if queued or being queued */}
-                  {proposal.state === 'Succeeded' && !isQueued && !isBeingQueued && (
+                  {proposal.state === 'Succeeded' && !isQueued && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
                       <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <div className="flex items-start gap-3">
@@ -1260,14 +1368,14 @@ export function GovernancePage() {
                     </div>
                   )}
 
-                  {/* Show queued status immediately after queueing, before state updates */}
-                  {isQueued && proposal.state !== 'Queued' && (
+                  {/* Show queued status only after queue transaction is confirmed */}
+                  {isQueued && proposal.state !== 'Queued' && !isLocallyExecuted && queuedProposalETAs.has(proposal.id) && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
                       <QueuedProposalStatus 
                         proposal={{
                           ...proposal,
                           state: 'Queued',
-                          proposalEta: queuedProposalETAs.get(proposal.id) || (Math.floor(Date.now() / 1000) + 36)
+                          proposalEta: queuedProposalETAs.get(proposal.id)!
                         }} 
                         onExecute={handleExecute} 
                         isExecuting={isExecuting || isExecuteConfirming} 
@@ -1277,8 +1385,8 @@ export function GovernancePage() {
                     </div>
                   )}
 
-                  {/* Execute button for Queued proposals - Always visible */}
-                  {proposal.state === 'Queued' && (
+                  {/* Execute button for Queued proposals - Only show if not executed */}
+                  {proposal.state === 'Queued' && typeof proposal.state !== 'number' && !isLocallyExecuted && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
                       <QueuedProposalStatus proposal={proposal} onExecute={handleExecute} isExecuting={isExecuting || isExecuteConfirming} isConnected={isConnected} executeHash={executeHash} />
                     </div>
@@ -1324,6 +1432,15 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
   const [showVoting, setShowVoting] = useState(false);
   const [localVotingProposalId, setLocalVotingProposalId] = useState<string | null>(null);
   
+  // Get vote choice from localStorage (set when user votes)
+  const getStoredVoteChoice = (proposalId: string): number | null => {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem(`vote_${proposalId}`);
+    return stored ? parseInt(stored, 10) : null;
+  };
+  
+  const [userVoteChoice, setUserVoteChoice] = useState<number | null>(() => getStoredVoteChoice(proposalId));
+  
   // Direct contract read for vote counts - refreshes independently
   const { data: directVoteCounts, refetch: refetchDirectVotes, error: voteCountsError } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
@@ -1344,7 +1461,7 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     args: [BigInt(proposalId)],
   });
 
-  const { data: votingPower } = useReadContract({
+  const { data: votingPower, refetch: refetchVotingPower } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'getVotes',
@@ -1352,18 +1469,18 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     query: { enabled: !!address && !!proposalSnapshot },
   });
 
-  // Check if user has voted
+  // Check if user has voted - check for all proposal states, not just when voting is shown
   const { data: hasVotedData, refetch: refetchHasVoted } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'hasVoted',
     args: address ? [BigInt(proposalId), address] : undefined,
-    query: { enabled: !!address && showVoting },
+    query: { enabled: !!address }, // Always check if address is available, regardless of proposal state
   });
   const hasVoted = hasVotedData as boolean | undefined;
 
   const { writeContract: writeVote, data: voteHash, isPending: isVoting } = useWriteContract();
-  const { isLoading: isVoteConfirming, isSuccess: isVoteConfirmed } = useWaitForTransactionReceipt({
+  const { isLoading: isVoteConfirming, isSuccess: isVoteConfirmed, data: voteReceipt } = useWaitForTransactionReceipt({
     hash: voteHash,
   });
 
@@ -1377,8 +1494,9 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     : initialVotes || { forVotes: '0', againstVotes: '0', abstainVotes: '0' };
 
   // Determine if user can actually vote (has voting power at snapshot)
-  const hasVotingPower = votingPower !== undefined && votingPower > 0n;
+  const hasVotingPower = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint' && votingPower > 0n;
   const canActuallyVote = canVote && hasVotingPower;
+  const isVotingPowerLoading = votingPower === undefined && !!address && proposalSnapshot !== undefined;
 
   // Log vote counts and voting power for debugging
   useEffect(() => {
@@ -1400,10 +1518,46 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     }
   }, [directVoteCounts, proposalId, voteCountsError, votingPower, address]);
 
-  // Handle vote confirmation
+  // Handle vote confirmation and extract vote choice from VoteCast event
   useEffect(() => {
-    if (isVoteConfirmed && localVotingProposalId === proposalId) {
-      console.log('Vote confirmed, refetching direct vote counts...');
+    if (isVoteConfirmed && localVotingProposalId === proposalId && voteReceipt && publicClient) {
+      console.log('Vote confirmed, extracting vote choice from events...');
+      
+      // Try to extract vote choice from VoteCast event
+      try {
+        const voteCastEvent = voteReceipt.logs.find((log: any) => {
+          try {
+            const decoded = decodeEventLog({
+              abi: DAOGovernor,
+              data: log.data,
+              topics: log.topics,
+            });
+            return decoded.eventName === 'VoteCast' && decoded.args && typeof decoded.args === 'object' && 'voter' in decoded.args && (decoded.args as any).voter?.toLowerCase() === address?.toLowerCase();
+          } catch {
+            return false;
+          }
+        });
+
+        if (voteCastEvent) {
+          const decoded = decodeEventLog({
+            abi: DAOGovernor,
+            data: voteCastEvent.data,
+            topics: voteCastEvent.topics,
+          });
+          if (decoded.eventName === 'VoteCast' && decoded.args && typeof decoded.args === 'object' && 'support' in decoded.args) {
+            const support = Number((decoded.args as any).support);
+            setUserVoteChoice(support);
+            // Store in localStorage so it persists
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`vote_${proposalId}`, support.toString());
+            }
+            console.log('Extracted vote choice from event:', support);
+          }
+        }
+      } catch (err) {
+        console.error('Error extracting vote choice from event:', err);
+      }
+      
       refetchDirectVotes();
       refetchHasVoted();
       setTimeout(() => {
@@ -1414,17 +1568,35 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
         refetchDirectVotes();
         refetchHasVoted();
       }, 8000);
-      // Keep showVoting true so the success message is displayed
-      // setShowVoting(false);
-      // Don't clear localVotingProposalId so the success message persists
-      // setLocalVotingProposalId(null);
     }
-  }, [isVoteConfirmed, localVotingProposalId, proposalId, refetchDirectVotes, refetchHasVoted]);
+  }, [isVoteConfirmed, localVotingProposalId, proposalId, refetchDirectVotes, refetchHasVoted, voteReceipt, publicClient, address]);
+
+  useEffect(() => {
+    if (showVoting && address && proposalSnapshot !== undefined) {
+      refetchVotingPower();
+      refetchHasVoted();
+    }
+  }, [showVoting, address, proposalSnapshot, refetchVotingPower, refetchHasVoted]);
+
+  // Load vote choice from localStorage on mount or when proposalId changes
+  useEffect(() => {
+    if (userVoteChoice === null) {
+      const stored = getStoredVoteChoice(proposalId);
+      if (stored !== null) {
+        setUserVoteChoice(stored);
+      }
+    }
+  }, [proposalId]);
 
   const handleVote = async (support: number) => {
     if (!address) return;
     
     setLocalVotingProposalId(proposalId);
+    setUserVoteChoice(support); // Track vote choice immediately
+    // Store in localStorage so it persists across page reloads
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`vote_${proposalId}`, support.toString());
+    }
     try {
       console.log('Casting vote directly:', { proposalId, support, address });
       writeVote({
@@ -1436,6 +1608,10 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     } catch (err: any) {
       console.error('Error casting vote:', err);
       setLocalVotingProposalId(null);
+      setUserVoteChoice(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`vote_${proposalId}`);
+      }
     }
   };
 
@@ -1449,8 +1625,25 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
         </div>
       </div>
 
-      {/* Cast your vote section */}
-      {canVote && (
+      {/* Show vote choice if user has voted - display for all proposal states including executed */}
+      {hasVoted && address && userVoteChoice !== null ? (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-green-600 dark:text-green-400">
+            ✓ You voted{' '}
+            {userVoteChoice === 1 ? (
+              <span className="font-semibold text-green-700 dark:text-green-300">in favor</span>
+            ) : userVoteChoice === 0 ? (
+              <span className="font-semibold text-red-700 dark:text-red-300">against</span>
+            ) : (
+              <span className="font-semibold text-gray-700 dark:text-gray-300">to abstain</span>
+            )}{' '}
+            of this proposal
+          </div>
+        </div>
+      ) : null}
+
+      {/* Cast your vote section - only show for active proposals where user hasn't voted yet */}
+      {canVote && !hasVoted && (
         <div>
           {!hasVotingPower && votingPower !== undefined && address ? (
             <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -1459,48 +1652,54 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
                 {votingPower === 0n && ' This usually means you either don\'t have a membership NFT, or you minted your NFT after this proposal was created.'}
               </p>
             </div>
-          ) : (showVoting && hasVoted) || (isVoteConfirmed && localVotingProposalId === proposalId) ? (
-            <div className="text-sm text-green-600 dark:text-green-400 mb-2">
-              ✓ You have already voted on this proposal
-            </div>
           ) : showVoting ? (
             <div className="space-y-2">
-              {/* Show processing indicator */}
-              {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId && (
+              {isVotingPowerLoading ? (
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
-                    {isVoting ? '⏳ Submitting vote transaction...' : '⏳ Waiting for transaction confirmation...'}
+                    ⏳ Checking your voting power...
                   </p>
                 </div>
-              )}
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleVote(1)}
-                  disabled={isVoting || isVoteConfirming || hasVoted === true || !hasVotingPower}
-                  className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
-                </button>
-                <button
-                  onClick={() => handleVote(0)}
-                  disabled={isVoting || isVoteConfirming || hasVoted === true || !hasVotingPower}
-                  className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
-                </button>
-                <button
-                  onClick={() => handleVote(2)}
-                  disabled={isVoting || isVoteConfirming || hasVoted === true || !hasVotingPower}
-                  className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}
-                </button>
-              </div>
-              {voteHash && localVotingProposalId === proposalId && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${voteHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{voteHash.substring(0, 10)}...</a>
-                </p>
+              ) : (
+                <>
+                  {/* Show processing indicator */}
+                  {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId && (
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-xs text-blue-800 dark:text-blue-200">
+                        {isVoting ? '⏳ Submitting vote transaction...' : '⏳ Waiting for transaction confirmation...'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleVote(1)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
+                    </button>
+                    <button
+                      onClick={() => handleVote(0)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
+                    </button>
+                    <button
+                      onClick={() => handleVote(2)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}
+                    </button>
+                  </div>
+                  {voteHash && localVotingProposalId === proposalId && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${voteHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{voteHash.substring(0, 10)}...</a>
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -1531,20 +1730,36 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
 }) {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
+  
+  // Don't show this component if proposal is already executed
+  if (proposal.state === 'Executed' || proposal.state === 7) {
+    return null;
+  }
 
   useEffect(() => {
-    if (!proposal.proposalEta) {
-      setIsReady(true);
-      setTimeRemaining('Ready to execute');
+    // If no ETA is available, don't show ready state - wait for ETA to be fetched
+    if (!proposal.proposalEta || proposal.proposalEta === 0) {
+      setIsReady(false);
+      setTimeRemaining('Calculating...');
       return;
     }
 
     const updateCountdown = () => {
       const now = Math.floor(Date.now() / 1000);
-      const eta = proposal.proposalEta;
+      const eta = typeof proposal.proposalEta === 'number' ? proposal.proposalEta : Number(proposal.proposalEta);
       const remaining = eta - now;
 
-      if (remaining <= 0) {
+      console.log('Countdown check:', { 
+        eta, 
+        now, 
+        remaining, 
+        proposalId: proposal.id || 'unknown',
+        isReady: remaining <= 0 
+      });
+
+      // Only show ready if ETA has actually passed (with a buffer to account for clock differences)
+      // Use a larger buffer (10 seconds) to ensure we don't show ready too early
+      if (remaining <= -10) { // 10 second buffer to account for clock differences and ensure ETA has truly passed
         setIsReady(true);
         setTimeRemaining('Ready to execute');
       } else {
@@ -1581,7 +1796,8 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
               Ready to Execute
             </h4>
             <p className="text-xs text-green-800 dark:text-green-300 mb-3">
-              The safety delay period has passed. You can now execute this proposal to apply the changes.
+              The safety delay period has passed. You can now finalise/execute (in case of on-chain changes) this
+              proposal.
             </p>
             <div className="flex items-center gap-3">
               <button
@@ -1606,6 +1822,11 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
     );
   }
 
+  // If no valid ETA, don't show anything (shouldn't happen for Queued proposals)
+  if (!proposal.proposalEta || proposal.proposalEta === 0) {
+    return null;
+  }
+
   return (
     <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
       <div className="flex items-start gap-3">
@@ -1617,7 +1838,9 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
             Scheduled for Execution
           </h4>
           <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-2">
-            This proposal is scheduled to execute after a safety delay period. This gives members time to review changes before they take effect.
+            This proposal is scheduled to execute after a safety delay period. This gives members time to review
+            changes, detect possible issues and intervene through a cancellation governance proposal before the changes
+            take effect (in case of a proposal with on-chain execution).
           </p>
           <div className="flex items-center gap-2 mt-2">
             <span className="text-sm font-mono font-semibold text-yellow-900 dark:text-yellow-200">
@@ -1663,4 +1886,3 @@ function CopyableProposalId({ proposalId }: { proposalId: string }) {
     </div>
   );
 }
-

@@ -494,7 +494,119 @@ export function ConstitutionPage() {
           </div>
         </div>
       </div>
+
+      {/* Roles & Permissions */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Roles & Permissions (Beginner Guide)</h2>
+          <div className="relative group">
+            <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+            <div className="absolute left-0 bottom-full mb-2 w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+              <p className="mb-2 font-semibold">Why Roles Exist</p>
+              <p className="text-gray-300">
+                Roles are named permissions. A contract checks roles before allowing sensitive actions, like upgrades or treasury payouts.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
+          <p>
+            Roles are on-chain permissions. When a proposal is executed, the Timelock is the caller, so it must hold the
+            required role on the target contract or execution will revert.
+          </p>
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 p-4">
+            <p className="font-semibold text-gray-900 dark:text-white">How to use this section</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Identify the contract your proposal touches, then check the required role below. If the Timelock is
+              missing that role, execution will fail until it is granted.
+            </p>
+          </div>
+          <div className="rounded-lg bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 p-4">
+            <p className="font-semibold text-gray-900 dark:text-white">Who usually holds roles</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              The Timelock holds execution roles, the deployer wallet holds admin roles for upgrades and role management,
+              and the Governor schedules actions through the Timelock.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Timelock</h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                The scheduler and executor for approved proposals.
+              </p>
+              <div className="mt-2 space-y-1">
+                <div><span className="font-mono">PROPOSER_ROLE</span>: Governor can schedule actions.</div>
+                <div><span className="font-mono">EXECUTOR_ROLE</span>: Anyone can trigger execution once ready.</div>
+                <div><span className="font-mono">CANCELLER_ROLE</span>: Governor can cancel queued actions.</div>
+                <div><span className="font-mono">DEFAULT_ADMIN_ROLE</span>: Deployer manages roles.</div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Governor</h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Where proposals are created, voted on, and queued.
+              </p>
+              <div className="mt-2 space-y-1">
+                <div><span className="font-mono">DEFAULT_ADMIN_ROLE</span>: Upgrade authority (deployer).</div>
+                <div><span className="font-mono">GOVERNANCE_ROLE</span>: Internal policy role (deployer).</div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Constitution</h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Sets spend caps, allowlist, and base URI.
+              </p>
+              <div className="mt-2 space-y-1">
+                <div><span className="font-mono">GOVERNANCE_ROLE</span>: Policy updates (timelock + deployer).</div>
+                <div><span className="font-mono">DEFAULT_ADMIN_ROLE</span>: Upgrades and role admin.</div>
+                <div><span className="font-mono">GUARDIAN_ROLE</span>: Reserved (not used today).</div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">TreasuryExecutor</h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Executes payouts and enforces caps.
+              </p>
+              <div className="mt-2 space-y-1">
+                <div><span className="font-mono">EXECUTOR_ROLE</span>: Payouts (timelock + deployer).</div>
+                <div><span className="font-mono">GUARDIAN_ROLE</span>: Guardian cancel (deployer).</div>
+                <div><span className="font-mono">DEFAULT_ADMIN_ROLE</span>: Upgrades and config.</div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">MembershipNFT</h3>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Memberships, delegation, and treasury wiring.
+              </p>
+              <div className="mt-2 space-y-1">
+                <div><span className="font-mono">TREASURY_ROLE</span>: Update treasury (timelock + deployer).</div>
+                <div><span className="font-mono">REVOKER_ROLE</span>: Revoke NFTs (deployer).</div>
+                <div><span className="font-mono">MINTER_ROLE</span>: Reserved (mint uses donation checks).</div>
+                <div><span className="font-mono">DEFAULT_ADMIN_ROLE</span>: Upgrades and config.</div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+            <p className="font-semibold text-blue-900 dark:text-blue-200">Timelock Roles for execution</p>
+            <p className="text-blue-800 dark:text-blue-300 mt-1">
+              These are the exact roles the Timelock must hold on each target contract. If a proposal touches multiple
+              contracts, all listed roles must be present.
+            </p>
+            <div className="mt-2 space-y-1 text-blue-800 dark:text-blue-300">
+              <div>Constitution: <span className="font-mono">GOVERNANCE_ROLE</span></div>
+              <div>TreasuryExecutor: <span className="font-mono">EXECUTOR_ROLE</span></div>
+              <div>MembershipNFT: <span className="font-mono">TREASURY_ROLE</span></div>
+            </div>
+          </div>
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
+            <p className="font-semibold text-blue-900 dark:text-blue-200">Quick mental model</p>
+            <p className="text-blue-800 dark:text-blue-300 mt-1">
+              Proposal passes, Governor queues it, Timelock waits out the delay, Timelock executes. If execution fails,
+              check whether the Timelock has the required role on the target contract.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
