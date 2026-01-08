@@ -34,7 +34,8 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">3. User Sovereignty</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              Members own their membership NFTs and control their voting power through delegation. The DAO cannot arbitrarily revoke memberships 
+              Members own their membership NFTs and control their voting power. New memberships automatically activate voting power by delegating to the member themselves, 
+              ensuring immediate participation. Members can change their delegation at any time. The DAO cannot arbitrarily revoke memberships 
               (except through governance or the revocation authority for compliance). Users maintain full control over their digital identity and participation.
             </p>
           </div>
@@ -99,8 +100,9 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delegation System</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              Members can delegate their voting power to themselves or to trusted delegates. This allows for flexible participation—members can 
-              vote directly or delegate to experts. Delegation is required to activate voting power, ensuring intentional participation.
+              When a member mints their membership NFT, their voting power is automatically delegated to themselves, ensuring immediate activation and participation. 
+              Members can change their delegation at any time—they can vote directly themselves or delegate to trusted experts or representatives. 
+              This automatic delegation removes friction for new members while maintaining flexibility for those who want to delegate to others.
             </p>
           </div>
           
@@ -174,7 +176,7 @@ export function PhilosophyPage() {
               <li><strong>Token ID:</strong> The unique identifier of your membership NFT</li>
               <li><strong>Minting transaction:</strong> The transaction hash and block number when you minted</li>
               <li><strong>Voting records:</strong> Your votes on governance proposals (if you voted)</li>
-              <li><strong>Delegation records:</strong> Who you delegated your voting power to</li>
+              <li><strong>Delegation records:</strong> Who you delegated your voting power to (new memberships are automatically delegated to the member themselves)</li>
             </ul>
             <p className="text-gray-700 dark:text-gray-300 mt-3">
               This on-chain data is immutable and publicly visible on block explorers. It cannot be deleted or modified, which ensures transparency and prevents manipulation of governance records.

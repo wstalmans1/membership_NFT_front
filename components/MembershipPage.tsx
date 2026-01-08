@@ -30,6 +30,8 @@ export function MembershipPage() {
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(true);
+  const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
@@ -251,9 +253,21 @@ export function MembershipPage() {
 
       {isConnected && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Your Membership Status</h2>
+          <button
+            onClick={() => setIsMembershipStatusExpanded(!isMembershipStatusExpanded)}
+            className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Your Membership Status</h2>
+            {isMembershipStatusExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+            )}
+          </button>
           
-          {isMember && tokenId ? (
+          {isMembershipStatusExpanded && (
+            <>
+              {isMember && tokenId ? (
             <div className="space-y-4">
               {/* Data Privacy and Storage Notice */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -280,7 +294,13 @@ export function MembershipPage() {
                 {isPrivacyExpanded && (
                   <div className="mt-3 ml-11 space-y-2">
                     <p className="text-xs text-blue-800 dark:text-blue-300">
-                      The personal information shown on your membership card (name, photo, date of birth, citizenship) is stored off-chain in a database and can be updated or deleted at any time. Only your wallet address, token ID, and governance records are stored permanently on-chain.
+                      The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship information at any time through the "Update" button on your membership card.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records (proposal creation and voting records) are permanent and cannot be modified.
                     </p>
                     <p className="text-xs text-blue-800 dark:text-blue-300">
                       <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
@@ -333,231 +353,6 @@ export function MembershipPage() {
                   </div>
                 )}
               </div>
-              
-              {/* Voting Power & Delegation Status */}
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
-                  <div className="relative group">
-                    <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                      <p className="mb-2 font-semibold">Voting Power</p>
-                      <p className="text-gray-300">
-                        Your voting power determines how much weight your vote has in governance proposals. Each membership NFT grants 1 vote, but you must delegate your votes (to yourself or another address) to activate them.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Current Voting Power:</span>
-                      <div className="relative group">
-                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                          <p className="mb-2 font-semibold">Current Voting Power</p>
-                          <p className="text-gray-300">
-                            The number of votes you currently have available for voting on proposals. This is 0 until you delegate your votes.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {(() => {
-                      const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
-                      return (
-                        <span className={`text-sm font-semibold ${votingPowerBigInt > 0n ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {votingPowerBigInt.toString()} vote{votingPowerBigInt !== 1n ? 's' : ''}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
-                      <div className="relative group">
-                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                          <p className="mb-2 font-semibold">Delegation</p>
-                          <p className="text-gray-300">
-                            Delegation determines who can use your voting power. You can delegate to yourself (to vote directly) or to another address (to let them vote on your behalf). Delegation is required to activate your voting power.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
-                      {currentDelegate && typeof currentDelegate === 'string' && currentDelegate !== '0x0000000000000000000000000000000000000000' 
-                        ? (currentDelegate.toLowerCase() === address?.toLowerCase() 
-                            ? 'Yourself' 
-                            : `${currentDelegate.substring(0, 6)}...${currentDelegate.substring(38)}`)
-                        : 'Not delegated'}
-                    </span>
-                  </div>
-
-                  {(() => {
-                    const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
-                    return (
-                      <>
-                        {votingPowerBigInt === 0n && !delegationSuccess && (
-                          <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
-                            <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                              ⚠️ Your voting power is not activated. Delegate to yourself or another address to activate it.
-                            </p>
-                          </div>
-                        )}
-
-                        {delegationSuccess && (
-                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                            <p className="text-xs text-green-800 dark:text-green-200">
-                              ✅ Delegation updated successfully! Your voting power has been activated.
-                            </p>
-                          </div>
-                        )}
-
-                        {!showDelegationForm ? (
-                          <button
-                            onClick={() => {
-                              setShowDelegationForm(true);
-                              setDelegationMode(currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase() ? 'self' : 'self');
-                              setDelegateToAddress('');
-                            }}
-                            className="w-full mt-3 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
-                          >
-                            {votingPowerBigInt > 0n ? 'Change Delegation' : 'Activate Voting Power'}
-                          </button>
-                        ) : (
-                          <div className="mt-3 p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Delegation</h4>
-                            
-                            <div className="space-y-3">
-                              <div>
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                  <input
-                                    type="radio"
-                                    name="delegation"
-                                    checked={delegationMode === 'self'}
-                                    onChange={() => {
-                                      setDelegationMode('self');
-                                      setDelegateToAddress('');
-                                    }}
-                                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                                  />
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
-                                    <div className="relative group">
-                                      <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                      <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                                        <p className="mb-2 font-semibold">Delegate to Myself</p>
-                                        <p className="text-gray-300">
-                                          This activates your voting power and allows you to vote directly on proposals.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </label>
-                              </div>
-                              
-                              <div>
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                  <input
-                                    type="radio"
-                                    name="delegation"
-                                    checked={delegationMode === 'other'}
-                                    onChange={() => setDelegationMode('other')}
-                                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                                  />
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
-                                    <div className="relative group">
-                                      <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                      <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                                        <p className="mb-2 font-semibold">Delegate to Another Address</p>
-                                        <p className="text-gray-300">
-                                          Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </label>
-                              </div>
-                              
-                              {delegationMode === 'other' && (
-                                <div>
-                                  <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Delegate Address
-                                  </label>
-                                  <input
-                                    id="delegateToAddress"
-                                    type="text"
-                                    value={delegateToAddress}
-                                    onChange={(e) => setDelegateToAddress(e.target.value)}
-                                    placeholder="0x..."
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                                  />
-                                  {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
-                                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                                      Please enter a valid Ethereum address (0x followed by 40 characters)
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                              
-                              <div className="flex gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowDelegationForm(false);
-                                    setDelegationMode('self');
-                                    setDelegateToAddress('');
-                                  }}
-                                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!address) return;
-                                    
-                                    const targetAddress = delegationMode === 'self' ? address : delegateToAddress;
-                                    
-                                    if (!targetAddress || (delegationMode === 'other' && !/^0x[a-fA-F0-9]{40}$/.test(targetAddress))) {
-                                      setError('Please enter a valid Ethereum address');
-                                      return;
-                                    }
-
-                                    setIsDelegating(true);
-                                    setError(null);
-
-                                    try {
-                                      writeDelegate({
-                                        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-                                        abi: MembershipNFT,
-                                        functionName: 'delegate',
-                                        args: [targetAddress as `0x${string}`],
-                                      });
-                                    } catch (err: any) {
-                                      console.error('Delegation error:', err);
-                                      setError(err.message || 'Failed to delegate');
-                                      setIsDelegating(false);
-                                    }
-                                  }}
-                                  disabled={isDelegatePending || isDelegateConfirming || isDelegating || (delegationMode === 'other' && (!delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x')))}
-                                  className="flex-1 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                                >
-                                  {isDelegatePending || isDelegateConfirming || isDelegating ? 'Processing...' : 'Update Delegation'}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
 
               {/* Update Form */}
               {showUpdateForm && currentMetadata && (
@@ -585,6 +380,281 @@ export function MembershipPage() {
                   />
                 </div>
               )}
+              
+              {/* Voting Power & Delegation Status */}
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
+                  <div className="relative group">
+                    <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                      <p className="mb-2 font-semibold">Voting Power</p>
+                      <p className="text-gray-300">
+                        Your voting power determines how much weight your vote has in governance proposals. Each membership NFT grants 1 vote, which is automatically delegated to yourself when you mint. You can change delegation to vote directly or delegate to another address.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Voting Power:</span>
+                      <div className="relative group">
+                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Voting Power</p>
+                          <p className="text-gray-300">
+                            Each DAO member has 1 vote, which can be delegated to yourself or to another address. When delegated to yourself, you can vote directly. When delegated to another address, that address can vote on your behalf.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {(() => {
+                      // Always show 1 vote if user is a member, regardless of delegation status
+                      const displayVotingPower = isMember ? 1n : 0n;
+                      const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
+                      // Use green if voting power is activated (delegated to self), otherwise use default color
+                      const isActivated = votingPowerBigInt > 0n;
+                      return (
+                        <span className={`text-sm font-semibold ${isActivated ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                          {displayVotingPower.toString()} vote
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
+                      <div className="relative group">
+                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Delegation</p>
+                          <p className="text-gray-300">
+                            Delegation determines who can use your voting power. You can delegate to yourself (to vote directly) or to another address (to let them vote on your behalf). New memberships are automatically delegated to yourself.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
+                      {currentDelegate && typeof currentDelegate === 'string' && currentDelegate !== '0x0000000000000000000000000000000000000000' 
+                        ? (currentDelegate.toLowerCase() === address?.toLowerCase() 
+                            ? 'Yourself' 
+                            : `${currentDelegate.substring(0, 6)}...${currentDelegate.substring(38)}`)
+                        : 'Not delegated'}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
+                    return (
+                      <>
+                        {delegationSuccess && (
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                            <p className="text-xs text-green-800 dark:text-green-200">
+                              ✅ Delegation updated successfully!
+                            </p>
+                          </div>
+                        )}
+
+                        {!showDelegationForm ? (
+                          <button
+                            onClick={() => {
+                              setShowDelegationForm(true);
+                              // If already delegated to self, default to 'other' mode
+                              const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                              setDelegationMode(isAlreadyDelegatedToSelf ? 'other' : 'self');
+                              setDelegateToAddress('');
+                            }}
+                            className="w-full mt-3 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
+                          >
+                            Change Delegation
+                          </button>
+                        ) : (
+                          <div className="mt-3 p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Delegation</h4>
+                            
+                            <div className="space-y-3">
+                              {/* Check if already delegated to self */}
+                              {(() => {
+                                const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                
+                                // If already delegated to self, show only address input (no radio buttons)
+                                if (isAlreadyDelegatedToSelf) {
+                                  return (
+                                    <div>
+                                      <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Delegate to Address
+                                        <div className="relative group inline-block ml-2">
+                                          <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                          <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                                            <p className="mb-2 font-semibold">Delegate to Another Address</p>
+                                            <p className="text-gray-300">
+                                              Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </label>
+                                      <input
+                                        id="delegateToAddress"
+                                        type="text"
+                                        value={delegateToAddress}
+                                        onChange={(e) => setDelegateToAddress(e.target.value)}
+                                        placeholder="0x..."
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                                      />
+                                      {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                          Please enter a valid Ethereum address (0x followed by 40 characters)
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                
+                                // If not delegated to self, show radio buttons with both options
+                                return (
+                                  <>
+                                    <div>
+                                      <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                          type="radio"
+                                          name="delegation"
+                                          checked={delegationMode === 'self'}
+                                          onChange={() => {
+                                            setDelegationMode('self');
+                                            setDelegateToAddress('');
+                                          }}
+                                          className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
+                                          <div className="relative group">
+                                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                                              <p className="mb-2 font-semibold">Delegate to Myself</p>
+                                              <p className="text-gray-300">
+                                                This allows you to vote directly on proposals using your voting power.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </label>
+                                    </div>
+                                    
+                                    <div>
+                                      <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                          type="radio"
+                                          name="delegation"
+                                          checked={delegationMode === 'other'}
+                                          onChange={() => setDelegationMode('other')}
+                                          className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
+                                          <div className="relative group">
+                                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                                              <p className="mb-2 font-semibold">Delegate to Another Address</p>
+                                              <p className="text-gray-300">
+                                                Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </label>
+                                    </div>
+                                    
+                                    {delegationMode === 'other' && (
+                                      <div>
+                                        <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                          Delegate Address
+                                        </label>
+                                        <input
+                                          id="delegateToAddress"
+                                          type="text"
+                                          value={delegateToAddress}
+                                          onChange={(e) => setDelegateToAddress(e.target.value)}
+                                          placeholder="0x..."
+                                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                                        />
+                                        {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
+                                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                            Please enter a valid Ethereum address (0x followed by 40 characters)
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                              
+                              <div className="flex gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowDelegationForm(false);
+                                    setDelegationMode('self');
+                                    setDelegateToAddress('');
+                                  }}
+                                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!address) return;
+                                    
+                                    // Determine target address based on current delegation status
+                                    const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                    const targetAddress = isAlreadyDelegatedToSelf 
+                                      ? delegateToAddress 
+                                      : (delegationMode === 'self' ? address : delegateToAddress);
+                                    
+                                    if (!targetAddress || (!isAlreadyDelegatedToSelf && delegationMode === 'other' && !/^0x[a-fA-F0-9]{40}$/.test(targetAddress)) || (isAlreadyDelegatedToSelf && !/^0x[a-fA-F0-9]{40}$/.test(targetAddress))) {
+                                      setError('Please enter a valid Ethereum address');
+                                      return;
+                                    }
+
+                                    setIsDelegating(true);
+                                    setError(null);
+
+                                    try {
+                                      writeDelegate({
+                                        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+                                        abi: MembershipNFT,
+                                        functionName: 'delegate',
+                                        args: [targetAddress as `0x${string}`],
+                                      });
+                                    } catch (err: any) {
+                                      console.error('Delegation error:', err);
+                                      setError(err.message || 'Failed to delegate');
+                                      setIsDelegating(false);
+                                    }
+                                  }}
+                                  disabled={(() => {
+                                    const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                    if (isAlreadyDelegatedToSelf) {
+                                      return isDelegatePending || isDelegateConfirming || isDelegating || !delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x');
+                                    }
+                                    return isDelegatePending || isDelegateConfirming || isDelegating || (delegationMode === 'other' && (!delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x')));
+                                  })()}
+                                  className="flex-1 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                >
+                                  {isDelegatePending || isDelegateConfirming || isDelegating ? 'Processing...' : 'Update Delegation'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
 
               {/* Delegation Returned Notification */}
               {delegationReturnedNotification && (
@@ -672,7 +742,6 @@ export function MembershipPage() {
           ) : (
             <div className="space-y-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Join the DAO by minting a membership NFT</p>
                 <p className="text-gray-700 dark:text-gray-300">
                   Join the DAO by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH</strong>
                 </p>
@@ -684,10 +753,71 @@ export function MembershipPage() {
                 </div>
               )}
 
+              {/* Data Privacy Notice */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <span className="text-lg">🔒</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                      Data Privacy Notice
+                    </h3>
+                    <div className="space-y-2 text-xs text-blue-800 dark:text-blue-300 mb-3">
+                      <p>
+                        Before minting your membership NFT, please understand:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>
+                          <strong>Personal Information (Off-Chain):</strong> Your name, photo, date of birth, and citizenship 
+                          information will be stored in an off-chain database (not on the blockchain)
+                        </li>
+                        <li>
+                          <strong>On-Chain Data (Permanent):</strong> Only your wallet address, token ID, and governance records 
+                          (proposal creation and voting records) are stored permanently on the blockchain and cannot be changed
+                        </li>
+                        <li>
+                          <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship 
+                          information at any time through the membership page
+                        </li>
+                        <li>
+                          <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance 
+                          records (proposal creation and voting records) are permanent and cannot be modified
+                        </li>
+                        <li>
+                          <strong>Privacy:</strong> Someone viewing only the blockchain cannot link your wallet 
+                          address to your personal information—this link exists only in the off-chain database
+                        </li>
+                      </ul>
+                      <a
+                        href="/philosophy#data-privacy"
+                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
+                      >
+                        Learn more about data privacy and storage →
+                      </a>
+                    </div>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={privacyNoticeAccepted}
+                        onChange={(e) => setPrivacyNoticeAccepted(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      />
+                      <span className="text-sm text-blue-900 dark:text-blue-200">
+                        I understand how my data will be stored and used
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {!showForm && (
                 <button
                   onClick={() => setShowForm(true)}
-                  className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
+                  disabled={!privacyNoticeAccepted}
+                  className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-500"
                 >
                   Mint Membership
                 </button>
@@ -704,11 +834,14 @@ export function MembershipPage() {
                     onCancel={() => {
                       setShowForm(false);
                       setError(null);
+                      setPrivacyNoticeAccepted(false);
                     }}
                   />
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       )}

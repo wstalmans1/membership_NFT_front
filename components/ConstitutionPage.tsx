@@ -17,12 +17,6 @@ export function ConstitutionPage() {
     functionName: 'minDonationWei',
   });
 
-  const { data: baseURI } = useReadContract({
-    address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
-    abi: Constitution,
-    functionName: 'baseURI',
-  });
-
   const { data: revocationAuthority } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
@@ -153,23 +147,10 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
+              {minDonation !== undefined && minDonation !== null
+                ? `${formatEther(BigInt(minDonation.toString()))} Sepolia ETH`
+                : 'Loading...'}
             </span>
-          </div>
-          <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600 dark:text-gray-400">Base URI</span>
-              <div className="relative group">
-                <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Base URI</p>
-                  <p className="text-gray-300">
-                    The base URL used to construct metadata URIs for membership NFTs. The token ID is appended to this URI to fetch individual NFT metadata.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <span className="font-mono text-sm text-gray-900 dark:text-white">{baseURI ? String(baseURI) : '...'}</span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
@@ -185,7 +166,7 @@ export function ConstitutionPage() {
                 </div>
               </div>
             </div>
-            {revocationAuthority ? (
+            {revocationAuthority !== undefined && revocationAuthority !== null ? (
               <a
                 href={`https://eth-sepolia.blockscout.com/address/${String(revocationAuthority)}`}
                 target="_blank"
@@ -195,7 +176,7 @@ export function ConstitutionPage() {
                 {String(revocationAuthority)}
               </a>
             ) : (
-              <span className="font-mono text-sm text-gray-900 dark:text-white">...</span>
+              <span className="font-mono text-sm text-gray-900 dark:text-white">Loading...</span>
             )}
           </div>
         </div>
@@ -219,7 +200,9 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {perTxSpendCap ? formatEther(BigInt(perTxSpendCap.toString())) : '...'} Sepolia ETH
+              {perTxSpendCap !== undefined && perTxSpendCap !== null
+                ? `${formatEther(BigInt(perTxSpendCap.toString()))} Sepolia ETH`
+                : 'Loading...'}
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -236,7 +219,9 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {epochSpendCap ? formatEther(BigInt(epochSpendCap.toString())) : '...'} Sepolia ETH
+              {epochSpendCap !== undefined && epochSpendCap !== null
+                ? `${formatEther(BigInt(epochSpendCap.toString()))} Sepolia ETH`
+                : 'Loading...'}
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -253,7 +238,9 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {epochDuration ? `${Number(epochDuration)} seconds` : '...'}
+              {epochDuration !== undefined && epochDuration !== null
+                ? `${Number(epochDuration)} seconds`
+                : 'Loading...'}
             </span>
           </div>
           <div className="py-3">
@@ -312,7 +299,9 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {votingDelay ? `${Number(votingDelay)} blocks` : '...'}
+              {votingDelay !== undefined && votingDelay !== null
+                ? `${Number(votingDelay)} blocks`
+                : 'Loading...'}
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -329,7 +318,9 @@ export function ConstitutionPage() {
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {votingPeriod ? `${Number(votingPeriod)} blocks` : '...'}
+              {votingPeriod !== undefined && votingPeriod !== null
+                ? `${Number(votingPeriod)} blocks`
+                : 'Loading...'}
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -342,11 +333,16 @@ export function ConstitutionPage() {
                   <p className="text-gray-300">
                     The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
                   </p>
+                  <p className="text-gray-300 mt-2">
+                    <strong>Note:</strong> A threshold of 0 means anyone can create proposals, even without a membership NFT. A threshold of 1 means only members with at least 1 vote (1 delegated NFT) can create proposals.
+                  </p>
                 </div>
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {proposalThreshold ? proposalThreshold.toString() : '...'}
+              {proposalThreshold !== undefined && proposalThreshold !== null
+                ? proposalThreshold.toString()
+                : 'Loading...'}
             </span>
           </div>
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -357,13 +353,15 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Quorum Numerator</p>
                   <p className="text-gray-300">
-                    The numerator used to calculate the quorum percentage. Quorum = (numerator / 100) × total membership supply. For example, a numerator of 10 means 10% of members must vote for a proposal to pass.
+                    The numerator used to calculate the quorum percentage. Quorum = (numerator / 100) × total membership supply. For example, a numerator of 10 means minimum 10% of members must vote for a proposal to be considered.
                   </p>
                 </div>
               </div>
             </div>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {quorumNumerator ? quorumNumerator.toString() : '...'}
+              {quorumNumerator !== undefined && quorumNumerator !== null
+                ? quorumNumerator.toString()
+                : 'Loading...'}
             </span>
           </div>
         </div>
