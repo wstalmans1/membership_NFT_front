@@ -1650,17 +1650,22 @@ export function GovernancePage() {
             {isLoadingProposals ? 'Loading...' : 'Refresh'}
           </button>
         </div>
-        {isLoadingProposals ? (
+        {(isLoadingProposals || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            <p>Loading proposals...</p>
+            <p>{searchProgress || 'Loading proposals...'}</p>
           </div>
-        ) : proposals.length === 0 ? (
+        ) : (!isLoadingProposals && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && proposals.length === 0) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <p>No proposals yet.</p>
             <p className="text-sm mt-2">Be the first to create a proposal!</p>
           </div>
         ) : (
           <div className="space-y-4">
+            {isLoadingOlder && searchProgress && (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-sm">{searchProgress}</p>
+              </div>
+            )}
             {proposals.map((proposal, index) => {
               const isExpanded = expandedProposal === proposal.id;
               const isVoting = votingProposalId === proposal.id;

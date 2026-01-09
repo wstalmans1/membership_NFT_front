@@ -33,6 +33,7 @@ export function MembershipPage() {
   const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(true);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [privacyInitialized, setPrivacyInitialized] = useState(false);
   
   // Prevent hydration mismatch and ensure smooth initial render
   useEffect(() => {
@@ -66,6 +67,17 @@ export function MembershipPage() {
 
   // Determine if user is a member (must be defined before hooks that use it)
   const isMember = balance ? Number(balance) > 0 : false;
+
+  // Set initial privacy expanded state based on membership status
+  // If user has NFT: collapsed (they can see their NFT card)
+  // If user doesn't have NFT: expanded (they need to see the mint form)
+  useEffect(() => {
+    if (!privacyInitialized && address && balance !== undefined) {
+      // Balance has loaded, set initial state
+      setIsPrivacyExpanded(!isMember); // Expanded if not a member, collapsed if member
+      setPrivacyInitialized(true);
+    }
+  }, [address, balance, isMember, privacyInitialized]);
 
   // Log tokenId fetch status for debugging
   useEffect(() => {
@@ -276,32 +288,28 @@ export function MembershipPage() {
               {isMember && tokenId ? (
             <div className="space-y-4">
               {/* Data Privacy and Storage Notice */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <button
-                  onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
-                  className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                >
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                      <span className="text-lg">🔒</span>
+              {privacyInitialized && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <button
+                    onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
+                    className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                        <span className="text-lg">🔒</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                      Your Data Privacy
-                    </h3>
-                    {mounted && (
-                      <>
-                        {isPrivacyExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
-                        )}
-                      </>
-                    )}
-                  </div>
-                </button>
-                {mounted && (
+                    <div className="flex-1 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                        Your Data Privacy
+                      </h3>
+                      {isPrivacyExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                      )}
+                    </div>
+                  </button>
                   <div
                     className={`overflow-hidden transition-all duration-300 ease-in-out ${
                       isPrivacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
@@ -329,8 +337,8 @@ export function MembershipPage() {
                       </a>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* NFT Display Component with Update/Delete buttons */}
               <div className="flex flex-col md:flex-row gap-4 items-start">

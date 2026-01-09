@@ -258,7 +258,7 @@ export function Dashboard() {
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white">Getting Started</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">New to crypto? Start here</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">New to Qawl DAO? Start here</p>
           </Link>
         </div>
       </div>
