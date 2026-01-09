@@ -54,7 +54,7 @@ export default function GettingStarted() {
                   </div>
                 </div>
                 <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 mb-4 ml-2">
-                  <li>1. Visit <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">metamask.io</a></li>
+                  <li>1. Visit <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" suppressHydrationWarning>metamask.io</a></li>
                   <li>2. Click "Download" and choose your browser</li>
                   <li>3. Follow the installation instructions</li>
                   <li>4. Create a new wallet or import an existing one</li>
@@ -65,6 +65,7 @@ export default function GettingStarted() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+                  suppressHydrationWarning
                 >
                   <Download className="w-4 h-4" />
                   Install MetaMask
@@ -84,7 +85,7 @@ export default function GettingStarted() {
                   </div>
                 </div>
                 <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 mb-4 ml-2">
-                  <li>1. Download <a href="https://brave.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Brave browser</a> if needed</li>
+                  <li>1. Download <a href="https://brave.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" suppressHydrationWarning>Brave browser</a> if needed</li>
                   <li>2. Open Brave and look for the wallet icon in the toolbar</li>
                   <li>3. Click it and follow the setup</li>
                   <li>4. Create a new wallet or import an existing one</li>
@@ -95,6 +96,7 @@ export default function GettingStarted() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+                  suppressHydrationWarning
                 >
                   <Download className="w-4 h-4" />
                   Get Brave Browser
@@ -212,6 +214,7 @@ export default function GettingStarted() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-4 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      suppressHydrationWarning
                     >
                       Visit Faucet
                       <ExternalLink className="w-4 h-4" />
@@ -261,6 +264,7 @@ export default function GettingStarted() {
               <a
                 href="/"
                 className="inline-block px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
+                suppressHydrationWarning
               >
                 Go to Dashboard →
               </a>

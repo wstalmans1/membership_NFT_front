@@ -50,6 +50,15 @@ export function GovernancePage() {
   const [executingProposalId, setExecutingProposalId] = useState<string | null>(null);
   const [executedProposalIds, setExecutedProposalIds] = useState<Set<string>>(new Set());
   const lastExecuteHashRef = useRef<string | undefined>(undefined);
+  
+  // Pagination state: track oldest block we've loaded and all accumulated proposals
+  const [oldestLoadedBlock, setOldestLoadedBlock] = useState<bigint | null>(null);
+  const [allProposals, setAllProposals] = useState<any[]>([]);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<string | null>(null);
+  const [noMoreProposals, setNoMoreProposals] = useState(false);
+  const [hasAutoSearched, setHasAutoSearched] = useState(false);
+  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   const { writeContract, data: hash, isPending, isError } = useWriteContract();
   const { writeContract: writeVote, data: voteHash, isPending: isVoting, isError: isVoteError } = useWriteContract();
@@ -136,45 +145,60 @@ export function GovernancePage() {
     functionName: 'quorumNumerator',
   });
 
-  // Fetch proposals from ProposalCreated events
-  const { data: proposals = [], refetch: refetchProposals, isLoading: isLoadingProposals } = useQuery({
-    queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
+  // Get timelock delay from TimelockController
+  const { data: timelockDelaySeconds } = useReadContract({
+    address: CONTRACTS.SEPOLIA.TIMELOCK,
+    abi: [
+      {
+        inputs: [],
+        name: 'getMinDelay',
+        outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+    ],
+    functionName: 'getMinDelay',
+  });
+
+  // Fetch latest proposals from ProposalCreated events (last 800 blocks)
+  const CHUNK_SIZE = 800n;
+  // Block number of the first proposal ever created in the DAO
+  const FIRST_PROPOSAL_BLOCK = 9983760n;
+  const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
+    queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
     queryFn: async () => {
       if (!publicClient) return [];
 
       try {
         // Get current block number
-        const currentBlockNumber = await publicClient.getBlockNumber();
+        const currentBlock = await publicClient.getBlock({ blockTag: 'latest' });
+        const currentBlockNumber = currentBlock.number;
         
-        // RPC providers typically limit to 1000 blocks, so we'll fetch in chunks if needed
-        // For now, just fetch the last 1000 blocks to stay within limits
-        const maxBlocksToFetch = 1000n;
-        const fromBlock = currentBlockNumber > maxBlocksToFetch 
-          ? currentBlockNumber - maxBlocksToFetch 
-          : 0n;
+        // Fetch only the last 800 blocks for immediate display (but not before the first proposal)
+        const fromBlock = currentBlockNumber > CHUNK_SIZE 
+          ? (currentBlockNumber - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
+              ? currentBlockNumber - CHUNK_SIZE 
+              : FIRST_PROPOSAL_BLOCK)
+          : FIRST_PROPOSAL_BLOCK;
 
-        console.log('Fetching proposals from block', fromBlock.toString(), 'to', currentBlockNumber.toString(), `(${Number(currentBlockNumber - fromBlock)} blocks)`);
+        console.log('Fetching latest proposals from block', fromBlock.toString(), 'to', currentBlockNumber.toString(), `(${Number(currentBlockNumber - fromBlock)} blocks)`);
+        
+        // Verify event signature is found
+        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+        if (!proposalCreatedEvent) {
+          console.error('ProposalCreated event not found in ABI!');
+          return [];
+        }
 
-        // Get ProposalCreated events - use ABI directly for automatic decoding
+        // Fetch logs for the latest chunk
         const logs = await publicClient.getLogs({
           address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-          event: {
-            type: 'event',
-            name: 'ProposalCreated',
-            inputs: DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated')?.inputs || [],
-          } as any,
-          fromBlock,
+          event: proposalCreatedEvent as any,
+          fromBlock: fromBlock,
           toBlock: currentBlockNumber,
         });
-
-        console.log('Found proposal logs:', logs.length);
-        if (logs.length > 0) {
-          console.log('Sample log structure:', {
-            address: logs[0].address,
-            topics: logs[0].topics,
-            blockNumber: logs[0].blockNumber?.toString(),
-          });
-        }
+        
+        console.log(`Found ${logs.length} proposal logs in latest ${CHUNK_SIZE.toString()} blocks`);
 
         // Process logs - they should already be decoded
         const proposalPromises = logs.map(async (log: any) => {
@@ -395,14 +419,388 @@ export function GovernancePage() {
         
         // Sort by blockNumber (newest first) to ensure correct chronological order
         return proposals.sort((a, b) => b.blockNumber - a.blockNumber);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching proposals:', error);
+        console.error('Error details:', {
+          message: error?.message,
+          code: error?.code,
+          name: error?.name,
+          stack: error?.stack,
+        });
+        // Return empty array on error to prevent UI crash
         return [];
       }
     },
     enabled: !!publicClient,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds to show new proposals immediately
   });
+
+  // Get current block number for auto-search
+  useEffect(() => {
+    if (!publicClient) return;
+    
+    const fetchBlockNumber = async () => {
+      try {
+        const block = await publicClient.getBlock({ blockTag: 'latest' });
+        setCurrentBlockNumber(block.number);
+      } catch (error) {
+        console.error('Error fetching current block number:', error);
+      }
+    };
+    
+    fetchBlockNumber();
+    // Refresh block number periodically
+    const interval = setInterval(fetchBlockNumber, 30000);
+    return () => clearInterval(interval);
+  }, [publicClient]);
+
+  // Merge latest proposals with accumulated older proposals, removing duplicates
+  useEffect(() => {
+    if (latestProposals.length > 0) {
+      setAllProposals((prev) => {
+        // Create a map of existing proposals by ID for quick lookup
+        const existingMap = new Map(prev.map(p => [p.id, p]));
+        
+        // Add/update latest proposals (they take precedence for state updates)
+        latestProposals.forEach(proposal => {
+          existingMap.set(proposal.id, proposal);
+        });
+        
+        // Convert back to array and sort by block number (newest first)
+        return Array.from(existingMap.values()).sort((a, b) => b.blockNumber - a.blockNumber);
+      });
+      
+      // Set oldest loaded block on initial load (find the oldest block number from proposals)
+      if (oldestLoadedBlock === null && latestProposals.length > 0) {
+        const oldestBlock = Math.min(...latestProposals.map(p => p.blockNumber));
+        setOldestLoadedBlock(BigInt(oldestBlock));
+      }
+    } else if (latestProposals.length === 0 && !isLoadingProposals && !hasAutoSearched && currentBlockNumber && oldestLoadedBlock === null) {
+      // No proposals found in initial query - automatically search backwards
+      console.log('No proposals found in initial query, automatically searching backwards...');
+      const initialOldestBlock = currentBlockNumber > CHUNK_SIZE 
+        ? (currentBlockNumber - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
+            ? currentBlockNumber - CHUNK_SIZE 
+            : FIRST_PROPOSAL_BLOCK)
+        : FIRST_PROPOSAL_BLOCK;
+      
+      setOldestLoadedBlock(initialOldestBlock);
+      setHasAutoSearched(true);
+    }
+  }, [latestProposals, oldestLoadedBlock, isLoadingProposals, hasAutoSearched, currentBlockNumber]);
+  
+  // Auto-trigger backward search when oldestLoadedBlock is set but no proposals found yet
+  useEffect(() => {
+    if (oldestLoadedBlock && oldestLoadedBlock > FIRST_PROPOSAL_BLOCK && hasAutoSearched && allProposals.length === 0 && !isLoadingOlder && publicClient) {
+      // Small delay to ensure state is settled, then trigger the existing loadOlderProposals function
+      const timer = setTimeout(() => {
+        // Use the existing loadOlderProposals function which will handle the search
+        loadOlderProposals();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oldestLoadedBlock, hasAutoSearched, allProposals.length, isLoadingOlder, publicClient]);
+
+  // Function to load older proposals (auto-continue until proposals found)
+  const loadOlderProposals = async () => {
+    if (!publicClient || !oldestLoadedBlock || oldestLoadedBlock === 0n || isLoadingOlder) return;
+    
+    setIsLoadingOlder(true);
+    setSearchProgress(null);
+    
+    try {
+      // Check if we've reached the first proposal block
+      if (oldestLoadedBlock <= FIRST_PROPOSAL_BLOCK) {
+        setNoMoreProposals(true);
+        setSearchProgress('No more proposals available. Reached the first proposal in the DAO.');
+        setTimeout(() => {
+          setSearchProgress(null);
+        }, 3000);
+        setIsLoadingOlder(false);
+        return;
+      }
+      
+      const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+      if (!proposalCreatedEvent) {
+        console.error('ProposalCreated event not found in ABI!');
+        return;
+      }
+      
+      let currentOldestBlock = oldestLoadedBlock;
+      let totalBlocksChecked = 0n;
+      let allFoundProposals: any[] = [];
+      const MAX_CHUNKS_TO_SEARCH = 10; // Limit to prevent infinite loops
+      const MIN_PROPOSALS_TO_LOAD = 5; // Load at least 5 proposals before stopping
+      let chunksSearched = 0;
+      
+      // Keep searching chunks until we find at least MIN_PROPOSALS_TO_LOAD proposals or hit limits
+      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > FIRST_PROPOSAL_BLOCK && allFoundProposals.length < MIN_PROPOSALS_TO_LOAD) {
+        const newFromBlock = currentOldestBlock > CHUNK_SIZE 
+          ? (currentOldestBlock - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
+              ? currentOldestBlock - CHUNK_SIZE 
+              : FIRST_PROPOSAL_BLOCK)
+          : FIRST_PROPOSAL_BLOCK;
+        const newToBlock = currentOldestBlock - 1n;
+        const blocksInChunk = newToBlock - newFromBlock + 1n;
+        totalBlocksChecked += blocksInChunk;
+        
+        // Update search progress
+        const proposalsFoundSoFar = allFoundProposals.length;
+        const remainingNeeded = Math.max(0, MIN_PROPOSALS_TO_LOAD - proposalsFoundSoFar);
+        setSearchProgress(
+          proposalsFoundSoFar > 0
+            ? `Found ${proposalsFoundSoFar} proposal(s), searching for ${remainingNeeded} more... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
+            : `Searching for proposals... (checked ${totalBlocksChecked.toLocaleString()} blocks so far)`
+        );
+        
+        console.log(`Loading older proposals: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
+        
+        try {
+          const logs = await publicClient.getLogs({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            event: proposalCreatedEvent as any,
+            fromBlock: newFromBlock,
+            toBlock: newToBlock,
+          });
+          
+          console.log(`Found ${logs.length} proposal logs in chunk ${chunksSearched + 1}`);
+          
+          // If we found proposals, process them and stop searching
+          if (logs.length > 0) {
+            // Process logs (same processing logic as latest proposals)
+            const proposalPromises = logs.map(async (log: any) => {
+              try {
+                let proposalId: bigint;
+                let proposer: Address;
+                let description: string;
+                let targets: Address[];
+                let values: bigint[];
+                let calldatas: `0x${string}`[];
+                let voteStart: bigint;
+                let voteEnd: bigint;
+
+                if (log.args) {
+                  proposalId = log.args.proposalId as bigint;
+                  proposer = log.args.proposer as Address;
+                  description = log.args.description as string;
+                  targets = log.args.targets as Address[];
+                  values = log.args.values as bigint[] || [];
+                  calldatas = log.args.calldatas as `0x${string}`[] || [];
+                  voteStart = log.args.voteStart as bigint;
+                  voteEnd = log.args.voteEnd as bigint;
+                } else {
+                  const { decodeEventLog } = await import('viem');
+                  const decoded = decodeEventLog({
+                    abi: DAOGovernor,
+                    data: log.data,
+                    topics: log.topics,
+                  });
+                  if (!decoded.args || !Array.isArray(decoded.args)) {
+                    return null;
+                  }
+                  const args = decoded.args as any;
+                  proposalId = args.proposalId as bigint;
+                  proposer = args.proposer as Address;
+                  description = args.description as string;
+                  targets = args.targets as Address[];
+                  values = args.values as bigint[] || [];
+                  calldatas = args.calldatas as `0x${string}`[] || [];
+                  voteStart = args.voteStart as bigint;
+                  voteEnd = args.voteEnd as bigint;
+                }
+                
+                const stateMap: Record<number, string> = {
+                  0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated',
+                  4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed',
+                };
+                const stateLabels: Record<number, string> = {
+                  0: '⏳ Waiting to Start', 1: '🗳️ Voting Open', 2: '❌ Canceled',
+                  3: '❌ Defeated', 4: '✅ Proposal Passed', 5: '⏳ Scheduled',
+                  6: '⏰ Expired', 7: '✅ Executed',
+                };
+
+                const [state, proposalVotesResult, proposalSnapshot, proposalDeadline] = await Promise.all([
+                  publicClient.readContract({
+                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                    abi: DAOGovernor,
+                    functionName: 'state',
+                    args: [proposalId],
+                  }),
+                  publicClient.readContract({
+                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                    abi: DAOGovernor,
+                    functionName: 'proposalVotes',
+                    args: [proposalId],
+                  }).catch(() => null),
+                  publicClient.readContract({
+                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                    abi: DAOGovernor,
+                    functionName: 'proposalSnapshot',
+                    args: [proposalId],
+                  }).catch(() => null),
+                  publicClient.readContract({
+                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                    abi: DAOGovernor,
+                    functionName: 'proposalDeadline',
+                    args: [proposalId],
+                  }).catch(() => null),
+                ]);
+
+                let quorumResult: bigint | null = null;
+                if (proposalSnapshot) {
+                  try {
+                    quorumResult = (await publicClient.readContract({
+                      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                      abi: DAOGovernor,
+                      functionName: 'quorum',
+                      args: [proposalSnapshot],
+                    })) as bigint;
+                  } catch (err) {
+                    quorumResult = null;
+                  }
+                }
+
+                const proposalVotes = proposalVotesResult as [bigint, bigint, bigint] | null;
+                const quorum = quorumResult as bigint | null;
+
+                let voteAnalysis: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null = null;
+                if (proposalVotes && quorum !== null) {
+                  const againstVotes = proposalVotes[0] || 0n;
+                  const forVotes = proposalVotes[1] || 0n;
+                  const abstainVotes = proposalVotes[2] || 0n;
+                  const totalVotes = forVotes + abstainVotes;
+                  const quorumReached = totalVotes >= quorum;
+                  const voteSucceeded = forVotes > againstVotes;
+                  
+                  let reason = '';
+                  if (quorumReached && voteSucceeded) {
+                    reason = `Quorum reached (${totalVotes.toLocaleString()} votes ≥ ${quorum.toLocaleString()} required) and majority for (${forVotes.toLocaleString()} for vs ${againstVotes.toLocaleString()} against)`;
+                  } else if (!quorumReached) {
+                    reason = `Quorum not reached (${totalVotes.toLocaleString()} votes < ${quorum.toLocaleString()} required)`;
+                  } else if (!voteSucceeded) {
+                    reason = `Quorum reached but majority against (${againstVotes.toLocaleString()} against vs ${forVotes.toLocaleString()} for)`;
+                  }
+                  voteAnalysis = { quorumReached, voteSucceeded, reason };
+                }
+
+                let proposalEta: bigint | null = null;
+                if (Number(state) === 5) {
+                  try {
+                    proposalEta = (await publicClient.readContract({
+                      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                      abi: DAOGovernor,
+                      functionName: 'proposalEta',
+                      args: [proposalId],
+                    })) as bigint;
+                  } catch (err) {
+                    // Ignore
+                  }
+                }
+
+                return {
+                  id: proposalId.toString(),
+                  proposalId: proposalId.toString(),
+                  proposer,
+                  description,
+                  targets,
+                  values: values.map(v => v.toString()),
+                  calldatas: calldatas as `0x${string}`[],
+                  voteStart: Number(voteStart),
+                  voteEnd: Number(voteEnd),
+                  state: stateMap[Number(state)] || 'Unknown',
+                  stateLabel: stateLabels[Number(state)] || 'Unknown',
+                  blockNumber: Number(log.blockNumber),
+                  proposalEta: proposalEta ? Number(proposalEta) : null,
+                  votes: proposalVotes ? {
+                    againstVotes: proposalVotes[0]?.toString() || '0',
+                    forVotes: proposalVotes[1]?.toString() || '0',
+                    abstainVotes: proposalVotes[2]?.toString() || '0',
+                  } : undefined,
+                  quorum: quorum?.toString() || undefined,
+                  voteAnalysis,
+                };
+              } catch (err) {
+                console.error('Error decoding older proposal event:', err);
+                return null;
+              }
+            });
+
+            const chunkProposals = (await Promise.all(proposalPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
+            allFoundProposals.push(...chunkProposals);
+            
+            // Update current oldest block to continue searching backwards
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            
+            // If we've found enough proposals, stop searching
+            if (allFoundProposals.length >= MIN_PROPOSALS_TO_LOAD) {
+              break;
+            }
+            
+            // Add a small delay between chunks to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } else {
+            // No proposals in this chunk, continue searching
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            
+            // Add a small delay between chunks to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (chunkError: any) {
+          console.error(`Error fetching chunk ${chunksSearched + 1}:`, chunkError);
+          // Continue to next chunk on error
+          currentOldestBlock = newFromBlock;
+          chunksSearched++;
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      // Merge found proposals with existing proposals
+      if (allFoundProposals.length > 0) {
+        setAllProposals((prev) => {
+          const existingMap = new Map(prev.map(p => [p.id, p]));
+          allFoundProposals.forEach(proposal => {
+            existingMap.set(proposal.id, proposal);
+          });
+          return Array.from(existingMap.values()).sort((a, b) => b.blockNumber - a.blockNumber);
+        });
+        
+        // Update oldest loaded block to the oldest block we searched
+        const oldestFoundBlock = Math.min(...allFoundProposals.map(p => p.blockNumber));
+        setOldestLoadedBlock(BigInt(oldestFoundBlock));
+        
+        setSearchProgress(`Found ${allFoundProposals.length} proposal(s) after checking ${totalBlocksChecked.toLocaleString()} blocks`);
+      } else {
+        // No proposals found after searching multiple chunks
+        if (currentOldestBlock <= FIRST_PROPOSAL_BLOCK) {
+          setNoMoreProposals(true);
+          setSearchProgress(`No more proposals found. Reached the first proposal in the DAO.`);
+        } else {
+          setSearchProgress(`No proposals found in ${totalBlocksChecked.toLocaleString()} blocks. Try loading more.`);
+        }
+        // Still update oldest loaded block so we don't search the same range again
+        setOldestLoadedBlock(currentOldestBlock > FIRST_PROPOSAL_BLOCK ? currentOldestBlock : FIRST_PROPOSAL_BLOCK);
+      }
+      
+      // Clear search progress after a delay
+      setTimeout(() => {
+        setSearchProgress(null);
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error loading older proposals:', error);
+      setSearchProgress(`Error: ${error.message || 'Failed to load proposals'}`);
+      setTimeout(() => {
+        setSearchProgress(null);
+      }, 3000);
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  // Use merged proposals for display
+  const proposals = allProposals;
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -491,14 +889,14 @@ export function GovernancePage() {
       
       // Refetch proposals after a short delay to allow block to be mined
       setTimeout(() => {
-        refetchProposals();
+        refetchLatestProposals();
         setTimeout(() => {
           setShowCreateForm(false);
           setSuccess(null);
         }, 2000);
       }, 2000);
     }
-  }, [isConfirmed, refetchProposals]);
+  }, [isConfirmed, refetchLatestProposals]);
 
   // Handle queue confirmation - fetch actual ETA from contract when queue is confirmed
   useEffect(() => {
@@ -584,7 +982,7 @@ export function GovernancePage() {
         
         setSuccess('Proposal scheduled successfully! It will be ready to execute after the safety delay period.');
         setTimeout(() => {
-          refetchProposals();
+          refetchLatestProposals();
           setTimeout(() => {
             setSuccess(null);
           }, 3000);
@@ -593,7 +991,7 @@ export function GovernancePage() {
 
       fetchActualETA();
     }
-  }, [isQueueConfirmed, queueHash, publicClient, queueingProposalId, refetchProposals]);
+  }, [isQueueConfirmed, queueHash, publicClient, queueingProposalId, refetchLatestProposals]);
 
   // Handle execute confirmation
   useEffect(() => {
@@ -605,19 +1003,19 @@ export function GovernancePage() {
       }
       setSuccess('Proposal executed successfully! All changes have been applied.');
       // Immediately refetch proposals to update state
-      refetchProposals();
+      refetchLatestProposals();
       // Refetch multiple times with delays to ensure state has updated on-chain
       setTimeout(() => {
-        refetchProposals();
+        refetchLatestProposals();
       }, 2000);
       setTimeout(() => {
-        refetchProposals();
+        refetchLatestProposals();
         setTimeout(() => {
           setSuccess(null);
         }, 3000);
       }, 5000);
     }
-  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchProposals]);
+  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchLatestProposals]);
 
   // Clean up tracking when proposal state updates to Queued - use actual ETA from contract
   useEffect(() => {
@@ -657,7 +1055,7 @@ export function GovernancePage() {
       
       // Refetch immediately
       console.log('Refetching proposals immediately after vote confirmation...');
-      refetchProposals().then((result) => {
+      refetchLatestProposals().then((result) => {
         console.log('First refetch completed, proposals:', result.data?.length);
         if (result.data) {
           const votedProposal = result.data.find((p: any) => p.id === confirmedProposalId);
@@ -673,8 +1071,8 @@ export function GovernancePage() {
       // Refetch multiple times with increasing delays to ensure state has updated
       setTimeout(() => {
         console.log('Refetching proposals after 3 seconds...');
-        queryClient.invalidateQueries({ queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
-        refetchProposals().then((result) => {
+        queryClient.invalidateQueries({ queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
+        refetchLatestProposals().then((result) => {
           console.log('Second refetch completed');
           if (result.data) {
             const votedProposal = result.data.find((p: any) => p.id === confirmedProposalId);
@@ -690,8 +1088,8 @@ export function GovernancePage() {
       
       setTimeout(() => {
         console.log('Refetching proposals after 8 seconds...');
-        queryClient.invalidateQueries({ queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
-        refetchProposals().then((result) => {
+        queryClient.invalidateQueries({ queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
+        refetchLatestProposals().then((result) => {
           console.log('Third refetch completed');
           if (result.data) {
             const votedProposal = result.data.find((p: any) => p.id === confirmedProposalId);
@@ -706,7 +1104,7 @@ export function GovernancePage() {
         setSuccess(null);
       }, 8000);
     }
-  }, [isVoteConfirmed, votingProposalId, refetchProposals, refetchHasVoted, queryClient, voteReceipt]);
+  }, [isVoteConfirmed, votingProposalId, refetchLatestProposals, refetchHasVoted, queryClient, voteReceipt]);
 
   const handleVote = async (proposalId: string, support: number) => {
     if (!address || !isConnected) {
@@ -913,7 +1311,29 @@ export function GovernancePage() {
       {/* Governance Parameters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Proposal Threshold</p>
+                  <p className="text-gray-300">
+                    The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
+                  </p>
+                  <p className="text-gray-300 mt-2">
+                    <strong>Note:</strong> A threshold of 0 means anyone can create proposals, even without a membership NFT. A threshold of 1 means only members with at least 1 vote (1 delegated NFT) can create proposals.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              {proposalThreshold !== undefined && proposalThreshold !== null
+                ? proposalThreshold.toString()
+                : 'Loading...'}
+            </p>
+          </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
@@ -954,23 +1374,20 @@ export function GovernancePage() {
           </div>
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Timelock Delay</p>
               <div className="relative group">
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Proposal Threshold</p>
+                  <p className="mb-2 font-semibold">Timelock Delay</p>
                   <p className="text-gray-300">
-                    The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
-                  </p>
-                  <p className="text-gray-300 mt-2">
-                    <strong>Note:</strong> A threshold of 0 means anyone can create proposals, even without a membership NFT. A threshold of 1 means only members with at least 1 vote (1 delegated NFT) can create proposals.
+                    The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This safety delay allows the community to review and potentially cancel malicious proposals before they take effect.
                   </p>
                 </div>
               </div>
             </div>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {proposalThreshold !== undefined && proposalThreshold !== null
-                ? proposalThreshold.toString()
+              {timelockDelaySeconds !== undefined && timelockDelaySeconds !== null
+                ? `${Number(timelockDelaySeconds)} seconds${Number(timelockDelaySeconds) >= 12 ? ` (~${Math.round(Number(timelockDelaySeconds) / 12)} blocks)` : ''}`
                 : 'Loading...'}
             </p>
           </div>
@@ -1226,7 +1643,7 @@ export function GovernancePage() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Proposals</h2>
           <button
-            onClick={() => refetchProposals()}
+            onClick={() => refetchLatestProposals()}
             disabled={isLoadingProposals}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
           >
@@ -1260,7 +1677,7 @@ export function GovernancePage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Proposal #{proposals.length - index}</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">Proposal from block {proposal.blockNumber.toLocaleString()}</h3>
                         <CopyableProposalId proposalId={proposal.id} />
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -1418,6 +1835,42 @@ export function GovernancePage() {
                 </div>
               );
             })}
+            
+            {/* Pagination: Load older proposals */}
+            {oldestLoadedBlock !== null && oldestLoadedBlock > 0n && (
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
+                <button
+                  onClick={loadOlderProposals}
+                  disabled={isLoadingOlder || noMoreProposals}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isLoadingOlder ? (
+                    <>
+                      <span className="inline-block animate-spin mr-2">⏳</span>
+                      {searchProgress || 'Loading older proposals...'}
+                    </>
+                  ) : noMoreProposals ? (
+                    <>
+                      No more older proposals
+                    </>
+                  ) : (
+                    <>
+                      Load older proposals
+                    </>
+                  )}
+                </button>
+                {searchProgress && !isLoadingOlder && (
+                  <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                    {searchProgress}
+                  </p>
+                )}
+                {oldestLoadedBlock > 0n && !searchProgress && !noMoreProposals && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Currently showing proposals from block {oldestLoadedBlock.toLocaleString()} onwards
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

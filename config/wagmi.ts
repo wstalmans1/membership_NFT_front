@@ -1,7 +1,6 @@
 import { createConfig, http, fallback } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
+import { sepolia, mainnet } from 'wagmi/chains';
 import { metaMask, injected } from 'wagmi/connectors';
-import { CHAIN_ID } from './contracts';
 
 // Support custom RPC URLs for decentralization
 // Users can provide their own RPC endpoint via environment variable
@@ -25,13 +24,15 @@ const transports = rpcUrl
         http(rpcUrl), // User's custom RPC first
         http(), // Fallback to public RPCs
       ]),
+      [mainnet.id]: http(), // Mainnet uses default public RPCs
     }
   : {
       [sepolia.id]: http(), // Use default public RPCs
+      [mainnet.id]: http(), // Mainnet uses default public RPCs
     };
 
 export const wagmiConfig = createConfig({
-  chains: [sepolia],
+  chains: [sepolia, mainnet], // Include Mainnet so wagmi can detect when MetaMask switches to it
   connectors: [
     // Only MetaMask and Brave Wallet - simple and clean
     metaMask(),

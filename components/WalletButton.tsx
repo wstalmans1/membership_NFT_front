@@ -71,7 +71,7 @@ export function WalletButton() {
         {/* Pill-shaped button */}
         <button
           onClick={() => setShowModal(!showModal)}
-          className="flex items-center gap-2.5 px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-full hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors font-medium text-sm"
+          className="flex items-center gap-2.5 px-4 py-1.5 bg-blue-500 dark:bg-blue-600 text-white rounded-full hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors font-medium text-sm h-8"
         >
           <span className="font-semibold whitespace-nowrap">{balanceDisplay} Sepolia ETH</span>
           <span className="text-lg flex-shrink-0">🍉</span>

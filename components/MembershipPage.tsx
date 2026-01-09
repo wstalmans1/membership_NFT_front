@@ -32,6 +32,12 @@ export function MembershipPage() {
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(true);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  
+  // Prevent hydration mismatch and ensure smooth initial render
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
@@ -284,34 +290,44 @@ export function MembershipPage() {
                     <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
                       Your Data Privacy
                     </h3>
-                    {isPrivacyExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />
+                    {mounted && (
+                      <>
+                        {isPrivacyExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                        )}
+                      </>
                     )}
                   </div>
                 </button>
-                {isPrivacyExpanded && (
-                  <div className="mt-3 ml-11 space-y-2">
-                    <p className="text-xs text-blue-800 dark:text-blue-300">
-                      The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
-                    </p>
-                    <p className="text-xs text-blue-800 dark:text-blue-300">
-                      <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship information at any time through the "Update" button on your membership card.
-                    </p>
-                    <p className="text-xs text-blue-800 dark:text-blue-300">
-                      <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records (proposal creation and voting records) are permanent and cannot be modified.
-                    </p>
-                    <p className="text-xs text-blue-800 dark:text-blue-300">
-                      <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
-                    </p>
-                    <a
-                      href="/philosophy#data-privacy"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
-                    >
-                      Learn more about data privacy and storage →
-                    </a>
+                {mounted && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isPrivacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="ml-11 space-y-2">
+                      <p className="text-xs text-blue-800 dark:text-blue-300">
+                        The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
+                      </p>
+                      <p className="text-xs text-blue-800 dark:text-blue-300">
+                        <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship information at any time through the "Update" button on your membership card.
+                      </p>
+                      <p className="text-xs text-blue-800 dark:text-blue-300">
+                        <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records (proposal creation and voting records) are permanent and cannot be modified.
+                      </p>
+                      <p className="text-xs text-blue-800 dark:text-blue-300">
+                        <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
+                      </p>
+                      <a
+                        href="/philosophy#data-privacy"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
+                      >
+                        Learn more about data privacy and storage →
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>

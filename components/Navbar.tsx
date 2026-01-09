@@ -56,13 +56,11 @@ export function Navbar() {
             </div>
           </div>
           
-          {/* Right side: Network Status, Wallet Button, and Mobile Menu Button */}
+          {/* Right side: Wallet Button, Network Status, and Mobile Menu Button */}
           <div className="flex items-center gap-2 md:gap-4">
-            <div className="hidden sm:block">
-              <NetworkStatus />
-            </div>
-            <div className="hidden sm:block">
+            <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:h-16 sm:gap-1">
               <WalletButton />
+              <NetworkStatus />
             </div>
             
             {/* Mobile Menu Button */}
