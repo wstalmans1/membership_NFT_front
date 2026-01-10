@@ -7,7 +7,7 @@ import { Constitution } from '@/abis/Constitution';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatEther } from '@/lib/utils';
 import { encodeFunctionData, Address } from 'viem';
-import { HelpCircle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ExternalLink, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function ConstitutionPage() {
@@ -15,6 +15,7 @@ export function ConstitutionPage() {
   const router = useRouter();
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isAllowlistFormExpanded, setIsAllowlistFormExpanded] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   // Constitution parameters
   const { data: minDonation } = useReadContract({
@@ -350,15 +351,38 @@ export function ConstitutionPage() {
               <div className="space-y-2">
                 {(allowedRecipients as Address[]).map((address) => (
                   <div key={address} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <a
-                      href={`https://eth-sepolia.blockscout.com/address/${address}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
-                    >
-                      {address}
-                    </a>
-                    <span className="ml-2 px-2 py-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <a
+                        href={`https://eth-sepolia.blockscout.com/address/${address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                      >
+                        {address}
+                      </a>
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          try {
+                            await navigator.clipboard.writeText(address);
+                            setCopiedAddress(address);
+                            setTimeout(() => setCopiedAddress(null), 2000);
+                          } catch (err) {
+                            console.error('Failed to copy address:', err);
+                          }
+                        }}
+                        className="flex-shrink-0 p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                        title={copiedAddress === address ? 'Copied!' : 'Copy address'}
+                      >
+                        {copiedAddress === address ? (
+                          <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    <span className="ml-2 px-2 py-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded flex-shrink-0">
                       Allowed
                     </span>
                   </div>

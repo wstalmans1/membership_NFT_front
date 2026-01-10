@@ -232,13 +232,37 @@ export function GovernancePage() {
           return [];
         }
 
-        // Fetch logs for the latest chunk
-        const logs = await publicClient.getLogs({
-          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-          event: proposalCreatedEvent as any,
-          fromBlock: fromBlock,
-          toBlock: currentBlockNumber,
-        });
+        // Fetch logs for the latest chunk with retry logic
+        let logs: any[] = [];
+        let retries = 3;
+        let lastError: any = null;
+        
+        while (retries > 0) {
+          try {
+            logs = await publicClient.getLogs({
+              address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+              event: proposalCreatedEvent as any,
+              fromBlock: fromBlock,
+              toBlock: currentBlockNumber,
+            });
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            lastError = error;
+            retries--;
+            if (retries > 0) {
+              // Wait before retrying (exponential backoff)
+              const delay = (4 - retries) * 1000; // 1s, 2s, 3s
+              console.warn(`RPC request failed, retrying in ${delay}ms... (${retries} retries left)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        if (logs.length === 0 && lastError) {
+          console.warn('Failed to fetch proposal logs after retries:', lastError);
+          // Return empty array instead of throwing - UI will show "No proposals yet"
+          return [];
+        }
         
         console.log(`Found ${logs.length} proposal logs in latest ${CHUNK_SIZE.toString()} blocks`);
 
@@ -599,12 +623,40 @@ export function GovernancePage() {
         console.log(`Loading older proposals: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
         
         try {
-          const logs = await publicClient.getLogs({
-            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-            event: proposalCreatedEvent as any,
-            fromBlock: newFromBlock,
-            toBlock: newToBlock,
-          });
+          // Fetch logs with retry logic
+          let logs: any[] = [];
+          let retries = 3;
+          let lastError: any = null;
+          
+          while (retries > 0) {
+            try {
+              logs = await publicClient.getLogs({
+                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                event: proposalCreatedEvent as any,
+                fromBlock: newFromBlock,
+                toBlock: newToBlock,
+              });
+              break; // Success, exit retry loop
+            } catch (error: any) {
+              lastError = error;
+              retries--;
+              if (retries > 0) {
+                // Wait before retrying (exponential backoff)
+                const delay = (4 - retries) * 1000; // 1s, 2s, 3s
+                console.warn(`RPC request failed for chunk ${chunksSearched + 1}, retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
+          }
+          
+          if (logs.length === 0 && lastError) {
+            console.warn(`Failed to fetch logs for chunk ${chunksSearched + 1} after retries:`, lastError);
+            // Continue to next chunk on error
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            await new Promise(resolve => setTimeout(resolve, 200));
+            continue;
+          }
           
           console.log(`Found ${logs.length} proposal logs in chunk ${chunksSearched + 1}`);
           
