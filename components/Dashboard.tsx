@@ -247,6 +247,13 @@ export function Dashboard() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View governance parameters</p>
           </Link>
           <Link
+            href="/dao-architecture"
+            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+          >
+            <h3 className="font-semibold text-gray-900 dark:text-white">DAO Architecture</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand how the DAO works</p>
+          </Link>
+          <Link
             href="/philosophy"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >

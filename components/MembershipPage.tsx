@@ -29,16 +29,14 @@ export function MembershipPage() {
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(true);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [privacyInitialized, setPrivacyInitialized] = useState(false);
   
-  // Prevent hydration mismatch and ensure smooth initial render
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Initialize privacy expanded state based on membership status
+  // For members: collapsed (false) - they can see their NFT card
+  // For non-members: expanded (true) - they need to see the mint form
+  // We'll update this when balance loads, but start with false to avoid flash
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
@@ -68,16 +66,14 @@ export function MembershipPage() {
   // Determine if user is a member (must be defined before hooks that use it)
   const isMember = balance ? Number(balance) > 0 : false;
 
-  // Set initial privacy expanded state based on membership status
-  // If user has NFT: collapsed (they can see their NFT card)
-  // If user doesn't have NFT: expanded (they need to see the mint form)
+  // Set privacy expanded state based on membership status immediately when balance loads
+  // This ensures no flash - if user is a member, privacy section stays collapsed
   useEffect(() => {
-    if (!privacyInitialized && address && balance !== undefined) {
-      // Balance has loaded, set initial state
+    if (address && balance !== undefined) {
+      // Balance has loaded, set state immediately
       setIsPrivacyExpanded(!isMember); // Expanded if not a member, collapsed if member
-      setPrivacyInitialized(true);
     }
-  }, [address, balance, isMember, privacyInitialized]);
+  }, [address, balance, isMember]);
 
   // Log tokenId fetch status for debugging
   useEffect(() => {
@@ -285,11 +281,11 @@ export function MembershipPage() {
           
           {isMembershipStatusExpanded && (
             <>
-              {isMember && tokenId ? (
+              {isMember && tokenId && balance !== undefined ? (
             <div className="space-y-4">
               {/* Data Privacy and Storage Notice */}
-              {privacyInitialized && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              {/* Only render when we're certain user is a member (balance loaded) to prevent flash */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <button
                     onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
                     className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
@@ -338,7 +334,6 @@ export function MembershipPage() {
                     </div>
                   </div>
                 </div>
-              )}
 
               {/* NFT Display Component with Update/Delete buttons */}
               <div className="flex flex-col md:flex-row gap-4 items-start">

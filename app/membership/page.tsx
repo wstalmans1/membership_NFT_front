@@ -12,13 +12,18 @@ const MembershipPage = dynamic(() => import('@/components/MembershipPage').then(
   loading: () => <div className="min-h-screen bg-gray-900" />,
 });
 
+const Footer = dynamic(() => import('@/components/Footer').then(mod => ({ default: mod.Footer })), {
+  ssr: false,
+});
+
 export default function Membership() {
   return (
-    <div className="min-h-screen bg-gray-900" suppressHydrationWarning>
+    <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" suppressHydrationWarning>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1" suppressHydrationWarning>
         <MembershipPage />
       </main>
+      <Footer />
     </div>
   );
 }

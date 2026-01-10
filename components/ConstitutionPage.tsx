@@ -1,16 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { useReadContract, usePublicClient } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
 import { CONTRACTS } from '@/config/contracts';
 import { Constitution } from '@/abis/Constitution';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatEther } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
-import { HelpCircle } from 'lucide-react';
-import { DAOArchitectureSection } from './DAOArchitectureSection';
+import { encodeFunctionData, Address } from 'viem';
+import { HelpCircle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export function ConstitutionPage() {
+  const { address, isConnected } = useAccount();
+  const router = useRouter();
+  const [recipientAddress, setRecipientAddress] = useState('');
+  const [isAllowlistFormExpanded, setIsAllowlistFormExpanded] = useState(false);
+
   // Constitution parameters
   const { data: minDonation } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
@@ -67,73 +72,77 @@ export function ConstitutionPage() {
     functionName: 'quorumNumerator',
   });
 
-  // Fetch allowed recipients from events
-  const publicClient = usePublicClient();
-  const { data: allowedRecipients = [] } = useQuery({
-    queryKey: ['allowedRecipients', CONTRACTS.SEPOLIA.CONSTITUTION_PROXY],
-    queryFn: async () => {
-      if (!publicClient) return [];
-
-      try {
-        // Fetch RecipientAllowlistUpdated events from deployment block
-        const deploymentBlock = 9944847; // From CONTRACT_ADDRESSES.md
-        const currentBlock = await publicClient.getBlockNumber();
-        
-        // Calculate block range (limit to 1000 blocks to avoid RPC limits)
-        const fromBlock = currentBlock - BigInt(1000) > BigInt(deploymentBlock) 
-          ? currentBlock - BigInt(1000) 
-          : BigInt(deploymentBlock);
-        
-        // Fetch and decode events
-        const logs = await publicClient.getLogs({
-          address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
-          event: {
-            type: 'event',
-            name: 'RecipientAllowlistUpdated',
-            inputs: [
-              { type: 'address', indexed: true, name: 'account' },
-              { type: 'bool', indexed: false, name: 'allowed' },
-            ],
-          } as const,
-          fromBlock,
-          toBlock: currentBlock,
-        });
-
-        // Process events to get current state (latest event for each address determines if allowed)
-        const recipientMap = new Map<string, boolean>();
-        
-        for (const log of logs) {
-          if (log.args && 'account' in log.args && 'allowed' in log.args) {
-            const account = log.args.account as string;
-            const allowed = log.args.allowed as boolean;
-            recipientMap.set(account.toLowerCase(), allowed);
-          }
-        }
-
-        // Return only addresses that are currently allowed
-        return Array.from(recipientMap.entries())
-          .filter(([_, allowed]) => allowed)
-          .map(([address, _]) => address);
-      } catch (error) {
-        console.error('Error fetching allowed recipients:', error);
-        return [];
-      }
+  // Fetch allowed recipients directly from contract (using new enumerable function)
+  const { data: allowedRecipients, isLoading: isLoadingRecipients } = useReadContract({
+    address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
+    abi: Constitution,
+    functionName: 'getAllowedRecipients',
+    query: {
+      enabled: isConnected,
     },
-    enabled: !!publicClient,
-    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  // Check if the entered address is already in the allowlist
+  const isAddressAllowed = recipientAddress && allowedRecipients
+    ? (allowedRecipients as Address[]).some(addr => addr.toLowerCase() === recipientAddress.toLowerCase())
+    : undefined;
+
+  const handleCreateAllowlistProposal = () => {
+    if (!recipientAddress) {
+      alert('Please enter a recipient address');
+      return;
+    }
+
+    // Validate recipient address
+    if (recipientAddress.length !== 42 || !recipientAddress.startsWith('0x')) {
+      alert('Please enter a valid Ethereum address');
+      return;
+    }
+
+    // Check if address is already allowed
+    if (isAddressAllowed) {
+      alert('This address is already in the allowed recipients list');
+      return;
+    }
+
+    // Generate calldata for setRecipientAllowed(address, true)
+    const calldata = encodeFunctionData({
+      abi: Constitution,
+      functionName: 'setRecipientAllowed',
+      args: [recipientAddress as Address, true],
+    });
+
+    // Store proposal data in localStorage for GovernancePage to pick up
+    const proposalDescription = `Add Recipient to Allowlist\n\nRecipient: ${recipientAddress}\n\nThis proposal will add the specified address to the allowed recipients list, enabling it to receive funds from the DAO treasury through governance proposals.`;
+    
+    const proposalData = {
+      targets: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
+      calldatas: calldata,
+      description: proposalDescription,
+    };
+
+    console.log('Storing allowlist proposal:', {
+      recipient: recipientAddress,
+      description: proposalDescription,
+    });
+
+    localStorage.setItem('allowlistProposal', JSON.stringify(proposalData));
+    
+    // Navigate to governance page
+    router.push('/governance');
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 min-w-0 w-full max-w-full overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Constitution</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">View DAO governance parameters and rules</p>
       </div>
 
       {/* Membership Parameters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-hidden">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Membership Parameters</h2>
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0 overflow-hidden">
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <span className="text-gray-600 dark:text-gray-400">Minimum Donation</span>
@@ -184,12 +193,12 @@ export function ConstitutionPage() {
       </div>
 
       {/* Treasury Parameters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-hidden">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Treasury Parameters</h2>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600 dark:text-gray-400">Per-Transaction Spend Cap</span>
+        <div className="space-y-4 min-w-0 overflow-hidden">
+          <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+              <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Per-Transaction Spend Cap</span>
               <div className="relative group">
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -200,7 +209,7 @@ export function ConstitutionPage() {
                 </div>
               </div>
             </div>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-gray-900 dark:text-white flex-shrink-0 ml-4">
               {perTxSpendCap !== undefined && perTxSpendCap !== null
                 ? `${formatEther(BigInt(perTxSpendCap.toString()))} Sepolia ETH`
                 : 'Loading...'}
@@ -244,9 +253,9 @@ export function ConstitutionPage() {
                 : 'Loading...'}
             </span>
           </div>
-          <div className="py-3">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-gray-600 dark:text-gray-400">Allowed Recipients</span>
+          <div className="py-3 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-2 mb-3 min-w-0 overflow-hidden">
+              <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Allowed Recipients</span>
               <div className="relative group">
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -257,9 +266,89 @@ export function ConstitutionPage() {
                 </div>
               </div>
             </div>
-            {allowedRecipients.length > 0 ? (
+
+            {/* Add Recipient to Allowlist Form - Discrete, collapsed by default */}
+            {isConnected && (
+              <div className="mb-4 min-w-0 overflow-hidden">
+                <button
+                  onClick={() => setIsAllowlistFormExpanded(!isAllowlistFormExpanded)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded transition-colors min-w-0"
+                >
+                  <span className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                    <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">➕</span>
+                    <span className="truncate">Add recipient to allowlist</span>
+                  </span>
+                  {isAllowlistFormExpanded ? (
+                    <ChevronUp className="w-4 h-4 flex-shrink-0 ml-2" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 flex-shrink-0 ml-2" />
+                  )}
+                </button>
+                
+                {isAllowlistFormExpanded && (
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600 rounded-lg min-w-0 overflow-hidden">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 break-words">
+                      Fill in the address below and click "Create Governance Proposal". The proposal will need to be voted on and executed through governance.
+                    </p>
+                    
+                    <div className="space-y-3 min-w-0 overflow-hidden">
+                      <div className="min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">
+                            Recipient Address
+                          </label>
+                          <div className="relative group flex-shrink-0">
+                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                            <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                              <p className="mb-1 font-semibold">Recipient Address</p>
+                              <p className="text-gray-300">
+                                The Ethereum address to add to the allowed recipients list. This address will be able to receive funds from the DAO treasury after the proposal is executed.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          value={recipientAddress}
+                          onChange={(e) => setRecipientAddress(e.target.value)}
+                          placeholder="0x..."
+                          className="w-full min-w-0 max-w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono box-border"
+                        />
+                        {recipientAddress && (
+                          <p className={`mt-1 text-xs min-w-0 break-words ${isAddressAllowed === true ? 'text-green-600 dark:text-green-400' : isAddressAllowed === false ? 'text-gray-500 dark:text-gray-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                            {isAddressAllowed === undefined && recipientAddress.length === 42 && recipientAddress.startsWith('0x') 
+                              ? 'Checking address status...' 
+                              : isAddressAllowed === true
+                              ? '✓ Address is already in the allowlist' 
+                              : recipientAddress.length === 42 && recipientAddress.startsWith('0x')
+                              ? '✓ Ready to add to allowlist'
+                              : recipientAddress.length > 0
+                              ? 'Please enter a valid Ethereum address'
+                              : ''}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleCreateAllowlistProposal}
+                        disabled={!recipientAddress || recipientAddress.length !== 42 || !recipientAddress.startsWith('0x') || isAddressAllowed === true}
+                        className="w-full px-3 py-2 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        Create Governance Proposal
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isLoadingRecipients ? (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">Loading allowed recipients...</p>
+              </div>
+            ) : allowedRecipients && (allowedRecipients as Address[]).length > 0 ? (
               <div className="space-y-2">
-                {allowedRecipients.map((address) => (
+                {(allowedRecipients as Address[]).map((address) => (
                   <div key={address} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <a
                       href={`https://eth-sepolia.blockscout.com/address/${address}`}
@@ -496,8 +585,6 @@ export function ConstitutionPage() {
         </div>
       </div>
 
-      {/* DAO Architecture */}
-      <DAOArchitectureSection />
     </div>
   );
 }

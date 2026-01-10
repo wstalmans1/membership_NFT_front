@@ -14,8 +14,6 @@ const navItems = [
   { href: '/governance', label: 'Governance' },
   { href: '/treasury', label: 'Treasury' },
   { href: '/constitution', label: 'Constitution' },
-  { href: '/philosophy', label: 'Design Philosophy' },
-  { href: '/getting-started', label: 'Getting Started' },
 ];
 
 export function Navbar() {
@@ -32,27 +30,20 @@ export function Navbar() {
             </Link>
             {/* Desktop Navigation */}
             <div className="hidden lg:flex gap-4">
-              {navItems.map((item) => {
-                const isPhilosophy = item.href === '/philosophy';
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "px-3 py-2 text-sm font-medium transition-colors",
-                      isPhilosophy
-                        ? pathname === item.href
-                          ? "text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400"
-                          : "text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300"
-                        : pathname === item.href
-                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium transition-colors",
+                    pathname === item.href
+                      ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
             </div>
           </div>
           
@@ -82,28 +73,21 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 dark:border-gray-800 py-4">
             <div className="space-y-1">
-              {navItems.map((item) => {
-                const isPhilosophy = item.href === '/philosophy';
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "block px-3 py-2 text-sm font-medium transition-colors rounded-md",
-                      isPhilosophy
-                        ? pathname === item.href
-                          ? "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20"
-                          : "text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                        : pathname === item.href
-                          ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "block px-3 py-2 text-sm font-medium transition-colors rounded-md",
+                    pathname === item.href
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
             </div>
             {/* Mobile Wallet and Network Status */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">

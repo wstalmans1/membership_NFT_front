@@ -15,11 +15,15 @@ const SEPOLIA_FAUCETS = [
   { name: 'PoW Faucet', url: 'https://sepolia-faucet.pk910.de/', description: 'Proof of Work faucet, no account needed' },
 ];
 
+const Footer = dynamic(() => import('@/components/Footer').then(mod => ({ default: mod.Footer })), {
+  ssr: false,
+});
+
 export default function GettingStarted() {
   return (
-    <div className="min-h-screen bg-gray-900" suppressHydrationWarning>
+    <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8" suppressHydrationWarning>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1" suppressHydrationWarning>
         <div className="space-y-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Getting Started Guide</h1>
@@ -307,6 +311,7 @@ export default function GettingStarted() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

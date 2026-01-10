@@ -60,6 +60,48 @@ export function GovernancePage() {
   const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
+  // Check for pre-filled proposal data from Treasury page or Constitution page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check for treasury payout proposal
+      const treasuryProposal = localStorage.getItem('treasuryPayoutProposal');
+      if (treasuryProposal) {
+        try {
+          const proposalData = JSON.parse(treasuryProposal);
+          console.log('Loading treasury payout proposal from localStorage:', proposalData);
+          setTargets(proposalData.targets || '');
+          setCalldatas(proposalData.calldatas || '');
+          setDescription(proposalData.description || '');
+          setShowCreateForm(true);
+          // Clear the stored data after using it
+          localStorage.removeItem('treasuryPayoutProposal');
+        } catch (error) {
+          console.error('Failed to parse stored treasury proposal data:', error);
+          localStorage.removeItem('treasuryPayoutProposal');
+        }
+        return; // Exit early if treasury proposal found
+      }
+
+      // Check for allowlist proposal
+      const allowlistProposal = localStorage.getItem('allowlistProposal');
+      if (allowlistProposal) {
+        try {
+          const proposalData = JSON.parse(allowlistProposal);
+          console.log('Loading allowlist proposal from localStorage:', proposalData);
+          setTargets(proposalData.targets || '');
+          setCalldatas(proposalData.calldatas || '');
+          setDescription(proposalData.description || '');
+          setShowCreateForm(true);
+          // Clear the stored data after using it
+          localStorage.removeItem('allowlistProposal');
+        } catch (error) {
+          console.error('Failed to parse stored allowlist proposal data:', error);
+          localStorage.removeItem('allowlistProposal');
+        }
+      }
+    }
+  }, []);
+
   const { writeContract, data: hash, isPending, isError } = useWriteContract();
   const { writeContract: writeVote, data: voteHash, isPending: isVoting, isError: isVoteError } = useWriteContract();
   const { writeContract: writeQueue, data: queueHash, isPending: isQueueing } = useWriteContract();
