@@ -31,10 +31,9 @@ export function MembershipPage() {
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   // Check if we should expand from query parameter
-  const shouldExpandMembershipFromQuery = searchParams?.get('expand') === 'membership';
-  const shouldExpandAllMembersFromQuery = searchParams?.get('expand') === 'all-members';
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(shouldExpandMembershipFromQuery);
-  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(shouldExpandAllMembersFromQuery);
+  const expandParam = searchParams?.get('expand');
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(false);
+  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(false);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
   // Privacy expanded state - initialized from isMember when balance loads
@@ -80,19 +79,14 @@ export function MembershipPage() {
     ? Boolean(Number(balance) > 0)
     : undefined; // undefined means "still loading"
 
-  // Expand membership status section if query parameter is present
+  // Expand sections based on query parameter
   useEffect(() => {
-    if (shouldExpandMembershipFromQuery) {
+    if (expandParam === 'membership') {
       setIsMembershipStatusExpanded(true);
-    }
-  }, [shouldExpandMembershipFromQuery]);
-
-  // Expand all members section if query parameter is present
-  useEffect(() => {
-    if (shouldExpandAllMembersFromQuery) {
+    } else if (expandParam === 'all-members') {
       setIsAllMembersExpanded(true);
     }
-  }, [shouldExpandAllMembersFromQuery]);
+  }, [expandParam]);
 
   // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
   // This must be after isMember is declared
