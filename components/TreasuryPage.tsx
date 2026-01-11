@@ -10,7 +10,6 @@ import { formatEther, parseEther, formatAddress } from '@/lib/utils';
 import { encodeFunctionData, Address, decodeEventLog } from 'viem';
 import { HelpCircle, ExternalLink } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
-import { OnboardingChecklist } from './OnboardingChecklist';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -150,11 +149,16 @@ export function TreasuryPage() {
                 topics: log.topics,
               });
               
+              const args = decoded.args as any;
+              if (!args) {
+                throw new Error('Decoded event has no args');
+              }
+              
               const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
               
               return {
-                recipient: decoded.args.to as Address,
-                amount: decoded.args.amount as bigint,
+                recipient: args.to as Address,
+                amount: args.amount as bigint,
                 blockNumber: log.blockNumber,
                 timestamp: Number(block.timestamp),
                 transactionHash: log.transactionHash,
@@ -358,11 +362,16 @@ export function TreasuryPage() {
                   topics: log.topics,
                 });
                 
+                const args = decoded.args as any;
+                if (!args) {
+                  throw new Error('Decoded event has no args');
+                }
+                
                 const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
                 
                 return {
-                  recipient: decoded.args.to as Address,
-                  amount: decoded.args.amount as bigint,
+                  recipient: args.to as Address,
+                  amount: args.amount as bigint,
                   blockNumber: log.blockNumber,
                   timestamp: Number(block.timestamp),
                   transactionHash: log.transactionHash,
@@ -449,9 +458,6 @@ export function TreasuryPage() {
   // Use merged payouts for display
   const payouts = allPayouts;
 
-  // Check if wallet extension is installed
-  const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
-
   const handleCreateProposal = () => {
     if (!recipient || !amount) {
       alert('Please fill in both recipient address and amount');
@@ -515,9 +521,6 @@ export function TreasuryPage() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Treasury</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">View <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury balance and spending parameters. Payouts are executed through governance proposals.</p>
       </div>
-
-      {/* Onboarding Checklist - Show if wallet not fully set up */}
-      {hasWalletExtension && <OnboardingChecklist />}
 
       {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}

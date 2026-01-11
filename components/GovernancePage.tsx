@@ -9,7 +9,6 @@ import { formatAddress } from '@/lib/utils';
 import { Address, BaseError, ContractFunctionRevertedError, encodeFunctionData, parseEther, keccak256, toBytes, stringToBytes, pad, toHex, encodePacked, decodeEventLog } from 'viem';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
-import { OnboardingChecklist } from './OnboardingChecklist';
 import Link from 'next/link';
 
 const formatViemError = (err: unknown) => {
@@ -1349,14 +1348,8 @@ export function GovernancePage() {
     }
   };
 
-  // Check if wallet extension is installed
-  const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
-
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
-      {/* Onboarding Checklist - Show if wallet not fully set up */}
-      {hasWalletExtension && <OnboardingChecklist />}
-
       {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}
 
@@ -2442,7 +2435,7 @@ function ProposalTimeline({
 }: { 
   proposal: any; 
   currentBlockNumber: bigint | null;
-  timelockDelaySeconds: bigint | null;
+  timelockDelaySeconds: bigint | null | undefined;
   queuedProposalETA?: number;
 }) {
   const getTimelineSteps = () => {

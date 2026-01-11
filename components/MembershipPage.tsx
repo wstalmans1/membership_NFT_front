@@ -13,7 +13,6 @@ import { NFTMetadata, deleteMetadata, getMetadata, getAllMembers } from '@/lib/m
 import { NFTDisplay } from './NFTDisplay';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
-import { OnboardingChecklist } from './OnboardingChecklist';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -264,18 +263,12 @@ export function MembershipPage() {
     }
   }, [isConnected, address, balance, isMember]);
 
-  // Check if wallet extension is installed
-  const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
-
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Membership</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">Mint and manage your membership NFT, view all members</p>
       </div>
-
-      {/* Onboarding Checklist - Show if wallet not fully set up */}
-      {hasWalletExtension && <OnboardingChecklist />}
 
       {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WalletButton } from './WalletButton';
 import { NetworkStatus } from './NetworkStatus';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -16,9 +16,39 @@ const navItems = [
   { href: '/constitution', label: 'Constitution' },
 ];
 
+const moreMenuItems = [
+  { href: '/dao-architecture', label: 'DAO Architecture' },
+  { href: '/philosophy', label: 'Design Philosophy' },
+  { href: '/getting-started', label: 'Getting Started Guide' },
+];
+
 export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    }
+
+    if (moreMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [moreMenuOpen]);
+
+  // Close dropdown when pathname changes
+  useEffect(() => {
+    setMoreMenuOpen(false);
+  }, [pathname]);
 
   return (
     <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -29,7 +59,7 @@ export function Navbar() {
               <span className="font-bold">QAWL</span> <span className="text-base font-normal">DAO</span>
             </Link>
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex gap-4">
+            <div className="hidden lg:flex gap-4 items-center">
               {navItems.map((item) => (
                   <Link
                     key={item.href}
@@ -44,6 +74,42 @@ export function Navbar() {
                     {item.label}
                   </Link>
               ))}
+              {/* More Menu Dropdown */}
+              <div className="relative" ref={moreMenuRef}>
+                <button
+                  onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                  className={cn(
+                    "px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1",
+                    moreMenuItems.some(item => pathname === item.href)
+                      ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  )}
+                >
+                  More
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
+                </button>
+                {moreMenuOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                    <div className="py-1">
+                      {moreMenuItems.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMoreMenuOpen(false)}
+                          className={cn(
+                            "block px-4 py-2 text-sm transition-colors",
+                            pathname === item.href
+                              ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                          )}
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -88,6 +154,43 @@ export function Navbar() {
                     {item.label}
                   </Link>
               ))}
+              {/* More Menu in Mobile */}
+              <div className="mt-2">
+                <button
+                  onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors rounded-md",
+                    moreMenuItems.some(item => pathname === item.href)
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  More
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
+                </button>
+                {moreMenuOpen && (
+                  <div className="pl-4 mt-1 space-y-1">
+                    {moreMenuItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          setMoreMenuOpen(false);
+                        }}
+                        className={cn(
+                          "block px-3 py-2 text-sm transition-colors rounded-md",
+                          pathname === item.href
+                            ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             {/* Mobile Wallet and Network Status */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
