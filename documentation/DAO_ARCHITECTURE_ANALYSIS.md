@@ -1,7 +1,7 @@
-# Qawl DAO Architecture Analysis
+# QAWL DAO Architecture Analysis
 
 ## Purpose
-This document provides a comprehensive analysis of the Qawl DAO architecture to serve as a foundation for creating a visual schema showing:
+This document provides a comprehensive analysis of the QAWL DAO architecture to serve as a foundation for creating a visual schema showing:
 - How the community interacts with the DAO and its contracts
 - How the community controls roles through governance
 - Role allocations between contracts

@@ -14,13 +14,16 @@ const SEPOLIA_FAUCETS = [
 export function OnboardingChecklist() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { data: balance } = useBalance({
+  const { data: balance, isLoading: isLoadingBalance } = useBalance({
     address: address,
   });
 
   const hasWallet = typeof window !== 'undefined' && !!(window as any).ethereum;
   const isCorrectNetwork = chainId === sepolia.id;
-  const hasBalance = balance ? parseFloat(formatEther(BigInt(balance.value.toString()))) >= 0.001 : false;
+  // Only check balance when it's actually loaded, default to false (not complete) while loading
+  const hasBalance = balance && !isLoadingBalance 
+    ? parseFloat(formatEther(BigInt(balance.value.toString()))) >= 0.001 
+    : false;
   const allComplete = hasWallet && isConnected && isCorrectNetwork && hasBalance;
 
   const steps = [

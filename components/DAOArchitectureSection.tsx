@@ -20,16 +20,16 @@ export function DAOArchitectureSection() {
   const isExpanded = (sectionId: string) => expandedSections.has(sectionId);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0 overflow-hidden">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">DAO Architecture</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white"><span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> Architecture</h2>
           <div className="relative group">
             <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
             <div className="absolute left-0 bottom-full mb-2 w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-              <p className="mb-2 font-semibold">DAO Architecture Overview</p>
+              <p className="mb-2 font-semibold"><span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> Architecture Overview</p>
               <p className="text-gray-300">
-                Understanding how the DAO works: contracts, roles, and governance flows. Click sections to expand for detailed information.
+                Understanding how the <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> works: contracts, roles, and governance flows. Click sections to expand for detailed information.
               </p>
             </div>
           </div>
@@ -50,7 +50,7 @@ export function DAOArchitectureSection() {
         {/* High-Level Overview */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/30">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-            <strong className="text-gray-900 dark:text-white">Quick Overview:</strong> The DAO consists of 5 core contracts that work together. 
+            <strong className="text-gray-900 dark:text-white">Quick Overview:</strong> The <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> consists of 5 core contracts that work together. 
             Members create proposals, vote on them, and approved proposals are executed through the Timelock. 
             Click any section below to learn more.
           </p>
@@ -60,7 +60,7 @@ export function DAOArchitectureSection() {
         <Section
           id="core-contracts"
           title="Core Contracts"
-          summary="5 contracts that make up the DAO: Governor, Timelock, MembershipNFT, Constitution, and TreasuryExecutor"
+          summary="5 contracts that make up the QAWL DAO: Governor, Timelock, MembershipNFT, Constitution, and TreasuryExecutor"
           isExpanded={isExpanded('core-contracts')}
           onToggle={() => toggleSection('core-contracts')}
         >
@@ -70,7 +70,7 @@ export function DAOArchitectureSection() {
         {/* Community Interaction Flow */}
         <Section
           id="interaction-flow"
-          title="How Members Interact with the DAO"
+          title="How Members Interact with the QAWL DAO"
           summary="Joining, creating proposals, voting, and executing proposals"
           isExpanded={isExpanded('interaction-flow')}
           onToggle={() => toggleSection('interaction-flow')}
@@ -171,7 +171,7 @@ function ContractDetails() {
         <div className="border-l-4 border-purple-500 pl-4">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-1">MembershipNFT</h4>
           <p className="text-gray-600 dark:text-gray-400 mb-2">
-            Represents DAO membership. Each NFT = 1 vote. Members mint NFTs by making a minimum donation.
+            Represents <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> membership. Each NFT = 1 vote. Members mint NFTs by making a minimum donation.
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500">
             <span className="font-mono">Address:</span> {CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY}
@@ -181,7 +181,7 @@ function ContractDetails() {
         <div className="border-l-4 border-yellow-500 pl-4">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-1">Constitution</h4>
           <p className="text-gray-600 dark:text-gray-400 mb-2">
-            Central parameter store. Defines minimum donation, spend caps, allowed recipients, and other DAO rules.
+            Central parameter store. Defines minimum donation, spend caps, allowed recipients, and other <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> rules.
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500">
             <span className="font-mono">Address:</span> {CONTRACTS.SEPOLIA.CONSTITUTION_PROXY}
@@ -191,7 +191,7 @@ function ContractDetails() {
         <div className="border-l-4 border-red-500 pl-4">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-1">TreasuryExecutor</h4>
           <p className="text-gray-600 dark:text-gray-400 mb-2">
-            Holds and manages DAO treasury funds. Enforces spending rules from the Constitution.
+            Holds and manages <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> treasury funds. Enforces spending rules from the Constitution.
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500">
             <span className="font-mono">Address:</span> {CONTRACTS.SEPOLIA.TREASURY_PROXY}
@@ -207,7 +207,7 @@ function InteractionFlowDetails() {
     <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
       <div className="space-y-3">
         <div>
-          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">1. Joining the DAO</h4>
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">1. Joining the <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span></h4>
           <ol className="list-decimal list-inside space-y-1 text-gray-600 dark:text-gray-400 ml-2">
             <li>User calls <span className="font-mono">MembershipNFT.mint()</span> with ETH ≥ minimum donation</li>
             <li>NFT is minted, voting power is auto-delegated to self</li>

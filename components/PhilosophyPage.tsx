@@ -2,11 +2,11 @@
 
 export function PhilosophyPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Design Philosophy</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          The principles and choices that guide Qawl DAO's architecture and implementation
+          The principles and choices that guide <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>'s architecture and implementation
         </p>
       </div>
 
@@ -17,7 +17,7 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">1. Decentralization First</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              We prioritize decentralization at every layer of the stack. Our smart contracts are upgradeable but governed by the DAO itself. 
+              We prioritize decentralization at every layer of the stack. Our smart contracts are upgradeable but governed by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> itself. 
               We minimize reliance on centralized infrastructure, choosing decentralized alternatives whenever possible. The frontend can be deployed 
               to IPFS, and we avoid centralized services like WalletConnect in favor of direct wallet connections.
             </p>
@@ -35,7 +35,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">3. User Sovereignty</h3>
             <p className="text-gray-700 dark:text-gray-300">
               Members own their membership NFTs and control their voting power. New memberships automatically activate voting power by delegating to the member themselves, 
-              ensuring immediate participation. Members can change their delegation at any time. The DAO cannot arbitrarily revoke memberships 
+              ensuring immediate participation. Members can change their delegation at any time. The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> cannot arbitrarily revoke memberships 
               (except through governance or the revocation authority for compliance). Users maintain full control over their digital identity and participation.
             </p>
           </div>
@@ -43,7 +43,7 @@ export function PhilosophyPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">4. Progressive Decentralization</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              We acknowledge that complete decentralization may not be achievable immediately. We use upgradeable contracts to allow the DAO to evolve, 
+              We acknowledge that complete decentralization may not be achievable immediately. We use upgradeable contracts to allow the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> to evolve, 
               and we make pragmatic choices (like using Supabase for off-chain metadata storage) while maintaining a path toward greater decentralization.
             </p>
           </div>
@@ -58,7 +58,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Smart Contracts</h3>
             <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-4">
               <li><strong>OpenZeppelin Contracts:</strong> We use battle-tested, audited OpenZeppelin contracts as the foundation for security and reliability.</li>
-              <li><strong>UUPS Upgradeable Pattern:</strong> Contracts are upgradeable to allow the DAO to evolve, but upgrades require governance approval.</li>
+              <li><strong>UUPS Upgradeable Pattern:</strong> Contracts are upgradeable to allow the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> to evolve, but upgrades require governance approval.</li>
               <li><strong>ERC721Votes:</strong> Membership NFTs use ERC721Votes for transparent, on-chain voting power tracking.</li>
               <li><strong>Timelock:</strong> Treasury operations go through a timelock to prevent hasty decisions and allow for review.</li>
             </ul>
@@ -93,7 +93,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">One Member, One Vote</h3>
             <p className="text-gray-700 dark:text-gray-300">
               Each membership NFT grants exactly one vote, ensuring equal representation regardless of donation amount. This prevents plutocracy 
-              and ensures that all members have an equal voice in DAO decisions.
+              and ensures that all members have an equal voice in <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> decisions.
             </p>
           </div>
           

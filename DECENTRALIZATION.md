@@ -1,6 +1,6 @@
 # Decentralization Guide
 
-This document outlines how the Qawl DAO frontend is designed to minimize reliance on centralized infrastructure.
+This document outlines how the QAWL DAO frontend is designed to minimize reliance on centralized infrastructure.
 
 ## Current Decentralization Measures
 

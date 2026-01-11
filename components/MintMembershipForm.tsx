@@ -404,7 +404,7 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
         <button
           type="submit"
           disabled={isUploading || isMinting || isConfirming || isWritePending}
-          className="flex-1 px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="flex-1 px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
           {isUploading ? 'Uploading Photo...' : isMinting || isWritePending ? 'Waiting for MetaMask...' : isConfirming ? 'Confirming Transaction...' : 'Mint Membership NFT'}
         </button>

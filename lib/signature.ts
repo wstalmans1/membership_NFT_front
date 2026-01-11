@@ -6,7 +6,7 @@ import { CONTRACTS } from '@/config/contracts';
  */
 export function getUpdateMembershipDomain(chainId: number) {
   return {
-    name: 'Qawl DAO Membership',
+    name: 'QAWL DAO Membership',
     version: '1',
     chainId: chainId,
     verifyingContract: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY as Address,

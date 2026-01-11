@@ -25,24 +25,24 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-4 md:gap-8">
-            <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white">
-              Qawl DAO
+            <Link href="/" className="text-xl text-gray-900 dark:text-white">
+              <span className="font-bold">QAWL</span> <span className="text-base font-normal">DAO</span>
             </Link>
             {/* Desktop Navigation */}
             <div className="hidden lg:flex gap-4">
               {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium transition-colors",
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "px-3 py-2 text-sm font-medium transition-colors",
                     pathname === item.href
-                      ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </Link>
+                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
               ))}
             </div>
           </div>
@@ -74,19 +74,19 @@ export function Navbar() {
           <div className="lg:hidden border-t border-gray-200 dark:border-gray-800 py-4">
             <div className="space-y-1">
               {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "block px-3 py-2 text-sm font-medium transition-colors rounded-md",
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "block px-3 py-2 text-sm font-medium transition-colors rounded-md",
                     pathname === item.href
-                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
-                  )}
-                >
-                  {item.label}
-                </Link>
+                          ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
               ))}
             </div>
             {/* Mobile Wallet and Network Status */}

@@ -18,7 +18,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            <p className="font-semibold text-gray-900 dark:text-white mb-1">Qawl DAO</p>
+            <p className="font-semibold text-gray-900 dark:text-white mb-1"><span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span></p>
             <p>Decentralized Autonomous Organization</p>
           </div>
           
@@ -34,14 +34,18 @@ export function Footer() {
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 )}
               >
-                {item.label}
+                {item.href === '/dao-architecture' ? (
+                  <><span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> Architecture</>
+                ) : (
+                  item.label
+                )}
               </Link>
             ))}
           </nav>
         </div>
         
         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 text-center text-xs text-gray-500 dark:text-gray-500">
-          <p>© {new Date().getFullYear()} Qawl DAO. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span>. All rights reserved.</p>
         </div>
       </div>
     </footer>

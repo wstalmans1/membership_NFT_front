@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWatchContractEvent } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatEther } from '@/lib/utils';
@@ -29,14 +29,20 @@ export function MembershipPage() {
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(true);
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(false);
+  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(false);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
-  // Initialize privacy expanded state based on membership status
-  // For members: collapsed (false) - they can see their NFT card
-  // For non-members: expanded (true) - they need to see the mint form
-  // We'll update this when balance loads, but start with false to avoid flash
-  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
+  // Privacy expanded state - initialized from isMember when balance loads
+  // Use lazy initialization to prevent flash
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(() => {
+    // This function runs once on mount, but isMember might be undefined
+    // So we default to false and update via useEffect when balance loads
+    return false;
+  });
+  
+  // Track if user has manually toggled privacy section
+  const [hasUserToggledPrivacy, setHasUserToggledPrivacy] = useState(false);
   
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
@@ -46,7 +52,7 @@ export function MembershipPage() {
   const [delegationSuccess, setDelegationSuccess] = useState(false);
 
   // Get membership balance
-  const { data: balance, refetch: refetchBalance } = useReadContract({
+  const { data: balance, isLoading: isLoadingBalance, refetch: refetchBalance } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'balanceOf',
@@ -55,25 +61,28 @@ export function MembershipPage() {
   });
 
   // Get token ID if member - use tokenOfOwner (simpler, more reliable)
+  // Only load when section is expanded
   const { data: tokenId, isLoading: isLoadingTokenId, error: tokenIdError, refetch: refetchTokenId } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'tokenOfOwner',
     args: address && balance && Number(balance) > 0 ? [address] : undefined,
-    query: { enabled: !!address && !!balance && Number(balance) > 0 },
+    query: { enabled: !!address && !!balance && Number(balance) > 0 && isMembershipStatusExpanded },
   });
 
-  // Determine if user is a member (must be defined before hooks that use it)
-  const isMember = balance ? Number(balance) > 0 : false;
+  // Determine if user is a member - only calculate when balance has loaded
+  // This prevents any rendering until we have definitive membership status
+  const isMember = address && balance !== undefined
+    ? Boolean(Number(balance) > 0)
+    : undefined; // undefined means "still loading"
 
-  // Set privacy expanded state based on membership status immediately when balance loads
-  // This ensures no flash - if user is a member, privacy section stays collapsed
+  // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
+  // This must be after isMember is declared
   useEffect(() => {
-    if (address && balance !== undefined) {
-      // Balance has loaded, set state immediately
+    if (!hasUserToggledPrivacy && isMember !== undefined) {
       setIsPrivacyExpanded(!isMember); // Expanded if not a member, collapsed if member
     }
-  }, [address, balance, isMember]);
+  }, [isMember, hasUserToggledPrivacy]);
 
   // Log tokenId fetch status for debugging
   useEffect(() => {
@@ -88,11 +97,12 @@ export function MembershipPage() {
     }
   }, [address, balance, tokenId, isLoadingTokenId, tokenIdError]);
 
-  // Get min donation
+  // Get min donation - only load when section is expanded
   const { data: minDonation } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
     functionName: 'minDonationWei',
+    query: { enabled: isMembershipStatusExpanded },
   });
 
 
@@ -108,22 +118,22 @@ export function MembershipPage() {
     hash: burnHash,
   });
 
-  // Get current delegation status
+  // Get current delegation status - only load when section is expanded
   const { data: currentDelegate, refetch: refetchDelegate } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'delegates',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && isMember },
+    query: { enabled: !!address && isMember === true && isMembershipStatusExpanded },
   });
 
-  // Get current voting power
+  // Get current voting power - only load when section is expanded
   const { data: votingPower, refetch: refetchVotingPower } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'getVotes',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && isMember },
+    query: { enabled: !!address && isMember === true && isMembershipStatusExpanded },
   });
 
   // Function to load all members
@@ -220,16 +230,31 @@ export function MembershipPage() {
     }
   }, [isBurnSuccess, burnHash, tokenId, address]);
 
-  // Load all members on component mount
+  // Load all members:
+  // - If not connected: load immediately
+  // - If connected: load only after membership status has been determined
+  // This ensures "Your Membership Status" renders first for connected users, then "All Members" section
   useEffect(() => {
-    loadAllMembers();
-  }, []);
+    if (!isConnected) {
+      // Not connected: load members immediately
+      loadAllMembers();
+    } else if (isConnected && address && balance !== undefined && isMember !== undefined) {
+      // Connected: only start loading members after we've determined membership status
+      // This ensures the "Your Membership Status" section renders first
+      loadAllMembers();
+    }
+  }, [isConnected, address, balance, isMember]);
 
   // Check if wallet extension is installed
   const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full min-w-0 overflow-hidden">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Membership</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">Mint and manage your membership NFT, view all members</p>
+      </div>
+
       {/* Onboarding Checklist - Show if wallet not fully set up */}
       {hasWalletExtension && <OnboardingChecklist />}
 
@@ -238,79 +263,83 @@ export function MembershipPage() {
 
       {!isConnected && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <span className="text-xl">🎫</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                Connect Your Wallet to View Your Membership
-              </h3>
-              <p className="text-blue-800 dark:text-blue-300 mb-4">
-                Connect your wallet to see your membership NFT, mint a new membership, or manage your existing membership. 
-                If you haven't set up a wallet yet, check the checklist above or visit our getting started guide.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/getting-started"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
-                >
-                  Getting Started Guide →
-                </Link>
-              </div>
-            </div>
-          </div>
+          <p className="text-teal-600 dark:text-teal-400">
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+          </p>
         </div>
       )}
 
-      {isConnected && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setIsMembershipStatusExpanded(!isMembershipStatusExpanded)}
-            className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
-          >
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Your Membership Status</h2>
-            {isMembershipStatusExpanded ? (
-              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-            )}
-          </button>
-          
-          {isMembershipStatusExpanded && (
-            <>
-              {isMember && tokenId && balance !== undefined ? (
-            <div className="space-y-4">
+      {/* Show section header for all users (connected and non-connected) */}
+      {/* Content inside only loads when expanded and connected */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => setIsMembershipStatusExpanded(!isMembershipStatusExpanded)}
+          className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
+        >
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Your Membership Status
+          </h2>
+          {isMembershipStatusExpanded ? (
+            <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+          )}
+        </button>
+        
+        {isMembershipStatusExpanded && (
+          <>
+            {!isConnected || !address ? (
+              // Not connected - show message
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>Connect your wallet to view your membership status.</p>
+              </div>
+            ) : balance === undefined || isMember === undefined ? (
+              // Still loading balance/membership status
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>Loading membership status...</p>
+              </div>
+            ) : isMember === true ? (
+                // Member view - wait for tokenId to load when expanded
+                tokenId ? (
+                <div className="space-y-4">
               {/* Data Privacy and Storage Notice */}
               {/* Only render when we're certain user is a member (balance loaded) to prevent flash */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <button
-                    onClick={() => setIsPrivacyExpanded(!isPrivacyExpanded)}
-                    className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                  >
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                        <span className="text-lg">🔒</span>
+              {/* Use calculated value directly if user hasn't toggled, otherwise use state */}
+              {(() => {
+                const privacyExpanded = hasUserToggledPrivacy 
+                  ? isPrivacyExpanded 
+                  : (isMember !== undefined ? !isMember : false);
+                
+                return (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <button
+                      onClick={() => {
+                        setHasUserToggledPrivacy(true);
+                        setIsPrivacyExpanded(!privacyExpanded);
+                      }}
+                      className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                          <span className="text-lg">🔒</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                        Your Data Privacy
-                      </h3>
-                      {isPrivacyExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
-                      )}
-                    </div>
-                  </button>
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isPrivacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
-                    }`}
-                  >
+                      <div className="flex-1 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                          Your Data Privacy
+                        </h3>
+                        {privacyExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                        )}
+                      </div>
+                    </button>
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        privacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+                      }`}
+                    >
                     <div className="ml-11 space-y-2">
                       <p className="text-xs text-blue-800 dark:text-blue-300">
                         The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
@@ -334,6 +363,8 @@ export function MembershipPage() {
                     </div>
                   </div>
                 </div>
+                  );
+                })()}
 
               {/* NFT Display Component with Update/Delete buttons */}
               <div className="flex flex-col md:flex-row gap-4 items-start">
@@ -424,14 +455,14 @@ export function MembershipPage() {
                         <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                           <p className="mb-2 font-semibold">Voting Power</p>
                           <p className="text-gray-300">
-                            Each DAO member has 1 vote, which can be delegated to yourself or to another address. When delegated to yourself, you can vote directly. When delegated to another address, that address can vote on your behalf.
+                            Each <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> member has 1 vote, which can be delegated to yourself or to another address. When delegated to yourself, you can vote directly. When delegated to another address, that address can vote on your behalf.
                           </p>
                         </div>
                       </div>
                     </div>
                     {(() => {
                       // Always show 1 vote if user is a member, regardless of delegation status
-                      const displayVotingPower = isMember ? 1n : 0n;
+                      const displayVotingPower = isMember === true ? 1n : 0n;
                       const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
                       // Use green if voting power is activated (delegated to self), otherwise use default color
                       const isActivated = votingPowerBigInt > 0n;
@@ -486,7 +517,7 @@ export function MembershipPage() {
                               setDelegationMode(isAlreadyDelegatedToSelf ? 'other' : 'self');
                               setDelegateToAddress('');
                             }}
-                            className="w-full mt-3 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
+                            className="w-full mt-3 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
                           >
                             Change Delegation
                           </button>
@@ -661,7 +692,7 @@ export function MembershipPage() {
                                     }
                                     return isDelegatePending || isDelegateConfirming || isDelegating || (delegationMode === 'other' && (!delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x')));
                                   })()}
-                                  className="flex-1 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                  className="flex-1 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                                 >
                                   {isDelegatePending || isDelegateConfirming || isDelegating ? 'Processing...' : 'Update Delegation'}
                                 </button>
@@ -757,12 +788,19 @@ export function MembershipPage() {
                   )}
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="space-y-4">
+                </div>
+                ) : (
+                  // TokenId still loading for member
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p>Loading membership details...</p>
+                  </div>
+                )
+              ) : isMember === false ? (
+                // Non-member view - show mint form immediately
+                <div className="space-y-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-gray-700 dark:text-gray-300">
-                  Join the DAO by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH</strong>
+                  Join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH</strong>
                 </p>
               </div>
 
@@ -836,7 +874,7 @@ export function MembershipPage() {
                 <button
                   onClick={() => setShowForm(true)}
                   disabled={!privacyNoticeAccepted}
-                  className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 dark:disabled:hover:bg-blue-500"
+                  className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-800 dark:disabled:hover:bg-blue-700"
                 >
                   Mint Membership
                 </button>
@@ -859,24 +897,42 @@ export function MembershipPage() {
                 </div>
               )}
             </div>
-          )}
+              ) : null}
             </>
           )}
         </div>
-      )}
 
       {/* All Members Section */}
-      {allMembers.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            All Members ({allMembers.length})
-          </h2>
-          {isLoadingMembers ? (
+      {/* For non-connected users: show immediately */}
+      {/* For connected users: only render after membership status has been determined */}
+      {/* This ensures "Your Membership Status" section renders first for connected users, then "All Members" */}
+      {!isConnected || (isConnected && address && balance !== undefined && isMember !== undefined) ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
+          <button
+            onClick={() => setIsAllMembersExpanded(!isAllMembersExpanded)}
+            className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {isLoadingMembers ? (
+                'All Members'
+              ) : (
+                `All Members (${allMembers.length})`
+              )}
+            </h2>
+            {isAllMembersExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
+            )}
+          </button>
+          {isAllMembersExpanded && (
+            <>
+              {isLoadingMembers ? (
             <div className="text-center py-8">
               <p className="text-gray-600 dark:text-gray-400">Loading members...</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          ) : allMembers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
               {allMembers.map((member) => (
                 <NFTDisplay
                   key={member.tokenId}
@@ -885,9 +941,15 @@ export function MembershipPage() {
                 />
               ))}
             </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-600 dark:text-gray-400">No members found.</p>
+            </div>
+          )}
+            </>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

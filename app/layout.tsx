@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Qawl DAO",
+  title: "QAWL DAO",
   description: "Decentralized Autonomous Organization",
 };
 

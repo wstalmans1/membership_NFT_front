@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useBalance, useReadContract, usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
@@ -19,6 +19,15 @@ export function TreasuryPage() {
   const router = useRouter();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
+  
+  // State for pagination and backward search (similar to governance proposals)
+  const [allPayouts, setAllPayouts] = useState<any[]>([]);
+  const [oldestLoadedBlock, setOldestLoadedBlock] = useState<bigint | null>(null);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<string | null>(null);
+  const [noMorePayouts, setNoMorePayouts] = useState(false);
+  const [hasAutoSearched, setHasAutoSearched] = useState(false);
+  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   // Get treasury balance
   const { data: treasuryBalance } = useBalance({
@@ -60,8 +69,8 @@ export function TreasuryPage() {
   const CHUNK_SIZE = 800n; // Same as governance page to stay under RPC limits
   const DEPLOYMENT_BLOCK = 9944847n; // From CONTRACT_ADDRESSES.md
   
-  const { data: recentPayouts, isLoading: isLoadingPayouts } = useQuery({
-    queryKey: ['recentPayouts'],
+  const { data: latestPayouts = [], refetch: refetchLatestPayouts, isLoading: isLoadingPayouts } = useQuery({
+    queryKey: ['latestPayouts', CONTRACTS.SEPOLIA.TREASURY_PROXY],
     queryFn: async () => {
       if (!publicClient) return [];
       
@@ -88,12 +97,46 @@ export function TreasuryPage() {
         
         console.log('Fetching recent payouts from block', fromBlock.toString(), 'to', currentBlock.toString(), `(${Number(currentBlock - fromBlock)} blocks)`);
         
-        const logs = await publicClient.getLogs({
-          address: CONTRACTS.SEPOLIA.TREASURY_PROXY as Address,
-          event: payoutEvent as any,
-          fromBlock: fromBlock,
-          toBlock: currentBlock,
-        });
+        // Fetch logs with retry logic (similar to governance proposals)
+        let logs: any[] = [];
+        let retries = 3;
+        let lastError: any = null;
+        
+        while (retries > 0) {
+          try {
+            logs = await publicClient.getLogs({
+              address: CONTRACTS.SEPOLIA.TREASURY_PROXY as Address,
+              event: payoutEvent as any,
+              fromBlock: fromBlock,
+              toBlock: currentBlock,
+            });
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            lastError = error;
+            retries--;
+            if (retries > 0) {
+              // Wait before retrying (exponential backoff)
+              const delay = (4 - retries) * 1000; // 1s, 2s, 3s
+              console.warn(`RPC request failed, retrying in ${delay}ms... (${retries} retries left)`, {
+                message: error?.message,
+                code: error?.code,
+                name: error?.name,
+              });
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        if (logs.length === 0 && lastError) {
+          console.warn('Failed to fetch payout logs after retries:', {
+            message: lastError?.message,
+            code: lastError?.code,
+            name: lastError?.name,
+            stack: lastError?.stack,
+          });
+          // Return empty array instead of throwing - UI will show "No payout history available"
+          return [];
+        }
 
         console.log(`Found ${logs.length} payout event(s) in latest ${CHUNK_SIZE.toString()} blocks`);
 
@@ -117,7 +160,7 @@ export function TreasuryPage() {
                 transactionHash: log.transactionHash,
               };
             } catch (err) {
-              console.warn('Failed to decode payout event:', err);
+              console.warn('Failed to decode payout event:', err, log);
               return null;
             }
           })
@@ -128,17 +171,283 @@ export function TreasuryPage() {
           .filter((p): p is NonNullable<typeof payouts[0]> => p !== null)
           .sort((a, b) => Number(b.blockNumber - a.blockNumber));
       } catch (err: any) {
-        console.error('Failed to fetch recent payouts:', err);
-        // If error is due to block range, try a smaller range
-        if (err.message?.includes('limit') || err.message?.includes('range')) {
-          console.warn('RPC limit hit, will retry with smaller range on next query');
-        }
+        console.error('Error fetching recent payouts:', err);
+        console.error('Error details:', {
+          message: err?.message,
+          code: err?.code,
+          name: err?.name,
+          stack: err?.stack,
+        });
+        // Return empty array on error to prevent UI crash
         return [];
       }
     },
-    enabled: isConnected && !!publicClient,
+    enabled: !!publicClient, // Run even when not connected (for viewing historical payouts)
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // Get current block number for auto-search
+  useEffect(() => {
+    if (!publicClient) return;
+    
+    const fetchBlockNumber = async () => {
+      try {
+        const block = await publicClient.getBlock({ blockTag: 'latest' });
+        setCurrentBlockNumber(block.number);
+      } catch (error) {
+        console.error('Error fetching current block number:', error);
+      }
+    };
+    
+    fetchBlockNumber();
+    // Refresh block number periodically
+    const interval = setInterval(fetchBlockNumber, 30000);
+    return () => clearInterval(interval);
+  }, [publicClient]);
+
+  // Merge latest payouts with accumulated older payouts, removing duplicates
+  useEffect(() => {
+    if (latestPayouts.length > 0) {
+      setAllPayouts((prev) => {
+        // Create a map of existing payouts by transaction hash for quick lookup
+        const existingMap = new Map(prev.map(p => [p.transactionHash, p]));
+        
+        // Add/update latest payouts (they take precedence)
+        latestPayouts.forEach(payout => {
+          existingMap.set(payout.transactionHash, payout);
+        });
+        
+        // Convert back to array and sort by block number (newest first)
+        return Array.from(existingMap.values()).sort((a, b) => Number(b.blockNumber - a.blockNumber));
+      });
+      
+      // Set oldest loaded block on initial load
+      if (oldestLoadedBlock === null && latestPayouts.length > 0) {
+        const oldestBlock = Math.min(...latestPayouts.map(p => Number(p.blockNumber)));
+        setOldestLoadedBlock(BigInt(oldestBlock));
+      }
+    } else if (latestPayouts.length === 0 && !isLoadingPayouts && !hasAutoSearched && currentBlockNumber && oldestLoadedBlock === null) {
+      // No payouts found in initial query - automatically search backwards
+      console.log('No payouts found in initial query, automatically searching backwards...');
+      const initialOldestBlock = currentBlockNumber > CHUNK_SIZE 
+        ? (currentBlockNumber - CHUNK_SIZE > DEPLOYMENT_BLOCK 
+            ? currentBlockNumber - CHUNK_SIZE 
+            : DEPLOYMENT_BLOCK)
+        : DEPLOYMENT_BLOCK;
+      
+      setOldestLoadedBlock(initialOldestBlock);
+      setHasAutoSearched(true);
+    }
+  }, [latestPayouts, oldestLoadedBlock, isLoadingPayouts, hasAutoSearched, currentBlockNumber]);
+
+  // Auto-trigger backward search when oldestLoadedBlock is set but no payouts found yet
+  useEffect(() => {
+    if (oldestLoadedBlock && oldestLoadedBlock > DEPLOYMENT_BLOCK && hasAutoSearched && allPayouts.length === 0 && !isLoadingOlder && publicClient) {
+      // Small delay to ensure state is settled, then trigger the existing loadOlderPayouts function
+      const timer = setTimeout(() => {
+        loadOlderPayouts();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oldestLoadedBlock, hasAutoSearched, allPayouts.length, isLoadingOlder, publicClient]);
+
+  // Function to load older payouts (auto-continue until payouts found)
+  const loadOlderPayouts = async () => {
+    if (!publicClient || !oldestLoadedBlock || oldestLoadedBlock === 0n || isLoadingOlder) return;
+    
+    setIsLoadingOlder(true);
+    setSearchProgress(null);
+    
+    try {
+      // Check if we've reached the deployment block
+      if (oldestLoadedBlock <= DEPLOYMENT_BLOCK) {
+        setNoMorePayouts(true);
+        setSearchProgress('No more payouts available. Reached the deployment block.');
+        setTimeout(() => {
+          setSearchProgress(null);
+        }, 3000);
+        setIsLoadingOlder(false);
+        return;
+      }
+      
+      const payoutEvent = TreasuryExecutor.find((item: any) => 
+        item.type === 'event' && item.name === 'PayoutExecuted'
+      );
+      if (!payoutEvent) {
+        console.error('PayoutExecuted event not found in ABI!');
+        setIsLoadingOlder(false);
+        return;
+      }
+      
+      let currentOldestBlock = oldestLoadedBlock;
+      let totalBlocksChecked = 0n;
+      let allFoundPayouts: any[] = [];
+      const MAX_CHUNKS_TO_SEARCH = 10; // Limit to prevent infinite loops
+      const MIN_PAYOUTS_TO_LOAD = 2; // Load at least 2 payouts before stopping (since user said there are 2)
+      let chunksSearched = 0;
+      
+      // Keep searching chunks until we find at least MIN_PAYOUTS_TO_LOAD payouts or hit limits
+      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > DEPLOYMENT_BLOCK && allFoundPayouts.length < MIN_PAYOUTS_TO_LOAD) {
+        const newFromBlock = currentOldestBlock > CHUNK_SIZE 
+          ? (currentOldestBlock - CHUNK_SIZE > DEPLOYMENT_BLOCK 
+              ? currentOldestBlock - CHUNK_SIZE 
+              : DEPLOYMENT_BLOCK)
+          : DEPLOYMENT_BLOCK;
+        const newToBlock = currentOldestBlock - 1n;
+        const blocksInChunk = newToBlock - newFromBlock + 1n;
+        totalBlocksChecked += blocksInChunk;
+        
+        // Update search progress
+        const payoutsFoundSoFar = allFoundPayouts.length;
+        const remainingNeeded = Math.max(0, MIN_PAYOUTS_TO_LOAD - payoutsFoundSoFar);
+        setSearchProgress(
+          payoutsFoundSoFar > 0
+            ? `Found ${payoutsFoundSoFar} payout(s), searching for ${remainingNeeded} more... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
+            : `Searching for payouts... (checked ${totalBlocksChecked.toLocaleString()} blocks so far)`
+        );
+        
+        console.log(`Loading older payouts: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
+        
+        try {
+          // Fetch logs with retry logic
+          let logs: any[] = [];
+          let retries = 3;
+          let lastError: any = null;
+          
+          while (retries > 0) {
+            try {
+              logs = await publicClient.getLogs({
+                address: CONTRACTS.SEPOLIA.TREASURY_PROXY as Address,
+                event: payoutEvent as any,
+                fromBlock: newFromBlock,
+                toBlock: newToBlock,
+              });
+              break; // Success, exit retry loop
+            } catch (error: any) {
+              lastError = error;
+              retries--;
+              if (retries > 0) {
+                // Wait before retrying (exponential backoff)
+                const delay = (4 - retries) * 1000; // 1s, 2s, 3s
+                console.warn(`RPC request failed for chunk ${chunksSearched + 1}, retrying in ${delay}ms... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
+          }
+          
+          if (logs.length === 0 && lastError) {
+            console.warn(`Failed to fetch logs for chunk ${chunksSearched + 1} after retries:`, lastError);
+            // Continue to next chunk on error
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            await new Promise(resolve => setTimeout(resolve, 200));
+            continue;
+          }
+          
+          console.log(`Found ${logs.length} payout logs in chunk ${chunksSearched + 1}`);
+          
+          // If we found payouts, process them
+          if (logs.length > 0) {
+            // Process logs
+            const payoutPromises = logs.map(async (log: any) => {
+              try {
+                const decoded = decodeEventLog({
+                  abi: TreasuryExecutor,
+                  data: log.data,
+                  topics: log.topics,
+                });
+                
+                const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+                
+                return {
+                  recipient: decoded.args.to as Address,
+                  amount: decoded.args.amount as bigint,
+                  blockNumber: log.blockNumber,
+                  timestamp: Number(block.timestamp),
+                  transactionHash: log.transactionHash,
+                };
+              } catch (err) {
+                console.error('Error decoding older payout event:', err);
+                return null;
+              }
+            });
+
+            const chunkPayouts = (await Promise.all(payoutPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
+            allFoundPayouts.push(...chunkPayouts);
+            
+            // Update current oldest block to continue searching backwards
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            
+            // If we've found enough payouts, stop searching
+            if (allFoundPayouts.length >= MIN_PAYOUTS_TO_LOAD) {
+              break;
+            }
+            
+            // Add a small delay between chunks to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } else {
+            // No payouts in this chunk, continue searching
+            currentOldestBlock = newFromBlock;
+            chunksSearched++;
+            
+            // Add a small delay between chunks to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (chunkError: any) {
+          console.error(`Error fetching chunk ${chunksSearched + 1}:`, chunkError);
+          // Continue to next chunk on error
+          currentOldestBlock = newFromBlock;
+          chunksSearched++;
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      // Merge found payouts with existing payouts
+      if (allFoundPayouts.length > 0) {
+        setAllPayouts((prev) => {
+          const existingMap = new Map(prev.map(p => [p.transactionHash, p]));
+          allFoundPayouts.forEach(payout => {
+            existingMap.set(payout.transactionHash, payout);
+          });
+          return Array.from(existingMap.values()).sort((a, b) => Number(b.blockNumber - a.blockNumber));
+        });
+        
+        // Update oldest loaded block to the oldest block we searched
+        const oldestFoundBlock = Math.min(...allFoundPayouts.map(p => Number(p.blockNumber)));
+        setOldestLoadedBlock(BigInt(oldestFoundBlock));
+        
+        setSearchProgress(`Found ${allFoundPayouts.length} payout(s) after checking ${totalBlocksChecked.toLocaleString()} blocks`);
+      } else {
+        // No payouts found after searching multiple chunks
+        if (currentOldestBlock <= DEPLOYMENT_BLOCK) {
+          setNoMorePayouts(true);
+          setSearchProgress(`No more payouts found. Reached the deployment block.`);
+        } else {
+          setSearchProgress(`No payouts found in ${totalBlocksChecked.toLocaleString()} blocks. Try loading more.`);
+        }
+        // Still update oldest loaded block so we don't search the same range again
+        setOldestLoadedBlock(currentOldestBlock > DEPLOYMENT_BLOCK ? currentOldestBlock : DEPLOYMENT_BLOCK);
+      }
+      
+      // Clear search progress after a delay
+      setTimeout(() => {
+        setSearchProgress(null);
+      }, 3000);
+    } catch (error: any) {
+      console.error('Error loading older payouts:', error);
+      setSearchProgress(`Error: ${error.message || 'Failed to load payouts'}`);
+      setTimeout(() => {
+        setSearchProgress(null);
+      }, 3000);
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  // Use merged payouts for display
+  const payouts = allPayouts;
 
   // Check if wallet extension is installed
   const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
@@ -180,7 +489,7 @@ export function TreasuryPage() {
     // Store proposal data in localStorage for GovernancePage to pick up
     // Ensure amount is preserved as string to avoid any precision issues
     const amountString = String(amount).trim();
-    const proposalDescription = `Treasury Payout Proposal\n\nRecipient: ${recipient}\nAmount: ${amountString} Sepolia ETH\n\nThis proposal will execute a payout from the DAO treasury to the specified recipient address.`;
+    const proposalDescription = `Treasury Payout Proposal\n\nRecipient: ${recipient}\nAmount: ${amountString} Sepolia ETH\n\nThis proposal will execute a payout from the QAWL DAO treasury to the specified recipient address.`;
     
     const proposalData = {
       targets: CONTRACTS.SEPOLIA.TREASURY_PROXY,
@@ -201,10 +510,10 @@ export function TreasuryPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Treasury</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">View DAO treasury balance and spending parameters. Payouts are executed through governance proposals.</p>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">View <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury balance and spending parameters. Payouts are executed through governance proposals.</p>
       </div>
 
       {/* Onboarding Checklist - Show if wallet not fully set up */}
@@ -215,41 +524,14 @@ export function TreasuryPage() {
 
       {!isConnected && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <span className="text-xl">💰</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                Connect Your Wallet to View Treasury
-              </h3>
-              <p className="text-blue-800 dark:text-blue-300 mb-4">
-                Connect your wallet to view the DAO treasury balance and spending parameters. 
-                Treasury payouts are executed through governance proposals. Check the checklist above if you need help setting up.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/getting-started"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
-                >
-                  Getting Started Guide →
-                </Link>
-                <Link
-                  href="/governance"
-                  className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm font-medium"
-                >
-                  View Governance →
-                </Link>
-              </div>
-            </div>
-          </div>
+          <p className="text-teal-600 dark:text-teal-400">
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+          </p>
         </div>
       )}
 
       {/* Treasury Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full min-w-0">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
@@ -258,7 +540,7 @@ export function TreasuryPage() {
               <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Treasury Balance</p>
                 <p className="text-gray-300">
-                  The total amount of Sepolia ETH held by the DAO treasury. Funds come from membership donations and can be spent through governance proposals.
+                  The total amount of Sepolia ETH held by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Funds come from membership donations and can be spent through governance proposals.
                 </p>
               </div>
             </div>
@@ -311,16 +593,10 @@ export function TreasuryPage() {
       {/* How to Execute Payouts */}
       {isConnected && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <span className="text-xl">📋</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                How to Execute Treasury Payouts
-              </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
+              How to Execute Treasury Payouts
+            </h3>
               <p className="text-blue-800 dark:text-blue-300 mb-2">
                 Treasury payouts are executed through governance proposals. To create a proposal, fill in the fields below and click on the button "Create Governance Proposal".
               </p>
@@ -329,7 +605,7 @@ export function TreasuryPage() {
                 <Link href="/constitution" className="underline hover:text-blue-900 dark:hover:text-blue-200">
                   allowed recipients list
                 </Link>
-                {' '}managed in the Constitution. Only addresses on this list can receive funds from the DAO treasury.
+                {' '}managed in the Constitution. Only addresses on this list can receive funds from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury.
               </p>
               
               <div className="space-y-4 mt-4">
@@ -406,26 +682,30 @@ export function TreasuryPage() {
                 <button
                   onClick={handleCreateProposal}
                   disabled={!recipient || !amount || isRecipientAllowed === false || (isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x'))}
-                  className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
                   Create Governance Proposal
                 </button>
               </div>
-            </div>
           </div>
         </div>
       )}
 
       {/* Payout History */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Recent Payouts</h2>
-        {isLoadingPayouts ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>Loading payout history...</p>
+        {(isLoadingPayouts || (isLoadingOlder && payouts.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && payouts.length === 0 && !isLoadingOlder && publicClient)) ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p>{searchProgress || 'Loading payout history...'}</p>
           </div>
-        ) : recentPayouts && recentPayouts.length > 0 ? (
+        ) : (!isLoadingPayouts && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && payouts.length === 0) ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p>No payout history available.</p>
+            <p className="text-sm mt-2">Payouts will appear here after execution.</p>
+          </div>
+        ) : (
           <div className="space-y-3">
-            {recentPayouts.map((payout, index) => (
+            {payouts.map((payout, index) => (
               <div
                 key={`${payout.transactionHash}-${index}`}
                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
@@ -460,11 +740,32 @@ export function TreasuryPage() {
                 </a>
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            <p>No payout history available.</p>
-            <p className="text-sm mt-2">Payouts will appear here after execution.</p>
+            
+            {oldestLoadedBlock !== null && oldestLoadedBlock > 0n && (
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
+                <button
+                  onClick={loadOlderPayouts}
+                  disabled={isLoadingOlder || noMorePayouts}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isLoadingOlder ? (
+                    <>
+                      <span className="inline-block animate-spin mr-2">⏳</span>
+                      {searchProgress || 'Loading older payouts...'}
+                    </>
+                  ) : noMorePayouts ? (
+                    'No more older payouts'
+                  ) : (
+                    'Load older payouts'
+                  )}
+                </button>
+                {oldestLoadedBlock > 0n && !searchProgress && !noMorePayouts && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Currently showing payouts from block {oldestLoadedBlock.toLocaleString()} onwards
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

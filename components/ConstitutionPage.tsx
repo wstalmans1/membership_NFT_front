@@ -9,6 +9,7 @@ import { formatEther } from '@/lib/utils';
 import { encodeFunctionData, Address } from 'viem';
 import { HelpCircle, ExternalLink, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export function ConstitutionPage() {
   const { address, isConnected } = useAccount();
@@ -74,13 +75,11 @@ export function ConstitutionPage() {
   });
 
   // Fetch allowed recipients directly from contract (using new enumerable function)
+  // This is public data, so it should be available even when wallet is not connected
   const { data: allowedRecipients, isLoading: isLoadingRecipients } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
     functionName: 'getAllowedRecipients',
-    query: {
-      enabled: isConnected,
-    },
   });
 
   // Check if the entered address is already in the allowlist
@@ -114,7 +113,7 @@ export function ConstitutionPage() {
     });
 
     // Store proposal data in localStorage for GovernancePage to pick up
-    const proposalDescription = `Add Recipient to Allowlist\n\nRecipient: ${recipientAddress}\n\nThis proposal will add the specified address to the allowed recipients list, enabling it to receive funds from the DAO treasury through governance proposals.`;
+    const proposalDescription = `Add Recipient to Allowlist\n\nRecipient: ${recipientAddress}\n\nThis proposal will add the specified address to the allowed recipients list, enabling it to receive funds from the QAWL DAO treasury through governance proposals.`;
     
     const proposalData = {
       targets: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
@@ -137,8 +136,16 @@ export function ConstitutionPage() {
     <div className="space-y-8 min-w-0 w-full max-w-full overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Constitution</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">View DAO governance parameters and rules</p>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">View <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> governance parameters and rules</p>
       </div>
+
+      {!isConnected && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <p className="text-teal-600 dark:text-teal-400">
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+          </p>
+        </div>
+      )}
 
       {/* Membership Parameters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-hidden">
@@ -152,7 +159,7 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Minimum Donation</p>
                   <p className="text-gray-300">
-                    The minimum amount of Sepolia ETH required to mint a membership NFT. This donation goes directly to the DAO treasury.
+                    The minimum amount of Sepolia ETH required to mint a membership NFT. This donation goes directly to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury.
                   </p>
                 </div>
               </div>
@@ -262,7 +269,7 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Allowed Recipients</p>
                   <p className="text-gray-300">
-                    The list of addresses that are authorized to receive payments from the DAO treasury. Only addresses on this allowlist can receive funds through governance proposals.
+                    The list of addresses that are authorized to receive payments from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Only addresses on this allowlist can receive funds through governance proposals.
                   </p>
                 </div>
               </div>
@@ -303,7 +310,7 @@ export function ConstitutionPage() {
                             <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                               <p className="mb-1 font-semibold">Recipient Address</p>
                               <p className="text-gray-300">
-                                The Ethereum address to add to the allowed recipients list. This address will be able to receive funds from the DAO treasury after the proposal is executed.
+                                The Ethereum address to add to the allowed recipients list. This address will be able to receive funds from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury after the proposal is executed.
                               </p>
                             </div>
                           </div>
@@ -333,7 +340,7 @@ export function ConstitutionPage() {
                       <button
                         onClick={handleCreateAllowlistProposal}
                         disabled={!recipientAddress || recipientAddress.length !== 42 || !recipientAddress.startsWith('0x') || isAddressAllowed === true}
-                        className="w-full px-3 py-2 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="w-full px-3 py-2 text-sm bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       >
                         Create Governance Proposal
                       </button>
@@ -352,14 +359,14 @@ export function ConstitutionPage() {
                 {(allowedRecipients as Address[]).map((address) => (
                   <div key={address} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <a
-                        href={`https://eth-sepolia.blockscout.com/address/${address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
-                      >
-                        {address}
-                      </a>
+                    <a
+                      href={`https://eth-sepolia.blockscout.com/address/${address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                    >
+                      {address}
+                    </a>
                       <button
                         onClick={async (e) => {
                           e.preventDefault();
@@ -490,7 +497,7 @@ export function ConstitutionPage() {
             <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
               <p className="mb-2 font-semibold">Contract Addresses</p>
               <p className="text-gray-300">
-                These are the on-chain addresses of the DAO's smart contracts. All contracts are verified on Blockscout, allowing anyone to inspect the code and verify their functionality. Click any address to view it on the block explorer.
+                These are the on-chain addresses of the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>'s smart contracts. All contracts are verified on Blockscout, allowing anyone to inspect the code and verify their functionality. Click any address to view it on the block explorer.
               </p>
             </div>
           </div>
@@ -504,7 +511,7 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Constitution Contract</p>
                   <p className="text-gray-300">
-                    Defines the core DAO parameters including minimum donation, spend caps, allowed recipients, and base URI. This contract acts as the source of truth for governance rules and treasury constraints.
+                    Defines the core <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> parameters including minimum donation, spend caps, allowed recipients, and base URI. This contract acts as the source of truth for governance rules and treasury constraints.
                   </p>
                 </div>
               </div>
@@ -548,7 +555,7 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Membership NFT Contract</p>
                   <p className="text-gray-300">
-                    Issues soulbound (non-transferable) membership NFTs to DAO members. Each NFT grants 1 vote in governance. Members mint NFTs by making a minimum donation to the treasury.
+                    Issues soulbound (non-transferable) membership NFTs to <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> members. Each NFT grants 1 vote in governance. Members mint NFTs by making a minimum donation to the treasury.
                   </p>
                 </div>
               </div>
@@ -570,7 +577,7 @@ export function ConstitutionPage() {
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Treasury Executor Contract</p>
                   <p className="text-gray-300">
-                    Manages DAO treasury funds and executes payouts. Enforces spend caps and recipient allowlists. All treasury operations must go through governance proposals and the Timelock.
+                    Manages <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury funds and executes payouts. Enforces spend caps and recipient allowlists. All treasury operations must go through governance proposals and the Timelock.
                   </p>
                 </div>
               </div>

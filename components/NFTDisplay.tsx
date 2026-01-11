@@ -44,11 +44,15 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
 
   if (loading) {
     return (
-      <div className="p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="animate-pulse space-y-4">
-          <div className="h-48 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
+      <div className="relative bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 rounded shadow-2xl overflow-hidden border border-cyan-500/30 mx-auto flex flex-col animate-pulse" style={{
+        boxShadow: '0 0 15px rgba(6, 182, 212, 0.15), inset 0 0 15px rgba(6, 182, 212, 0.05)',
+        width: '110mm',
+        height: '72mm',
+        maxWidth: '100%',
+        aspectRatio: '85.60 / 53.98'
+      }}>
+        <div className="p-1.5 h-full flex flex-col justify-center">
+          <div className="bg-gray-700 dark:bg-gray-600 rounded h-full"></div>
         </div>
       </div>
     );
@@ -86,8 +90,8 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
   const cardId = `WC-${new Date().getFullYear()}-${tokenId.toString().padStart(4, '0')}-HONOR`;
 
   return (
-    <div className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 rounded shadow-2xl overflow-hidden border border-cyan-400/50 mx-auto flex flex-col" style={{
-      boxShadow: '0 0 20px rgba(34, 211, 238, 0.3), inset 0 0 20px rgba(34, 211, 238, 0.1)',
+    <div className="relative bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 rounded shadow-2xl overflow-hidden border border-cyan-500/30 mx-auto flex flex-col" style={{
+      boxShadow: '0 0 15px rgba(6, 182, 212, 0.15), inset 0 0 15px rgba(6, 182, 212, 0.05)',
       width: '110mm', // Increased from 85.60mm (about 28% larger)
       height: '72mm', // Slightly taller to accommodate content
       maxWidth: '100%', // Responsive fallback
@@ -95,8 +99,8 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
     }}>
       {/* Glowing border effect */}
       <div className="absolute inset-0 rounded" style={{
-        background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(34, 211, 238, 0.05) 100%)',
-        border: '1px solid rgba(34, 211, 238, 0.3)'
+        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(6, 182, 212, 0.03) 100%)',
+        border: '1px solid rgba(6, 182, 212, 0.2)'
       }} />
       
       <div className="relative p-1.5 h-full flex flex-col justify-center">
@@ -238,6 +242,9 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
                   src={metadata.image}
                   alt={properties.name || 'Member Photo'}
                   className="w-full h-full object-cover"
+                  width={200}
+                  height={267}
+                  loading="lazy"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';

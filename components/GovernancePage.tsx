@@ -163,19 +163,19 @@ export function GovernancePage() {
   const hasVoted = hasVotedData as boolean | undefined;
 
   // Get voting delay and period
-  const { data: votingDelay } = useReadContract({
+  const { data: votingDelay, isLoading: isLoadingVotingDelay } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'votingDelay',
   });
 
-  const { data: votingPeriod } = useReadContract({
+  const { data: votingPeriod, isLoading: isLoadingVotingPeriod } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'votingPeriod',
   });
 
-  const { data: proposalThreshold } = useReadContract({
+  const { data: proposalThreshold, isLoading: isLoadingProposalThreshold } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'proposalThreshold',
@@ -188,7 +188,7 @@ export function GovernancePage() {
   });
 
   // Get timelock delay from TimelockController
-  const { data: timelockDelaySeconds } = useReadContract({
+  const { data: timelockDelaySeconds, isLoading: isLoadingTimelockDelay } = useReadContract({
     address: CONTRACTS.SEPOLIA.TIMELOCK,
     abi: [
       {
@@ -202,9 +202,12 @@ export function GovernancePage() {
     functionName: 'getMinDelay',
   });
 
+  // Check if all governance parameters are loaded
+  const isLoadingGovernanceParams = isLoadingProposalThreshold || isLoadingVotingDelay || isLoadingVotingPeriod || isLoadingTimelockDelay;
+
   // Fetch latest proposals from ProposalCreated events (last 800 blocks)
   const CHUNK_SIZE = 800n;
-  // Block number of the first proposal ever created in the DAO
+  // Block number of the first proposal ever created in the QAWL DAO
   const FIRST_PROPOSAL_BLOCK = 9983760n;
   const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
     queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
@@ -579,7 +582,7 @@ export function GovernancePage() {
       // Check if we've reached the first proposal block
       if (oldestLoadedBlock <= FIRST_PROPOSAL_BLOCK) {
         setNoMoreProposals(true);
-        setSearchProgress('No more proposals available. Reached the first proposal in the DAO.');
+        setSearchProgress('No more proposals available. Reached the first proposal in the QAWL DAO.');
         setTimeout(() => {
           setSearchProgress(null);
         }, 3000);
@@ -870,7 +873,7 @@ export function GovernancePage() {
         // No proposals found after searching multiple chunks
         if (currentOldestBlock <= FIRST_PROPOSAL_BLOCK) {
           setNoMoreProposals(true);
-          setSearchProgress(`No more proposals found. Reached the first proposal in the DAO.`);
+          setSearchProgress(`No more proposals found. Reached the first proposal in the QAWL DAO.`);
         } else {
           setSearchProgress(`No proposals found in ${totalBlocksChecked.toLocaleString()} blocks. Try loading more.`);
         }
@@ -1340,7 +1343,7 @@ export function GovernancePage() {
   const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full min-w-0 overflow-hidden">
       {/* Onboarding Checklist - Show if wallet not fully set up */}
       {hasWalletExtension && <OnboardingChecklist />}
 
@@ -1350,7 +1353,7 @@ export function GovernancePage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Governance</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Create proposals and vote on DAO decisions</p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Create proposals and vote on <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> decisions</p>
         </div>
         {isConnected && (
           <button
@@ -1360,7 +1363,7 @@ export function GovernancePage() {
               }
             }}
             disabled={isPending || isConfirming}
-            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {showCreateForm ? 'Cancel' : 'Create Proposal'}
           </button>
@@ -1369,123 +1372,105 @@ export function GovernancePage() {
 
       {!isConnected && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <span className="text-xl">🗳️</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                Connect Your Wallet to Participate in Governance
-              </h3>
-              <p className="text-blue-800 dark:text-blue-300 mb-4">
-                Connect your wallet to create proposals, vote on governance decisions, and help shape the future of the DAO. 
-                You'll need a membership NFT to participate. Check the checklist above for setup instructions.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/getting-started"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium"
-                >
-                  Getting Started Guide →
-                </Link>
-                <Link
-                  href="/membership"
-                  className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm font-medium"
-                >
-                  Get Membership NFT →
-                </Link>
-              </div>
-            </div>
-          </div>
+          <p className="text-teal-600 dark:text-teal-400">
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+          </p>
         </div>
       )}
 
       {/* Governance Parameters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Proposal Threshold</p>
-                  <p className="text-gray-300">
-                    The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
-                  </p>
-                  <p className="text-gray-300 mt-2">
-                    <strong>Note:</strong> A threshold of 0 means anyone can create proposals, even without a membership NFT. A threshold of 1 means only members with at least 1 vote (1 delegated NFT) can create proposals.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {proposalThreshold !== undefined && proposalThreshold !== null
-                ? proposalThreshold.toString()
-                : 'Loading...'}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Voting Delay</p>
-                  <p className="text-gray-300">
-                    The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {votingDelay !== undefined && votingDelay !== null
-                ? `${Number(votingDelay)} blocks`
-                : 'Loading...'}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Voting Period</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Voting Period</p>
-                  <p className="text-gray-300">
-                    The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {votingPeriod !== undefined && votingPeriod !== null
-                ? `${Number(votingPeriod)} blocks`
-                : 'Loading...'}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Timelock Delay</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Timelock Delay</p>
-                  <p className="text-gray-300">
-                    The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This safety delay allows the community to review and potentially cancel malicious proposals before they take effect.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              {timelockDelaySeconds !== undefined && timelockDelaySeconds !== null
-                ? `${Number(timelockDelaySeconds)} seconds${Number(timelockDelaySeconds) >= 12 ? ` (~${Math.round(Number(timelockDelaySeconds) / 12)} blocks)` : ''}`
-                : 'Loading...'}
-            </p>
+      {/* Only render when all parameters are loaded to prevent transitions */}
+      {isLoadingGovernanceParams ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <p>Loading governance parameters...</p>
           </div>
         </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 w-full min-w-0">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+                <div className="relative group">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Proposal Threshold</p>
+                    <p className="text-gray-300">
+                      The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
+                    </p>
+                    <p className="text-gray-300 mt-2">
+                      <strong>Note:</strong> A threshold of 0 means anyone can create proposals, even without a membership NFT. A threshold of 1 means only members with at least 1 vote (1 delegated NFT) can create proposals.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {proposalThreshold !== undefined && proposalThreshold !== null
+                  ? proposalThreshold.toString()
+                  : '0'}
+              </p>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
+                <div className="relative group">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Voting Delay</p>
+                    <p className="text-gray-300">
+                      The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {votingDelay !== undefined && votingDelay !== null
+                  ? `${Number(votingDelay)} blocks`
+                  : '0 blocks'}
+              </p>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Voting Period</p>
+                <div className="relative group">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Voting Period</p>
+                    <p className="text-gray-300">
+                      The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {votingPeriod !== undefined && votingPeriod !== null
+                  ? `${Number(votingPeriod)} blocks`
+                  : '0 blocks'}
+              </p>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Timelock Delay</p>
+                <div className="relative group">
+                  <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">Timelock Delay</p>
+                    <p className="text-gray-300">
+                      The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This safety delay allows the community to review and potentially cancel malicious proposals before they take effect.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {timelockDelaySeconds !== undefined && timelockDelaySeconds !== null
+                  ? `${Number(timelockDelaySeconds)} seconds${Number(timelockDelaySeconds) >= 12 ? ` (~${Math.round(Number(timelockDelaySeconds) / 12)} blocks)` : ''}`
+                  : '0 seconds'}
+              </p>
+            </div>
+          </div>
 
         {/* Voting Rules */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -1620,11 +1605,12 @@ export function GovernancePage() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Create Proposal Form */}
       {showCreateForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create New Proposal</h2>
           
           {error && (
@@ -1719,7 +1705,7 @@ export function GovernancePage() {
             <button
               type="submit"
               disabled={isPending || isConfirming}
-              className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending || isConfirming ? 'Submitting...' : 'Submit Proposal'}
             </button>
@@ -1733,17 +1719,8 @@ export function GovernancePage() {
       )}
 
       {/* Proposals List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Proposals</h2>
-          <button
-            onClick={() => refetchLatestProposals()}
-            disabled={isLoadingProposals}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-          >
-            {isLoadingProposals ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Proposals</h2>
         {(isLoadingProposals || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <p>{searchProgress || 'Loading proposals...'}</p>
@@ -1868,7 +1845,7 @@ export function GovernancePage() {
                                   handleQueue(proposal);
                                 }}
                                 disabled={isQueueing || isQueueConfirming || !isConnected}
-                                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                className="px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                               >
                                 {isQueueing || isQueueConfirming ? 'Scheduling...' : 'Schedule Execution'}
                               </button>

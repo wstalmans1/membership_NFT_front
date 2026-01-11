@@ -23,26 +23,26 @@ export default function GettingStarted() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1" suppressHydrationWarning>
-        <div className="space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
+        <div className="space-y-8 w-full min-w-0 overflow-hidden">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Getting Started Guide</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Step-by-step instructions to set up your wallet and start using the DAO
+              Step-by-step instructions to set up your wallet and start using the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>
             </p>
           </div>
 
           {/* Step 1: Install Wallet */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 1
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Install a Crypto Wallet</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               A crypto wallet is like a digital bank account that lets you interact with blockchain applications. 
-              You'll need one to connect to the DAO and mint your membership NFT.
+              You'll need one to connect to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> and mint your membership NFT.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -113,13 +113,13 @@ export default function GettingStarted() {
           {/* Step 2: Connect Wallet */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 2
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Connect Your Wallet</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Once your wallet is installed, connect it to the DAO:
+              Once your wallet is installed, connect it to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>:
             </p>
             <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
               <li>1. Look for the wallet connection button in the top right corner of the page</li>
@@ -132,13 +132,13 @@ export default function GettingStarted() {
           {/* Step 3: Switch to Sepolia */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 3
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Switch to Sepolia Network</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              This DAO runs on Sepolia testnet (not Ethereum mainnet). You need to switch your wallet to Sepolia:
+              The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs on Sepolia testnet (not Ethereum mainnet). You need to switch your wallet to Sepolia:
             </p>
             
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
@@ -150,7 +150,7 @@ export default function GettingStarted() {
                   </p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">
                     Sepolia is a test network where transactions are free (you use test ETH, not real ETH). 
-                    This allows you to test the DAO without spending real money.
+                    This allows you to test the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> without spending real money.
                   </p>
                 </div>
               </div>
@@ -196,7 +196,7 @@ export default function GettingStarted() {
           {/* Step 4: Get Sepolia ETH */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 4
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Get Sepolia ETH from a Faucet</h2>
@@ -217,7 +217,7 @@ export default function GettingStarted() {
                       href={faucet.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-4 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm font-medium inline-flex items-center gap-2"
+                      className="ml-4 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium inline-flex items-center gap-2"
                       suppressHydrationWarning
                     >
                       Visit Faucet
@@ -256,7 +256,7 @@ export default function GettingStarted() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">You're Ready!</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Once you've completed all the steps above, you're ready to interact with the DAO:
+              Once you've completed all the steps above, you're ready to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>:
             </p>
             <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
               <li>• Mint your membership NFT</li>
@@ -267,7 +267,7 @@ export default function GettingStarted() {
             <div className="mt-4">
               <a
                 href="/"
-                className="inline-block px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
+                className="inline-block px-6 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors font-medium"
                 suppressHydrationWarning
               >
                 Go to Dashboard →
@@ -289,7 +289,7 @@ export default function GettingStarted() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Do I need real ETH?</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  No! This DAO runs on Sepolia testnet, which uses free test ETH. You can get test ETH from faucets 
+                  No! The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs on Sepolia testnet, which uses free test ETH. You can get test ETH from faucets 
                   without spending any real money.
                 </p>
               </div>
@@ -304,7 +304,7 @@ export default function GettingStarted() {
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Can I use my mainnet wallet?</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Yes! The same wallet can be used on multiple networks. Just make sure you're on Sepolia network 
-                  when interacting with this DAO. Your mainnet funds are safe and separate.
+                  when interacting with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. Your mainnet funds are safe and separate.
                 </p>
               </div>
             </div>

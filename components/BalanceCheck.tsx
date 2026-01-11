@@ -13,7 +13,7 @@ const SEPOLIA_FAUCETS = [
 
 export function BalanceCheck() {
   const { address, isConnected } = useAccount();
-  const { data: balance } = useBalance({
+  const { data: balance, isLoading } = useBalance({
     address: address,
   });
 
@@ -21,7 +21,12 @@ export function BalanceCheck() {
     return null;
   }
 
-  const balanceEth = balance ? parseFloat(formatEther(BigInt(balance.value.toString()))) : 0;
+  // Don't render anything until balance is loaded to avoid false positives
+  if (isLoading || balance === undefined) {
+    return null;
+  }
+
+  const balanceEth = parseFloat(formatEther(BigInt(balance.value.toString())));
   const hasLowBalance = balanceEth < 0.001; // Less than 0.001 ETH
 
   if (!hasLowBalance) {

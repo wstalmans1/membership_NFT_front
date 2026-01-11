@@ -1,6 +1,6 @@
-# Qawl DAO Frontend
+# QAWL DAO Frontend
 
-A Next.js frontend for the Qawl DAO, built with TypeScript, Tailwind CSS, and Wagmi for Ethereum interactions.
+A Next.js frontend for the QAWL DAO, built with TypeScript, Tailwind CSS, and Wagmi for Ethereum interactions.
 
 ## Features
 

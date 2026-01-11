@@ -20,7 +20,7 @@ export default function Governance() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1" suppressHydrationWarning>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
         <GovernancePage />
       </main>
       <Footer />
