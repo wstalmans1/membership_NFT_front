@@ -598,7 +598,7 @@ export function TreasuryPage() {
               How to Execute Treasury Payouts
             </h3>
               <p className="text-blue-800 dark:text-blue-300 mb-2">
-                Treasury payouts are executed through governance proposals. To create a proposal, fill in the fields below and click on the button "Create Governance Proposal".
+                Treasury payouts are executed through governance proposals. To create a payout-proposal, fill in the fields below and click on the button "Create Governance Proposal".
               </p>
               <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
                 <span className="font-medium">Note:</span> The recipient address must be on the{' '}

@@ -40,6 +40,7 @@ export function GovernancePage() {
   const [description, setDescription] = useState('');
   const [targets, setTargets] = useState('');
   const [calldatas, setCalldatas] = useState('');
+  const [withOnChainExecution, setWithOnChainExecution] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [votingProposalId, setVotingProposalId] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function GovernancePage() {
           setTargets(proposalData.targets || '');
           setCalldatas(proposalData.calldatas || '');
           setDescription(proposalData.description || '');
+          setWithOnChainExecution(true); // Treasury payouts require on-chain execution
           setShowCreateForm(true);
           // Clear the stored data after using it
           localStorage.removeItem('treasuryPayoutProposal');
@@ -91,6 +93,7 @@ export function GovernancePage() {
           setTargets(proposalData.targets || '');
           setCalldatas(proposalData.calldatas || '');
           setDescription(proposalData.description || '');
+          setWithOnChainExecution(true); // Allowlist proposals require on-chain execution
           setShowCreateForm(true);
           // Clear the stored data after using it
           localStorage.removeItem('allowlistProposal');
@@ -920,7 +923,18 @@ export function GovernancePage() {
       let values: bigint[] = [];
       let calldataArray: `0x${string}`[] = [];
 
-      if (targets.trim()) {
+      if (withOnChainExecution) {
+        // Require targets and calldatas if on-chain execution is enabled
+        if (!targets.trim()) {
+          setError('Please provide target contract addresses when on-chain execution is enabled');
+          return;
+        }
+        if (!calldatas.trim()) {
+          setError('Please provide calldata when on-chain execution is enabled');
+          return;
+        }
+        
+        // Parse targets (comma-separated addresses)
         targetAddresses = targets
           .split(',')
           .map((addr) => addr.trim() as Address)
@@ -932,30 +946,25 @@ export function GovernancePage() {
         }
 
         // Parse calldatas (comma-separated hex strings)
-        if (calldatas.trim()) {
-          calldataArray = calldatas
-            .split(',')
-            .map((cd) => cd.trim() as `0x${string}`)
-            .filter((cd) => cd.startsWith('0x'));
-          
-          if (calldataArray.length !== targetAddresses.length) {
-            setError('Number of calldatas must match number of targets');
-            return;
-          }
-        } else {
-          // If no calldatas provided, use empty calldata for each target
-          calldataArray = targetAddresses.map(() => '0x' as `0x${string}`);
+        calldataArray = calldatas
+          .split(',')
+          .map((cd) => cd.trim() as `0x${string}`)
+          .filter((cd) => cd.startsWith('0x'));
+        
+        if (calldataArray.length !== targetAddresses.length) {
+          setError('Number of calldatas must match number of targets');
+          return;
         }
 
         // Values array (0 ETH for each target by default)
         values = targetAddresses.map(() => 0n);
       } else {
-        // For proposals with only description (no actions), we need at least one dummy target
-        // Use the Governor contract itself as a dummy target with empty calldata
+        // For proposals without on-chain execution (description-only), use dummy target
         targetAddresses = [CONTRACTS.SEPOLIA.GOVERNOR_PROXY as Address];
         values = [0n];
         calldataArray = ['0x' as `0x${string}`];
       }
+
 
       console.log('Submitting proposal:', {
         targets: targetAddresses,
@@ -983,6 +992,7 @@ export function GovernancePage() {
       setDescription('');
       setTargets('');
       setCalldatas('');
+      setWithOnChainExecution(false);
       
       // Refetch proposals after a short delay to allow block to be mined
       setTimeout(() => {
@@ -1626,6 +1636,28 @@ export function GovernancePage() {
           )}
 
           <form onSubmit={handleSubmitProposal} className="space-y-4">
+            <div className="mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={withOnChainExecution}
+                  onChange={(e) => setWithOnChainExecution(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  With on-chain execution
+                </span>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">On-chain Execution</p>
+                    <p className="text-gray-300">
+                      Check this box if your proposal requires executing actions on smart contracts (e.g., treasury payouts, parameter changes). Uncheck for description-only proposals (signaling proposals).
+                    </p>
+                  </div>
+                </div>
+              </label>
+            </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1650,11 +1682,13 @@ export function GovernancePage() {
                 required
               />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Target Contracts (optional, comma-separated addresses)
-                </label>
+            {withOnChainExecution && (
+              <>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Target Contracts (comma-separated addresses) *
+                    </label>
                 <div className="relative group">
                   <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -1670,16 +1704,17 @@ export function GovernancePage() {
                 value={targets}
                 onChange={(e) => setTargets(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                placeholder="0x..., 0x... (leave empty for description-only proposal)"
+                placeholder="0x..., 0x..."
+                required={withOnChainExecution}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                If provided, you must also provide matching calldatas below.
+                You must also provide matching calldatas below.
               </p>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Calldata (optional, comma-separated hex-encoded)
+                  Calldata (comma-separated hex-encoded) *
                 </label>
                 <div className="relative group">
                   <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
@@ -1697,11 +1732,14 @@ export function GovernancePage() {
                 onChange={(e) => setCalldatas(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="0x..., 0x... (must match number of targets)"
+                required={withOnChainExecution}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Number of calldatas must match number of targets.
               </p>
             </div>
+            </>
+            )}
             <button
               type="submit"
               disabled={isPending || isConfirming}
@@ -1818,6 +1856,16 @@ export function GovernancePage() {
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Proposal Timeline - Always visible */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+                    <ProposalTimeline 
+                      proposal={proposal}
+                      currentBlockNumber={currentBlockNumber}
+                      timelockDelaySeconds={timelockDelaySeconds}
+                      queuedProposalETA={queuedProposalETAs.get(proposal.id)}
+                    />
                   </div>
 
                   {/* Vote counts - Always visible with direct contract read */}
@@ -2381,6 +2429,211 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Component to display proposal timeline
+function ProposalTimeline({ 
+  proposal, 
+  currentBlockNumber, 
+  timelockDelaySeconds,
+  queuedProposalETA 
+}: { 
+  proposal: any; 
+  currentBlockNumber: bigint | null;
+  timelockDelaySeconds: bigint | null;
+  queuedProposalETA?: number;
+}) {
+  const getTimelineSteps = () => {
+    const steps: Array<{
+      label: string;
+      block: bigint | null;
+      status: 'completed' | 'current' | 'upcoming';
+      description: string;
+    }> = [];
+
+    // Step 1: Created
+    steps.push({
+      label: 'Proposal Created',
+      block: proposal.blockNumber,
+      status: 'completed',
+      description: `Created at block ${proposal.blockNumber.toLocaleString()}`
+    });
+
+    // Step 2: Voting Starts (Pending → Active)
+    steps.push({
+      label: 'Voting Starts',
+      block: proposal.voteStart,
+      status: proposal.state === 'Pending' ? 'upcoming' : 'completed',
+      description: `Voting begins at block ${proposal.voteStart.toLocaleString()}`
+    });
+
+    // Step 3: Voting Ends
+    steps.push({
+      label: 'Voting Ends',
+      block: proposal.voteEnd,
+      status: proposal.state === 'Active' ? 'current' : 
+              ['Succeeded', 'Defeated', 'Queued', 'Executed', 'Canceled', 'Expired'].includes(proposal.state) ? 'completed' : 'upcoming',
+      description: `Voting ends at block ${proposal.voteEnd.toLocaleString()}`
+    });
+
+    // Step 4: Result (Succeeded/Defeated) - Always show, status depends on current state
+    const hasVotingEnded = ['Succeeded', 'Defeated', 'Queued', 'Executed', 'Canceled', 'Expired'].includes(proposal.state);
+    steps.push({
+      label: hasVotingEnded 
+        ? (proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed' ? 'Proposal Passed' : 'Proposal Defeated')
+        : 'Voting Results',
+      block: proposal.voteEnd, // Right after voting ends
+      status: hasVotingEnded ? 'completed' : 'upcoming',
+      description: hasVotingEnded
+        ? (proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed'
+          ? 'Proposal received enough votes to pass'
+          : 'Proposal did not receive enough votes')
+        : 'Voting results will be determined after voting ends'
+    });
+
+    // Step 5: Schedule Execution - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
+    const canProceedToExecution = proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed' || proposal.state === 'Active';
+    if (canProceedToExecution) {
+      if (proposal.state === 'Queued' || proposal.state === 'Executed') {
+        steps.push({
+          label: 'Scheduled for Execution',
+          block: null, // ETA is timestamp-based
+          status: proposal.state === 'Queued' ? 'current' : 'completed',
+          description: queuedProposalETA 
+            ? `Scheduled to execute at ${new Date(queuedProposalETA * 1000).toLocaleString()}`
+            : 'Scheduled for execution after timelock delay'
+        });
+      } else if (proposal.state === 'Succeeded') {
+        steps.push({
+          label: 'Schedule Execution',
+          block: null,
+          status: 'upcoming',
+          description: 'Proposal can be queued for execution'
+        });
+      } else if (proposal.state === 'Active') {
+        steps.push({
+          label: 'Schedule Execution',
+          block: null,
+          status: 'upcoming',
+          description: 'If proposal passes, it can be queued for execution after voting ends'
+        });
+      }
+    }
+
+    // Step 6: Executed - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
+    if (canProceedToExecution) {
+      if (proposal.state === 'Executed') {
+        steps.push({
+          label: 'Executed',
+          block: null,
+          status: 'completed',
+          description: 'Proposal has been executed successfully'
+        });
+      } else if (proposal.state === 'Queued') {
+        steps.push({
+          label: 'Execute',
+          block: null,
+          status: 'upcoming',
+          description: queuedProposalETA 
+            ? `Can be executed after ${new Date(queuedProposalETA * 1000).toLocaleString()}`
+            : 'Can be executed after timelock delay period'
+        });
+      } else {
+        steps.push({
+          label: 'Execute',
+          block: null,
+          status: 'upcoming',
+          description: 'If proposal passes and is queued, it can be executed after the timelock delay'
+        });
+      }
+    }
+
+    return steps;
+  };
+
+  const steps = getTimelineSteps();
+  const currentBlock = currentBlockNumber || 0n;
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4">
+      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Proposal Timeline</h4>
+      <div className="space-y-3">
+        {steps.map((step, index) => {
+          const isLast = index === steps.length - 1;
+          const isCurrent = step.status === 'current';
+          const isCompleted = step.status === 'completed';
+          const isUpcoming = step.status === 'upcoming';
+
+          // Calculate blocks remaining/elapsed
+          let blockInfo = '';
+          if (step.block && currentBlock && currentBlock > 0n) {
+            const stepBlock = BigInt(step.block);
+            if (currentBlock >= stepBlock) {
+              const blocksAgo = currentBlock - stepBlock;
+              blockInfo = `${blocksAgo.toLocaleString()} blocks ago`;
+            } else {
+              const blocksRemaining = stepBlock - currentBlock;
+              blockInfo = `${blocksRemaining.toLocaleString()} blocks remaining`;
+            }
+          }
+
+          return (
+            <div key={index} className="flex items-start gap-3">
+              {/* Timeline line */}
+              <div className="flex flex-col items-center">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${
+                  isCompleted ? 'bg-green-500' :
+                  isCurrent ? 'bg-blue-500 animate-pulse' :
+                  'bg-gray-300 dark:bg-gray-600'
+                }`} />
+                {!isLast && (
+                  <div className={`w-0.5 flex-1 mt-1 ${
+                    isCompleted ? 'bg-green-500' :
+                    'bg-gray-300 dark:bg-gray-600'
+                  }`} style={{ minHeight: '24px' }} />
+                )}
+              </div>
+
+              {/* Step content */}
+              <div className="flex-1 pb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-sm font-medium ${
+                    isCompleted ? 'text-green-700 dark:text-green-300' :
+                    isCurrent ? 'text-blue-700 dark:text-blue-300' :
+                    'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    {step.label}
+                  </span>
+                  {isCurrent && (
+                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                      Current
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  {step.description}
+                </p>
+                {blockInfo && (
+                  <p className="text-xs text-gray-500 dark:text-gray-500 font-mono">
+                    {blockInfo}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Current position indicator */}
+      {currentBlock > 0n && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Current block: <span className="font-mono font-semibold">{currentBlock.toLocaleString()}</span>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

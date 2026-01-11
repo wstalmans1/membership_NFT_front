@@ -123,6 +123,8 @@ export function ConstitutionPage() {
 
     console.log('Storing allowlist proposal:', {
       recipient: recipientAddress,
+      target: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
+      calldata: calldata,
       description: proposalDescription,
     });
 

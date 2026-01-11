@@ -1,6 +1,6 @@
 'use client';
 
-import { useAccount, useBalance, useReadContract } from 'wagmi';
+import { useAccount, useBalance, useReadContract, usePublicClient } from 'wagmi';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { formatEther } from '@/lib/utils';
@@ -13,15 +13,29 @@ import { HelpCircle } from 'lucide-react';
 import { WalletInstallGuide } from './WalletInstallGuide';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import { BalanceCheck } from './BalanceCheck';
+import { useEffect, useState } from 'react';
+import { decodeEventLog, type Address } from 'viem';
 
 export function Dashboard() {
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  
+  // Add a timeout to prevent infinite loading
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoadingTimeout(true);
+    }, 10000); // 10 second timeout
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   // Check if any wallet extension is installed
   const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
   
   // Get membership NFT balance
-  const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
+  const { data: membershipBalance, isLoading: isLoadingMembership, isError: isErrorMembership } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'balanceOf',
@@ -30,7 +44,7 @@ export function Dashboard() {
   });
 
   // Get treasury balance
-  const { data: treasuryBalance, isLoading: isLoadingTreasury } = useBalance({
+  const { data: treasuryBalance, isLoading: isLoadingTreasury, isError: isErrorTreasury } = useBalance({
     address: CONTRACTS.SEPOLIA.TREASURY_PROXY,
   });
 
@@ -41,20 +55,105 @@ export function Dashboard() {
     functionName: 'minDonationWei',
   });
 
-  // Get proposal count (simplified - would need to track proposals)
-  const proposalCount = 0; // TODO: Implement proposal counting
+  // Get active proposal count
+  const { data: activeProposalCount = 0, isLoading: isLoadingProposals } = useQuery({
+    queryKey: ['activeProposalCount', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
+    queryFn: async () => {
+      if (!publicClient) return 0;
+
+      try {
+        // Get current block number
+        const currentBlock = await publicClient.getBlock({ blockTag: 'latest' });
+        const currentBlockNumber = currentBlock.number;
+        
+        // Fetch proposals from the last 800 blocks (RPC limit is typically 1000 blocks)
+        // This matches the chunk size used in GovernancePage
+        const CHUNK_SIZE = 800n;
+        const fromBlock = currentBlockNumber > CHUNK_SIZE 
+          ? currentBlockNumber - CHUNK_SIZE 
+          : 0n;
+
+        // Find ProposalCreated event in ABI
+        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+        if (!proposalCreatedEvent) {
+          console.error('ProposalCreated event not found in ABI!');
+          return 0;
+        }
+
+        // Fetch ProposalCreated events
+        const logs = await publicClient.getLogs({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          event: proposalCreatedEvent as any,
+          fromBlock: fromBlock,
+          toBlock: 'latest',
+        });
+
+        if (logs.length === 0) return 0;
+
+        // Decode events and get proposal IDs
+        const proposalIds: bigint[] = [];
+        for (const log of logs) {
+          try {
+            const decoded = decodeEventLog({
+              abi: DAOGovernor,
+              data: log.data,
+              topics: log.topics,
+            });
+            const args = decoded.args as any;
+            if (args.proposalId) {
+              proposalIds.push(args.proposalId as bigint);
+            }
+          } catch (err) {
+            console.error('Error decoding proposal event:', err);
+          }
+        }
+
+        if (proposalIds.length === 0) return 0;
+
+        // Check state of each proposal and count active ones (state === 1)
+        const stateChecks = await Promise.all(
+          proposalIds.map((proposalId) =>
+            publicClient.readContract({
+              address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+              abi: DAOGovernor,
+              functionName: 'state',
+              args: [proposalId],
+            }).catch(() => null)
+          )
+        );
+
+        // Count proposals with state === 1 (Active)
+        const activeCount = stateChecks.filter((state) => state === 1).length;
+        return activeCount;
+      } catch (error) {
+        console.error('Error fetching active proposal count:', error);
+        return 0;
+      }
+    },
+    enabled: !!publicClient,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 2,
+    retryDelay: 1000,
+  });
+
+  const proposalCount = activeProposalCount;
 
   // Get total members count
-  const { data: totalMembers = 0, isLoading: isLoadingMembers } = useQuery({
+  const { data: totalMembers = 0, isLoading: isLoadingMembers, isError: isErrorMembers } = useQuery({
     queryKey: ['totalMembers'],
     queryFn: getTotalMembersCount,
     refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 2, // Retry twice on failure
+    retryDelay: 1000, // Wait 1 second between retries
+    staleTime: 60000, // Consider data stale after 60 seconds
   });
 
   // Only determine membership status when data is actually loaded
-  const isMember = address && !isLoadingMembership && membershipBalance 
-    ? Boolean(Number(membershipBalance) > 0)
-    : undefined; // undefined means "still loading"
+  // If there's an error or we're not connected, default to false/undefined
+  // After timeout, assume not a member if still loading
+  const isMember = address && !isLoadingMembership && (membershipBalance !== undefined || isErrorMembership)
+    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
+    : (isConnected && address && (isErrorMembership || loadingTimeout) ? false : undefined); // undefined means "still loading", false if error or timeout
 
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
@@ -92,7 +191,7 @@ export function Dashboard() {
             Join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> by minting a membership NFT. Minimum donation: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
           </p>
           <Link
-            href="/membership"
+            href="/membership?expand=membership"
             className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors"
           >
             Mint Membership
@@ -101,8 +200,10 @@ export function Dashboard() {
       )}
 
       {/* Only render summary cards when all data is loaded to prevent transitions */}
-      {/* Wait for: totalMembers, treasuryBalance, and (if connected) membership status */}
-      {isLoadingMembers || isLoadingTreasury || (isConnected && address && isMember === undefined) ? (
+      {/* Wait for: totalMembers, treasuryBalance, proposals, and (if connected) membership status */}
+      {/* Show content if: all loading is done OR if there are errors (to prevent infinite loading) */}
+      {/* Don't wait forever - if queries error out or timeout, show the dashboard anyway */}
+      {!loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnected && address && isMember === undefined && !isErrorMembership)) ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <p>Loading dashboard data...</p>
@@ -126,7 +227,7 @@ export function Dashboard() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {totalMembers}
             </p>
-            <Link href="/membership" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
+            <Link href="/membership?expand=all-members" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
               View all →
             </Link>
           </div>
@@ -147,6 +248,9 @@ export function Dashboard() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '0'} Sepolia ETH
             </p>
+            <Link href="/treasury" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
+              To treasury →
+            </Link>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">

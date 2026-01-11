@@ -15,11 +15,13 @@ import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import { OnboardingChecklist } from './OnboardingChecklist';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 export function MembershipPage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
@@ -29,8 +31,11 @@ export function MembershipPage() {
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(false);
-  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(false);
+  // Check if we should expand from query parameter
+  const shouldExpandMembershipFromQuery = searchParams?.get('expand') === 'membership';
+  const shouldExpandAllMembersFromQuery = searchParams?.get('expand') === 'all-members';
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(shouldExpandMembershipFromQuery);
+  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(shouldExpandAllMembersFromQuery);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
   // Privacy expanded state - initialized from isMember when balance loads
@@ -75,6 +80,20 @@ export function MembershipPage() {
   const isMember = address && balance !== undefined
     ? Boolean(Number(balance) > 0)
     : undefined; // undefined means "still loading"
+
+  // Expand membership status section if query parameter is present
+  useEffect(() => {
+    if (shouldExpandMembershipFromQuery) {
+      setIsMembershipStatusExpanded(true);
+    }
+  }, [shouldExpandMembershipFromQuery]);
+
+  // Expand all members section if query parameter is present
+  useEffect(() => {
+    if (shouldExpandAllMembersFromQuery) {
+      setIsAllMembersExpanded(true);
+    }
+  }, [shouldExpandAllMembersFromQuery]);
 
   // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
   // This must be after isMember is declared
@@ -345,7 +364,7 @@ export function MembershipPage() {
                         The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
                       </p>
                       <p className="text-xs text-blue-800 dark:text-blue-300">
-                        <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship information at any time through the "Update" button on your membership card.
+                        <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo and date of birth at any time through the membership page
                       </p>
                       <p className="text-xs text-blue-800 dark:text-blue-300">
                         <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records (proposal creation and voting records) are permanent and cannot be modified.
@@ -836,8 +855,7 @@ export function MembershipPage() {
                           (proposal creation and voting records) are stored permanently on the blockchain and cannot be changed
                         </li>
                         <li>
-                          <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo, date of birth, and citizenship 
-                          information at any time through the membership page
+                          <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo and date of birth at any time through the membership page
                         </li>
                         <li>
                           <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance 

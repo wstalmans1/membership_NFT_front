@@ -59,9 +59,9 @@ export default function GettingStarted() {
                 </div>
                 <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 mb-4 ml-2">
                   <li>1. Visit <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" suppressHydrationWarning>metamask.io</a></li>
-                  <li>2. Click "Download" and choose your browser</li>
+                  <li>2. Download the extension for the adequate browser</li>
                   <li>3. Follow the installation instructions</li>
-                  <li>4. Create a new wallet or import an existing one</li>
+                  <li>4. Create a new wallet (for decentralization purposes, it's recommended to do it through a passphrase) or import an existing one</li>
                   <li>5. Save your recovery phrase securely!</li>
                 </ol>
                 <a
@@ -138,7 +138,7 @@ export default function GettingStarted() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Switch to Sepolia Network</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs on Sepolia testnet (not Ethereum mainnet). You need to switch your wallet to Sepolia:
+              The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs currently for testing purposes on Sepolia testnet (not Ethereum mainnet). You need to switch your wallet to Sepolia:
             </p>
             
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
@@ -289,7 +289,7 @@ export default function GettingStarted() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Do I need real ETH?</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  No! The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs on Sepolia testnet, which uses free test ETH. You can get test ETH from faucets 
+                  No! The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs currently for testing purposes on Sepolia testnet, which uses free test ETH. You can get test ETH from faucets 
                   without spending any real money.
                 </p>
               </div>

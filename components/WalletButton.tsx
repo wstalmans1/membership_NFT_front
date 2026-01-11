@@ -71,7 +71,7 @@ export function WalletButton() {
         {/* Pill-shaped button */}
         <button
           onClick={() => setShowModal(!showModal)}
-          className="flex items-center gap-2.5 px-4 py-1.5 bg-blue-700 dark:bg-blue-800 text-white rounded-full hover:bg-blue-800 dark:hover:bg-blue-900 transition-colors font-medium text-sm h-8"
+          className="flex items-center gap-2.5 px-4 py-1.5 bg-blue-600 dark:bg-blue-700 text-white rounded-full hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors font-medium text-sm h-8"
         >
           <span className="font-semibold whitespace-nowrap">{balanceDisplay} Sepolia ETH</span>
           <span className="text-lg flex-shrink-0">🍉</span>
@@ -194,7 +194,7 @@ export function WalletButton() {
     <button
       onClick={() => connect({ connector: wallet.connector })}
       disabled={isPending}
-      className="px-3 py-1.5 text-xs bg-blue-700 dark:bg-blue-800 text-white rounded-lg hover:bg-blue-800 dark:hover:bg-blue-900 transition-colors disabled:opacity-50"
+      className="px-3 py-1.5 text-xs bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50"
     >
       {isPending ? 'Connecting...' : `Connect ${wallet.name}`}
     </button>
