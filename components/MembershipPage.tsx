@@ -415,12 +415,7 @@ export function MembershipPage() {
         
         {isMembershipStatusExpanded && (
           <>
-            {!isConnected || !address ? (
-              // Not connected - show message
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <p>Connect your wallet to view your membership status.</p>
-              </div>
-            ) : balance === undefined || isMember === undefined ? (
+            {(!isConnected || !address) ? null : balance === undefined || isMember === undefined ? (
               // Still loading balance/membership status
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <p>Loading membership status...</p>
