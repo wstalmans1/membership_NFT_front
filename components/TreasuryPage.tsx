@@ -27,6 +27,7 @@ export function TreasuryPage() {
   const [noMorePayouts, setNoMorePayouts] = useState(false);
   const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
+  const [rateLimitError, setRateLimitError] = useState(false);
 
   // Get treasury balance
   const { data: treasuryBalance } = useBalance({
@@ -287,12 +288,15 @@ export function TreasuryPage() {
       let currentOldestBlock = oldestLoadedBlock;
       let totalBlocksChecked = 0n;
       let allFoundPayouts: any[] = [];
-      const MAX_CHUNKS_TO_SEARCH = 10; // Limit to prevent infinite loops
-      const MIN_PAYOUTS_TO_LOAD = 2; // Load at least 2 payouts before stopping (since user said there are 2)
+      const MAX_CHUNKS_TO_SEARCH = 5; // Reduced from 10 to limit automatic search depth
       let chunksSearched = 0;
+      const CHUNK_DELAY_MS = 750; // Increased from 200ms to reduce rate limit hits
       
-      // Keep searching chunks until we find at least MIN_PAYOUTS_TO_LOAD payouts or hit limits
-      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > DEPLOYMENT_BLOCK && allFoundPayouts.length < MIN_PAYOUTS_TO_LOAD) {
+      // Reset rate limit error state
+      setRateLimitError(false);
+      
+      // Keep searching chunks until we find payouts or hit limits
+      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > DEPLOYMENT_BLOCK) {
         const newFromBlock = currentOldestBlock > CHUNK_SIZE 
           ? (currentOldestBlock - CHUNK_SIZE > DEPLOYMENT_BLOCK 
               ? currentOldestBlock - CHUNK_SIZE 
@@ -304,10 +308,9 @@ export function TreasuryPage() {
         
         // Update search progress
         const payoutsFoundSoFar = allFoundPayouts.length;
-        const remainingNeeded = Math.max(0, MIN_PAYOUTS_TO_LOAD - payoutsFoundSoFar);
         setSearchProgress(
           payoutsFoundSoFar > 0
-            ? `Found ${payoutsFoundSoFar} payout(s), searching for ${remainingNeeded} more... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
+            ? `Found ${payoutsFoundSoFar} payout(s)... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
             : `Searching for payouts... (checked ${totalBlocksChecked.toLocaleString()} blocks so far)`
         );
         
@@ -330,6 +333,20 @@ export function TreasuryPage() {
               break; // Success, exit retry loop
             } catch (error: any) {
               lastError = error;
+              
+              // Check for rate limit error (429 or "Too Many Requests")
+              const isRateLimit = error?.status === 429 || 
+                                  error?.message?.includes('429') || 
+                                  error?.message?.includes('Too Many Requests') ||
+                                  error?.code === 429;
+              
+              if (isRateLimit) {
+                console.warn(`Rate limit hit for chunk ${chunksSearched + 1}`);
+                setRateLimitError(true);
+                // Stop searching on rate limit
+                throw new Error('Rate limit exceeded. Please try again later or load older payouts manually.');
+              }
+              
               retries--;
               if (retries > 0) {
                 // Wait before retrying (exponential backoff)
@@ -342,10 +359,10 @@ export function TreasuryPage() {
           
           if (logs.length === 0 && lastError) {
             console.warn(`Failed to fetch logs for chunk ${chunksSearched + 1} after retries:`, lastError);
-            // Continue to next chunk on error
+            // Continue to next chunk on error (unless rate limited)
             currentOldestBlock = newFromBlock;
             chunksSearched++;
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
             continue;
           }
           
@@ -385,31 +402,39 @@ export function TreasuryPage() {
             const chunkPayouts = (await Promise.all(payoutPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
             allFoundPayouts.push(...chunkPayouts);
             
-            // Update current oldest block to continue searching backwards
+            // Update current oldest block
             currentOldestBlock = newFromBlock;
             chunksSearched++;
             
-            // If we've found enough payouts, stop searching
-            if (allFoundPayouts.length >= MIN_PAYOUTS_TO_LOAD) {
-              break;
-            }
-            
-            // Add a small delay between chunks to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Stop searching once we find payouts - user can manually load more if needed
+            break;
           } else {
             // No payouts in this chunk, continue searching
             currentOldestBlock = newFromBlock;
             chunksSearched++;
             
-            // Add a small delay between chunks to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Add delay between chunks to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
           }
         } catch (chunkError: any) {
           console.error(`Error fetching chunk ${chunksSearched + 1}:`, chunkError);
-          // Continue to next chunk on error
+          
+          // Check for rate limit error
+          const isRateLimit = chunkError?.status === 429 || 
+                              chunkError?.message?.includes('429') || 
+                              chunkError?.message?.includes('Too Many Requests') ||
+                              chunkError?.message?.includes('Rate limit') ||
+                              chunkError?.code === 429;
+          
+          if (isRateLimit) {
+            setRateLimitError(true);
+            throw new Error('Rate limit exceeded. Please try again later or load older payouts manually.');
+          }
+          
+          // Continue to next chunk on other errors
           currentOldestBlock = newFromBlock;
           chunksSearched++;
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
         }
       }
       
@@ -446,10 +471,24 @@ export function TreasuryPage() {
       }, 3000);
     } catch (error: any) {
       console.error('Error loading older payouts:', error);
-      setSearchProgress(`Error: ${error.message || 'Failed to load payouts'}`);
+      
+      // Check if it's a rate limit error
+      const isRateLimit = error?.status === 429 || 
+                          error?.message?.includes('429') || 
+                          error?.message?.includes('Too Many Requests') ||
+                          error?.message?.includes('Rate limit') ||
+                          error?.code === 429;
+      
+      if (isRateLimit) {
+        setRateLimitError(true);
+        setSearchProgress('Rate limit exceeded. Please wait a moment and try loading older payouts manually.');
+      } else {
+        setSearchProgress(`Error: ${error.message || 'Failed to load payouts'}`);
+      }
+      
       setTimeout(() => {
         setSearchProgress(null);
-      }, 3000);
+      }, 5000); // Longer timeout for error messages
     } finally {
       setIsLoadingOlder(false);
     }
@@ -744,10 +783,21 @@ export function TreasuryPage() {
               </div>
             ))}
             
+            {rateLimitError && (
+              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <span className="font-semibold">Rate limit reached:</span> Too many requests were made. Please wait a moment before loading older payouts manually.
+                </p>
+              </div>
+            )}
+            
             {oldestLoadedBlock !== null && oldestLoadedBlock > 0n && (
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
                 <button
-                  onClick={loadOlderPayouts}
+                  onClick={() => {
+                    setRateLimitError(false); // Reset rate limit error when manually retrying
+                    loadOlderPayouts();
+                  }}
                   disabled={isLoadingOlder || noMorePayouts}
                   className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >

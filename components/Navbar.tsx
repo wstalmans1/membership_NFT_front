@@ -23,10 +23,32 @@ const moreMenuItems = [
 ];
 
 export function Navbar() {
-  const pathname = usePathname();
+  const pathnameFromHook = usePathname();
+  const [pathname, setPathname] = useState(pathnameFromHook || '/');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Sync pathname from window.location for static builds
+  useEffect(() => {
+    const updatePathname = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname.replace(/\/$/, '') || '/';
+        setPathname(path);
+      } else if (pathnameFromHook) {
+        setPathname(pathnameFromHook);
+      }
+    };
+    
+    updatePathname();
+    
+    // Listen for popstate events (back/forward navigation)
+    window.addEventListener('popstate', updatePathname);
+    
+    return () => {
+      window.removeEventListener('popstate', updatePathname);
+    };
+  }, [pathnameFromHook]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -60,55 +82,79 @@ export function Navbar() {
             </Link>
             {/* Desktop Navigation */}
             <div className="hidden lg:flex gap-4 items-center">
-              {navItems.map((item) => (
+              {navItems.map((item) => {
+                // Normalize both pathname and href for comparison (remove trailing slashes and query params)
+                const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
+                const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                const isActive = normalizedPathname === normalizedHref;
+                
+                return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
                       "px-3 py-2 text-sm font-medium transition-colors",
-                    pathname === item.href
-                          ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      isActive
+                        ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                     )}
                   >
                     {item.label}
                   </Link>
-              ))}
+                );
+              })}
               {/* More Menu Dropdown */}
               <div className="relative" ref={moreMenuRef}>
-                <button
-                  onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1",
-                    moreMenuItems.some(item => pathname === item.href)
-                      ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  )}
-                >
-                  More
-                  <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
-                </button>
-                {moreMenuOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
-                    <div className="py-1">
-                      {moreMenuItems.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => setMoreMenuOpen(false)}
-                          className={cn(
-                            "block px-4 py-2 text-sm transition-colors",
-                            pathname === item.href
-                              ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                          )}
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {(() => {
+                  const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
+                  const isMoreMenuActive = moreMenuItems.some(item => {
+                    const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                    return normalizedPathname === normalizedHref;
+                  });
+                  
+                  return (
+                    <>
+                      <button
+                        onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                        className={cn(
+                          "px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1",
+                          isMoreMenuActive
+                            ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        )}
+                      >
+                        More
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
+                      </button>
+                      {moreMenuOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                          <div className="py-1">
+                            {moreMenuItems.map((item) => {
+                              const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                              const isItemActive = normalizedPathname === normalizedHref;
+                              
+                              return (
+                                <Link
+                                  key={item.href}
+                                  href={item.href}
+                                  onClick={() => setMoreMenuOpen(false)}
+                                  className={cn(
+                                    "block px-4 py-2 text-sm transition-colors",
+                                    isItemActive
+                                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  )}
+                                >
+                                  {item.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -139,57 +185,80 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 dark:border-gray-800 py-4">
             <div className="space-y-1">
-              {navItems.map((item) => (
+              {navItems.map((item) => {
+                const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
+                const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                const isActive = normalizedPathname === normalizedHref;
+                
+                return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
                       "block px-3 py-2 text-sm font-medium transition-colors rounded-md",
-                    pathname === item.href
-                          ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                      isActive
+                        ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                     )}
                   >
                     {item.label}
                   </Link>
-              ))}
+                );
+              })}
               {/* More Menu in Mobile */}
               <div className="mt-2">
-                <button
-                  onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors rounded-md",
-                    moreMenuItems.some(item => pathname === item.href)
-                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
-                  )}
-                >
-                  More
-                  <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
-                </button>
-                {moreMenuOpen && (
-                  <div className="pl-4 mt-1 space-y-1">
-                    {moreMenuItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => {
-                          setMobileMenuOpen(false);
-                          setMoreMenuOpen(false);
-                        }}
+                {(() => {
+                  const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
+                  const isMoreMenuActive = moreMenuItems.some(item => {
+                    const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                    return normalizedPathname === normalizedHref;
+                  });
+                  
+                  return (
+                    <>
+                      <button
+                        onClick={() => setMoreMenuOpen(!moreMenuOpen)}
                         className={cn(
-                          "block px-3 py-2 text-sm transition-colors rounded-md",
-                          pathname === item.href
+                          "w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors rounded-md",
+                          isMoreMenuActive
                             ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
                             : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                         )}
                       >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                        More
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", moreMenuOpen && "rotate-180")} />
+                      </button>
+                      {moreMenuOpen && (
+                        <div className="pl-4 mt-1 space-y-1">
+                          {moreMenuItems.map((item) => {
+                            const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                            const isItemActive = normalizedPathname === normalizedHref;
+                            
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => {
+                                  setMobileMenuOpen(false);
+                                  setMoreMenuOpen(false);
+                                }}
+                                className={cn(
+                                  "block px-3 py-2 text-sm transition-colors rounded-md",
+                                  isItemActive
+                                    ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                                )}
+                              >
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
             {/* Mobile Wallet and Network Status */}

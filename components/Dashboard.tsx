@@ -9,6 +9,7 @@ import { Constitution } from '@/abis/Constitution';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { getTotalMembersCount } from '@/lib/metadata';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { HelpCircle } from 'lucide-react';
 import { WalletInstallGuide } from './WalletInstallGuide';
 import { OnboardingChecklist } from './OnboardingChecklist';
@@ -19,9 +20,30 @@ import { decodeEventLog, type Address } from 'viem';
 export function Dashboard() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
+  const router = useRouter();
   
   // Add a timeout to prevent infinite loading
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  // Track stable connection state to prevent flickering
+  const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // Handler for navigating to membership page with expand parameter
+  // This ensures query parameters are preserved in static builds
+  // In static export mode, Next.js Link may not preserve query params, so we handle it manually
+  const handleViewAllMembers = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = '/membership?expand=all-members';
+    // Use router.push for Next.js navigation (works in both dev and static builds)
+    router.push(url);
+  };
+  
+  const handleMintMembership = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = '/membership?expand=membership';
+    router.push(url);
+  };
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -31,8 +53,31 @@ export function Dashboard() {
     return () => clearTimeout(timer);
   }, []);
   
+  // Stabilize connection state to prevent flickering
+  useEffect(() => {
+    if (!hasInitialized) {
+      // On first mount, wait a bit before setting initial state
+      const initTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+        setHasInitialized(true);
+      }, 300); // Small delay to let wallet detection settle
+      
+      return () => clearTimeout(initTimer);
+    } else {
+      // After initialization, update state but only if it's been stable for a bit
+      const updateTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+      }, 200);
+      
+      return () => clearTimeout(updateTimer);
+    }
+  }, [isConnected, hasInitialized]);
+  
   // Check if any wallet extension is installed
   const hasWalletExtension = typeof window !== 'undefined' && !!(window as any).ethereum;
+  
+  // Use stable connection state for rendering
+  const isConnectedStable = stableIsConnected ?? false;
   
   // Get membership NFT balance
   const { data: membershipBalance, isLoading: isLoadingMembership, isError: isErrorMembership } = useReadContract({
@@ -153,7 +198,7 @@ export function Dashboard() {
   // After timeout, assume not a member if still loading
   const isMember = address && !isLoadingMembership && (membershipBalance !== undefined || isErrorMembership)
     ? Boolean(membershipBalance && Number(membershipBalance) > 0)
-    : (isConnected && address && (isErrorMembership || loadingTimeout) ? false : undefined); // undefined means "still loading", false if error or timeout
+    : (isConnectedStable && address && (isErrorMembership || loadingTimeout) ? false : undefined); // undefined means "still loading", false if error or timeout
 
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
@@ -163,19 +208,19 @@ export function Dashboard() {
       </div>
 
       {/* Wallet Installation Guide - Show if no wallet detected and connected */}
-      {isConnected && !hasWalletExtension && (
+      {hasInitialized && isConnectedStable && !hasWalletExtension && (
         <WalletInstallGuide />
       )}
 
       {/* Onboarding Checklist - Show if wallet not fully set up and connected */}
-      {isConnected && hasWalletExtension && (
+      {hasInitialized && isConnectedStable && hasWalletExtension && (
         <OnboardingChecklist />
       )}
 
       {/* Balance Check - Show if connected but low balance (only when balance is loaded) */}
-      {isConnected && <BalanceCheck />}
+      {hasInitialized && isConnectedStable && <BalanceCheck />}
 
-      {!isConnected && (
+      {hasInitialized && !isConnectedStable && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <p className="text-teal-600 dark:text-teal-400">
             Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
@@ -184,18 +229,19 @@ export function Dashboard() {
       )}
 
       {/* Only show "Become a Member" when membership status is definitively loaded and user is not a member */}
-      {isConnected && isMember === false && (
+      {hasInitialized && isConnectedStable && isMember === false && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-blue-900 dark:text-blue-200 mb-2">Become a Member</h2>
           <p className="text-blue-700 dark:text-blue-300 mb-4">
             Join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> by minting a membership NFT. Minimum donation: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
           </p>
-          <Link
+          <a
             href="/membership?expand=membership"
-            className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors"
+            onClick={handleMintMembership}
+            className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors cursor-pointer"
           >
             Mint Membership
-          </Link>
+          </a>
         </div>
       )}
 
@@ -203,7 +249,7 @@ export function Dashboard() {
       {/* Wait for: totalMembers, treasuryBalance, proposals, and (if connected) membership status */}
       {/* Show content if: all loading is done OR if there are errors (to prevent infinite loading) */}
       {/* Don't wait forever - if queries error out or timeout, show the dashboard anyway */}
-      {!loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnected && address && isMember === undefined && !isErrorMembership)) ? (
+      {!loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnectedStable && address && isMember === undefined && !isErrorMembership)) ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <p>Loading dashboard data...</p>
@@ -227,9 +273,13 @@ export function Dashboard() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {totalMembers}
             </p>
-            <Link href="/membership?expand=all-members" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
+            <a 
+              href="/membership?expand=all-members" 
+              onClick={handleViewAllMembers}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block cursor-pointer"
+            >
               View all →
-            </Link>
+            </a>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
@@ -286,7 +336,7 @@ export function Dashboard() {
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isConnected ? (isMember ? 'Member' : 'Not a Member') : 'Not Connected'}
+              {isConnectedStable ? (isMember ? 'Member' : 'Not a Member') : 'Not Connected'}
             </p>
             {isMember === true && (
               <Link href="/membership" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">

@@ -14,13 +14,14 @@ import { NFTDisplay } from './NFTDisplay';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 
 export function MembershipPage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
@@ -30,10 +31,37 @@ export function MembershipPage() {
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  // Check if we should expand from query parameter
-  const expandParam = searchParams?.get('expand');
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(false);
-  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(false);
+  // Check if we should expand from query parameter - use both searchParams and window.location for static builds
+  const getExpandParam = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlParam = params.get('expand');
+      if (urlParam) return urlParam;
+    }
+    return searchParams?.get('expand') || null;
+  };
+  const [expandParam, setExpandParam] = useState<string | null>(() => {
+    // Initialize from URL on mount
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('expand');
+    }
+    return searchParams?.get('expand') || null;
+  });
+  
+  // Initialize expanded states from query parameter
+  // Use a function to read from URL directly for static builds
+  const getInitialExpandParam = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('expand');
+    }
+    return searchParams?.get('expand') || null;
+  };
+  
+  const initialExpandParam = getInitialExpandParam();
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(initialExpandParam === 'membership');
+  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(initialExpandParam === 'all-members');
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
   // Privacy expanded state - initialized from isMember when balance loads
@@ -79,14 +107,101 @@ export function MembershipPage() {
     ? Boolean(Number(balance) > 0)
     : undefined; // undefined means "still loading"
 
-  // Expand sections based on query parameter
+  // Sync expand parameter from URL (for static builds and client-side navigation)
   useEffect(() => {
-    if (expandParam === 'membership') {
-      setIsMembershipStatusExpanded(true);
-    } else if (expandParam === 'all-members') {
-      setIsAllMembersExpanded(true);
-    }
-  }, [expandParam]);
+    const updateExpandParam = () => {
+      // Read directly from window.location for most reliable result in static builds
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const newParam = params.get('expand');
+        if (newParam !== expandParam) {
+          setExpandParam(newParam);
+        }
+      } else {
+        const newParam = searchParams?.get('expand') || null;
+        if (newParam !== expandParam) {
+          setExpandParam(newParam);
+        }
+      }
+    };
+    
+    // Check immediately
+    updateExpandParam();
+    
+    // Listen for navigation events
+    const handleLocationChange = () => {
+      // Use multiple timeouts to catch URL updates at different stages
+      setTimeout(updateExpandParam, 0);
+      setTimeout(updateExpandParam, 50);
+      setTimeout(updateExpandParam, 150);
+    };
+    
+    window.addEventListener('popstate', handleLocationChange);
+    
+    // Intercept Next.js Link navigation
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function(...args) {
+      originalPushState.apply(history, args);
+      handleLocationChange();
+    };
+    
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(history, args);
+      handleLocationChange();
+    };
+    
+    // Also listen for pathname changes (Next.js router)
+    // This will fire when Next.js completes navigation
+    const checkInterval = setInterval(() => {
+      updateExpandParam();
+    }, 100);
+    
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+      clearInterval(checkInterval);
+    };
+  }, [searchParams, expandParam, pathname]);
+
+  // Expand sections based on query parameter
+  // This effect runs when expandParam, searchParams, or pathname changes
+  // pathname is key - it changes when Next.js navigation completes
+  useEffect(() => {
+    // Read directly from URL to ensure we get the latest value
+    const checkAndExpand = () => {
+      if (typeof window === 'undefined') return;
+      
+      const params = new URLSearchParams(window.location.search);
+      const currentParam = params.get('expand');
+      
+      if (currentParam === 'membership') {
+        setIsMembershipStatusExpanded(true);
+        setIsAllMembersExpanded(false);
+      } else if (currentParam === 'all-members') {
+        setIsAllMembersExpanded(true);
+        setIsMembershipStatusExpanded(false);
+      }
+    };
+    
+    // Check immediately
+    checkAndExpand();
+    
+    // Check multiple times with delays to catch URL updates at different stages
+    // This is necessary because Next.js Link navigation updates URL asynchronously
+    const timeouts = [
+      setTimeout(checkAndExpand, 0),
+      setTimeout(checkAndExpand, 50),
+      setTimeout(checkAndExpand, 150),
+      setTimeout(checkAndExpand, 300),
+    ];
+    
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [expandParam, searchParams, pathname]);
 
   // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
   // This must be after isMember is declared
