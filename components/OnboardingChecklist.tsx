@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAccount, useChainId, useBalance } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { CheckCircle, Circle, AlertCircle, ExternalLink } from 'lucide-react';
@@ -17,6 +18,27 @@ export function OnboardingChecklist() {
   const { data: balance, isLoading: isLoadingBalance } = useBalance({
     address: address,
   });
+  
+  // Stabilize connection state to prevent flickering (similar to Dashboard)
+  const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
+  useEffect(() => {
+    if (!hasInitialized) {
+      const initTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+        setHasInitialized(true);
+      }, 300);
+      return () => clearTimeout(initTimer);
+    } else {
+      const updateTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+      }, 200);
+      return () => clearTimeout(updateTimer);
+    }
+  }, [isConnected, hasInitialized]);
+  
+  const isConnectedStable = stableIsConnected ?? false;
 
   const hasWallet = typeof window !== 'undefined' && !!(window as any).ethereum;
   const isCorrectNetwork = chainId === sepolia.id;
@@ -24,7 +46,7 @@ export function OnboardingChecklist() {
   const hasBalance = balance && !isLoadingBalance 
     ? parseFloat(formatEther(BigInt(balance.value.toString()))) >= 0.001 
     : false;
-  const allComplete = hasWallet && isConnected && isCorrectNetwork && hasBalance;
+  const allComplete = hasWallet && isConnectedStable && isCorrectNetwork && hasBalance;
 
   const steps = [
     {
@@ -36,7 +58,7 @@ export function OnboardingChecklist() {
     {
       id: 'connect',
       label: 'Connect your wallet',
-      completed: isConnected,
+      completed: isConnectedStable,
       description: 'Click "Connect MetaMask" or "Connect Brave" in the top right',
     },
     {
@@ -53,6 +75,11 @@ export function OnboardingChecklist() {
     },
   ];
 
+  // Don't render until initialized to prevent flickering
+  if (!hasInitialized) {
+    return null;
+  }
+  
   if (allComplete) {
     return null; // Hide checklist when everything is complete
   }
@@ -122,7 +149,7 @@ export function OnboardingChecklist() {
         </div>
       )}
 
-      {isConnected && !isCorrectNetwork && (
+      {isConnectedStable && !isCorrectNetwork && (
         <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { formatEther } from '@/lib/utils';
 import { AlertCircle, ExternalLink } from 'lucide-react';
@@ -16,8 +17,29 @@ export function BalanceCheck() {
   const { data: balance, isLoading } = useBalance({
     address: address,
   });
+  
+  // Stabilize connection state to prevent flickering (similar to Dashboard)
+  const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
+  useEffect(() => {
+    if (!hasInitialized) {
+      const initTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+        setHasInitialized(true);
+      }, 300);
+      return () => clearTimeout(initTimer);
+    } else {
+      const updateTimer = setTimeout(() => {
+        setStableIsConnected(isConnected);
+      }, 200);
+      return () => clearTimeout(updateTimer);
+    }
+  }, [isConnected, hasInitialized]);
+  
+  const isConnectedStable = stableIsConnected ?? false;
 
-  if (!isConnected || !address) {
+  if (!hasInitialized || !isConnectedStable || !address) {
     return null;
   }
 

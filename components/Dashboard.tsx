@@ -35,6 +35,12 @@ export function Dashboard() {
   const handleViewAllMembers = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const url = '/membership?expand=all-members';
+    // Update URL directly first to ensure it's set (MembershipPage listens for this)
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', url);
+      // Trigger popstate event so MembershipPage detects the change immediately
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
     // Use router.push for Next.js navigation (works in both dev and static builds)
     router.push(url);
   };
@@ -42,6 +48,13 @@ export function Dashboard() {
   const handleMintMembership = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const url = '/membership?expand=membership';
+    // Update URL directly first to ensure it's set (MembershipPage listens for this)
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', url);
+      // Trigger popstate event so MembershipPage detects the change immediately
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    // Use router.push for Next.js navigation (works in both dev and static builds)
     router.push(url);
   };
   
@@ -249,7 +262,8 @@ export function Dashboard() {
       {/* Wait for: totalMembers, treasuryBalance, proposals, and (if connected) membership status */}
       {/* Show content if: all loading is done OR if there are errors (to prevent infinite loading) */}
       {/* Don't wait forever - if queries error out or timeout, show the dashboard anyway */}
-      {!loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnectedStable && address && isMember === undefined && !isErrorMembership)) ? (
+      {/* Also wait for initialization to prevent flickering during wallet connection */}
+      {hasInitialized && !loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnectedStable && address && isMember === undefined && !isErrorMembership)) ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <p>Loading dashboard data...</p>
@@ -339,9 +353,13 @@ export function Dashboard() {
               {isConnectedStable ? (isMember ? 'Member' : 'Not a Member') : 'Not Connected'}
             </p>
             {isMember === true && (
-              <Link href="/membership" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
+              <a 
+                href="/membership?expand=membership" 
+                onClick={handleMintMembership}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block cursor-pointer"
+              >
                 View membership →
-              </Link>
+              </a>
             )}
           </div>
         </div>
@@ -350,13 +368,14 @@ export function Dashboard() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link
-            href="/membership"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+          <a
+            href="/membership?expand=membership"
+            onClick={handleMintMembership}
+            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer block"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white">Membership</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Mint or view your membership NFT</p>
-          </Link>
+          </a>
           <Link
             href="/governance"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"

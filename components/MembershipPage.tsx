@@ -394,7 +394,13 @@ export function MembershipPage() {
       {/* Content inside only loads when expanded and connected */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
         <button
-          onClick={() => setIsMembershipStatusExpanded(!isMembershipStatusExpanded)}
+          onClick={() => {
+            setIsMembershipStatusExpanded(!isMembershipStatusExpanded);
+            // Collapse "All Members" when expanding "Your Membership Status"
+            if (!isMembershipStatusExpanded) {
+              setIsAllMembersExpanded(false);
+            }
+          }}
           className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
         >
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -1029,7 +1035,13 @@ export function MembershipPage() {
       {!isConnected || (isConnected && address && balance !== undefined && isMember !== undefined) ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
           <button
-            onClick={() => setIsAllMembersExpanded(!isAllMembersExpanded)}
+            onClick={() => {
+              setIsAllMembersExpanded(!isAllMembersExpanded);
+              // Collapse "Your Membership Status" when expanding "All Members"
+              if (!isAllMembersExpanded) {
+                setIsMembershipStatusExpanded(false);
+              }
+            }}
             className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
           >
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
