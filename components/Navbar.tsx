@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { WalletButton } from './WalletButton';
 import { NetworkStatus } from './NetworkStatus';
 import { Menu, X, ChevronDown } from 'lucide-react';
@@ -24,10 +24,25 @@ const moreMenuItems = [
 
 export function Navbar() {
   const pathnameFromHook = usePathname();
+  const router = useRouter();
   const [pathname, setPathname] = useState(pathnameFromHook || '/');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Handler for mobile "More" menu navigation (ensures it works in static builds)
+  const handleMobileMoreMenuClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setMobileMenuOpen(false);
+    setMoreMenuOpen(false);
+    // Update URL directly for static builds
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', href);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    // Use router for Next.js navigation
+    router.push(href);
+  };
   
   // Sync pathname from window.location for static builds
   useEffect(() => {
@@ -236,22 +251,19 @@ export function Navbar() {
                             const isItemActive = normalizedPathname === normalizedHref;
                             
                             return (
-                              <Link
+                              <a
                                 key={item.href}
                                 href={item.href}
-                                onClick={() => {
-                                  setMobileMenuOpen(false);
-                                  setMoreMenuOpen(false);
-                                }}
+                                onClick={(e) => handleMobileMoreMenuClick(item.href, e)}
                                 className={cn(
-                                  "block px-3 py-2 text-sm transition-colors rounded-md",
+                                  "block px-3 py-2 text-sm transition-colors rounded-md cursor-pointer",
                                   isItemActive
                                     ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
                                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                                 )}
                               >
                                 {item.label}
-                              </Link>
+                              </a>
                             );
                           })}
                         </div>
