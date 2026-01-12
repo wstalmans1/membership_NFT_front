@@ -11,8 +11,6 @@ import { getTotalMembersCount } from '@/lib/metadata';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { HelpCircle } from 'lucide-react';
-import { WalletInstallGuide } from './WalletInstallGuide';
-import { OnboardingChecklist } from './OnboardingChecklist';
 import { BalanceCheck } from './BalanceCheck';
 import { useEffect, useState } from 'react';
 import { decodeEventLog, type Address } from 'viem';
@@ -219,16 +217,6 @@ export function Dashboard() {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">Welcome to <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span></p>
       </div>
-
-      {/* Wallet Installation Guide - Show if no wallet detected and connected */}
-      {hasInitialized && isConnectedStable && !hasWalletExtension && (
-        <WalletInstallGuide />
-      )}
-
-      {/* Onboarding Checklist - Show if wallet not fully set up and connected */}
-      {hasInitialized && isConnectedStable && hasWalletExtension && (
-        <OnboardingChecklist />
-      )}
 
       {/* Balance Check - Show if connected but low balance (only when balance is loaded) */}
       {hasInitialized && isConnectedStable && <BalanceCheck />}
