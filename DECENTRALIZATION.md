@@ -55,11 +55,18 @@ Consider using:
 - Use CDN for performance (optional)
 - Full control over infrastructure
 
-### 4. Metadata Storage (Already Decentralized)
+### 4. Metadata Storage (Pragmatic Choice)
 
-- NFT metadata stored on IPFS
-- Base URI configured in Constitution contract
-- No centralized metadata servers
+- **Current Implementation**: NFT metadata and photos stored in Supabase (off-chain database)
+- **Why Supabase instead of IPFS?**: 
+  - IPFS is immutable—once data is stored, it cannot be updated or deleted (only new versions can be added, but old data remains)
+  - We need to allow users to update and delete their personal information (name, photo, date of birth) to comply with data privacy rights
+  - Supabase provides CRUD (Create, Read, Update, Delete) operations essential for user data control
+- **User Control**: Users can update or delete their metadata at any time through the membership interface
+- **Future Path**: Exploring decentralized alternatives (Ceramic, OrbitDB, mutable IPFS solutions) that support updates/deletes while maintaining decentralization
+- **Base URI**: Configured in Constitution contract, but currently points to API route (requires separate hosting for static builds)
+
+**Note**: This is a pragmatic choice that balances user data control with decentralization goals. See [Philosophy Page](/philosophy) for more details on our design decisions.
 
 ## Removing Centralized Dependencies
 
@@ -79,7 +86,14 @@ Consider using:
    - No proprietary/centralized services in dependencies
    - Can audit all code
 
-3. **CDN/Asset Delivery** (Optional)
+3. **Supabase (Metadata Storage)**
+   - Currently used for NFT metadata and photo storage
+   - Enables user data updates and deletions
+   - Requires Supabase account and credentials
+   - Future: Exploring decentralized alternatives (IPFS, Arweave)
+   - See [Philosophy Page](/philosophy) for rationale
+
+4. **CDN/Asset Delivery** (Optional)
    - Currently uses local assets
    - If using CDN, prefer decentralized options:
      - IPFS gateways
@@ -156,22 +170,38 @@ Consider using:
 - **Censorship Resistant**: Can be mirrored easily
 - **Fast**: No server-side processing
 
+### Why Supabase for Metadata? (Pragmatic Choice)
+
+- **User Data Control**: Enables users to update and delete their personal information (name, photo, date of birth)
+- **IPFS Limitation**: IPFS is immutable—once data is stored, it cannot be updated or deleted (only new versions can be added, but old data remains). This doesn't meet our requirement for user data control.
+- **CRUD Operations**: Supabase provides Create, Read, Update, Delete operations essential for allowing users to manage their personal data
+- **Practical Solution**: Provides necessary functionality (CRUD operations, file storage) that's challenging with fully decentralized solutions
+- **Path to Decentralization**: Architecture allows migration to decentralized alternatives (Ceramic, OrbitDB, or mutable IPFS solutions) in the future that support updates/deletes
+- **Transparency**: Users are informed about what data is stored where (see Philosophy page)
+- **Balance**: Strikes a balance between user control and decentralization goals
+
 ## Future Enhancements
 
-1. **P2P Wallet Connection**
+1. **Decentralized Metadata Storage**
+   - Migrate from Supabase to IPFS or Arweave for metadata storage
+   - Maintain user ability to update/delete their data
+   - Use content-addressed storage for photos
+   - Implement decentralized database solutions (Ceramic, OrbitDB, etc.)
+
+2. **P2P Wallet Connection**
    - Consider integrating direct peer-to-peer wallet connections
    - Remove need for any intermediaries
 
-2. **Decentralized RPC Aggregation**
+3. **Decentralized RPC Aggregation**
    - Use multiple RPC providers with automatic failover
    - Weight providers by reliability/decentralization
 
-3. **IPFS Integration**
+4. **IPFS Integration**
    - Build-time IPFS upload
    - Automatic content addressing
    - Version management via IPFS
 
-4. **ENS Integration**
+5. **ENS Integration**
    - Automatic ENS resolution
    - Content hash updates
    - Subdomain management
@@ -181,11 +211,12 @@ Consider using:
 Check your setup:
 
 - ✅ No WalletConnect dependency
-- ✅ No API keys required
-- ✅ Works offline (after initial load)
+- ✅ No API keys required (for RPC)
+- ✅ Works offline (after initial load, except metadata)
 - ✅ Can be hosted on IPFS
-- ✅ No centralized services in critical path
 - ✅ User controls their own RPC endpoint
+- ⚠️ Supabase used for metadata (pragmatic choice, path to decentralization)
+- ✅ All blockchain interactions go directly to chain
 
 ## Resources
 

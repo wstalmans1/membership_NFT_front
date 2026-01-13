@@ -30,20 +30,6 @@ export function Navbar() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   
-  // Handler for mobile "More" menu navigation (ensures it works in static builds)
-  const handleMobileMoreMenuClick = (href: string, e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    setMobileMenuOpen(false);
-    setMoreMenuOpen(false);
-    // Update URL directly for static builds
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', href);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }
-    // Use router for Next.js navigation
-    router.push(href);
-  };
-  
   // Sync pathname from window.location for static builds
   useEffect(() => {
     const updatePathname = () => {
@@ -254,7 +240,13 @@ export function Navbar() {
                               <a
                                 key={item.href}
                                 href={item.href}
-                                onClick={(e) => handleMobileMoreMenuClick(item.href, e)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMobileMenuOpen(false);
+                                  setMoreMenuOpen(false);
+                                  // Let the anchor tag handle navigation naturally
+                                  // Don't prevent default - let browser handle it
+                                }}
                                 className={cn(
                                   "block px-3 py-2 text-sm transition-colors rounded-md cursor-pointer",
                                   isItemActive
