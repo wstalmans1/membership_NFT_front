@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   // The /api/metadata route needs to be hosted separately (e.g., Vercel, Netlify, or self-hosted)
   // Exclude API routes from build
   distDir: '.next',
+  // Optimize build output
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
 };
 
 export default nextConfig;

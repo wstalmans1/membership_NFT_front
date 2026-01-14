@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build && node scripts/fix-ipfs-routes.js",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "clean": "rm -rf .next out",
+    "clean:all": "rm -rf .next out node_modules package-lock.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
@@ -14,7 +16,6 @@
     "@wagmi/connectors": "^7.0.6",
     "@wagmi/core": "^3.0.2",
     "clsx": "^2.1.1",
-    "ethers": "^6.16.0",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "qrcode.react": "^4.2.0",
