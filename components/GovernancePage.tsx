@@ -7,9 +7,10 @@ import { CONTRACTS } from '@/config/contracts';
 import { DAOGovernor } from '@/abis/DAOGovernor';
 import { formatAddress } from '@/lib/utils';
 import { Address, BaseError, ContractFunctionRevertedError, encodeFunctionData, parseEther, keccak256, toBytes, stringToBytes, pad, toHex, encodePacked, decodeEventLog } from 'viem';
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
+import { useDataContext } from '@/contexts/DataContext';
 
 const formatViemError = (err: unknown) => {
   if (err instanceof BaseError) {
@@ -51,13 +52,21 @@ export function GovernancePage() {
   const [executedProposalIds, setExecutedProposalIds] = useState<Set<string>>(new Set());
   const lastExecuteHashRef = useRef<string | undefined>(undefined);
   
-  // Pagination state: track oldest block we've loaded and all accumulated proposals
-  const [oldestLoadedBlock, setOldestLoadedBlock] = useState<bigint | null>(null);
-  const [allProposals, setAllProposals] = useState<any[]>([]);
+  // Use context for persistent state across page navigation
+  const {
+    allProposals,
+    setAllProposals,
+    oldestLoadedProposalBlock: oldestLoadedBlock,
+    setOldestLoadedProposalBlock: setOldestLoadedBlock,
+    noMoreProposals,
+    setNoMoreProposals,
+    hasAutoSearchedProposals: hasAutoSearched,
+    setHasAutoSearchedProposals: setHasAutoSearched,
+  } = useDataContext();
+  
+  // Local state for UI-only concerns
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [searchProgress, setSearchProgress] = useState<string | null>(null);
-  const [noMoreProposals, setNoMoreProposals] = useState(false);
-  const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   // Check for pre-filled proposal data from Treasury page or Constitution page
@@ -213,6 +222,10 @@ export function GovernancePage() {
   const FIRST_PROPOSAL_BLOCK = 9983760n;
   const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
     queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false, // Don't refetch if data exists
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!publicClient) return [];
 
@@ -616,13 +629,13 @@ export function GovernancePage() {
         const blocksInChunk = newToBlock - newFromBlock + 1n;
         totalBlocksChecked += blocksInChunk;
         
-        // Update search progress
+        // Update search progress (just indicate we're searching, no block counts)
         const proposalsFoundSoFar = allFoundProposals.length;
         const remainingNeeded = Math.max(0, MIN_PROPOSALS_TO_LOAD - proposalsFoundSoFar);
         setSearchProgress(
           proposalsFoundSoFar > 0
-            ? `Found ${proposalsFoundSoFar} proposal(s), searching for ${remainingNeeded} more... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
-            : `Searching for proposals... (checked ${totalBlocksChecked.toLocaleString()} blocks so far)`
+            ? `Found ${proposalsFoundSoFar} proposal(s), searching for ${remainingNeeded} more...`
+            : 'Searching...'
         );
         
         console.log(`Loading older proposals: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
@@ -870,14 +883,15 @@ export function GovernancePage() {
         const oldestFoundBlock = Math.min(...allFoundProposals.map(p => p.blockNumber));
         setOldestLoadedBlock(BigInt(oldestFoundBlock));
         
-        setSearchProgress(`Found ${allFoundProposals.length} proposal(s) after checking ${totalBlocksChecked.toLocaleString()} blocks`);
+        setSearchProgress(`Found ${allFoundProposals.length} proposal(s)`);
       } else {
         // No proposals found after searching multiple chunks
         if (currentOldestBlock <= FIRST_PROPOSAL_BLOCK) {
           setNoMoreProposals(true);
           setSearchProgress(`No more proposals found. Reached the first proposal in the QAWL DAO.`);
         } else {
-          setSearchProgress(`No proposals found in ${totalBlocksChecked.toLocaleString()} blocks. Try loading more.`);
+          // Don't show "no proposals found" message - just clear progress silently
+          setSearchProgress(null);
         }
         // Still update oldest loaded block so we don't search the same range again
         setOldestLoadedBlock(currentOldestBlock > FIRST_PROPOSAL_BLOCK ? currentOldestBlock : FIRST_PROPOSAL_BLOCK);
@@ -1754,6 +1768,7 @@ export function GovernancePage() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Proposals</h2>
         {(isLoadingProposals || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
             <p>{searchProgress || 'Loading proposals...'}</p>
           </div>
         ) : (!isLoadingProposals && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && proposals.length === 0) ? (
@@ -1765,6 +1780,7 @@ export function GovernancePage() {
           <div className="space-y-4">
             {isLoadingOlder && searchProgress && (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
                 <p className="text-sm">{searchProgress}</p>
               </div>
             )}
@@ -1963,7 +1979,7 @@ export function GovernancePage() {
                 >
                   {isLoadingOlder ? (
                     <>
-                      <span className="inline-block animate-spin mr-2">⏳</span>
+                      <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
                       {searchProgress || 'Loading older proposals...'}
                     </>
                   ) : noMoreProposals ? (

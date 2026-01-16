@@ -8,10 +8,11 @@ import { Constitution } from '@/abis/Constitution';
 import { TreasuryExecutor } from '@/abis/TreasuryExecutor';
 import { formatEther, parseEther, formatAddress } from '@/lib/utils';
 import { encodeFunctionData, Address, decodeEventLog } from 'viem';
-import { HelpCircle, ExternalLink } from 'lucide-react';
+import { HelpCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useDataContext } from '@/contexts/DataContext';
 
 export function TreasuryPage() {
   const { address, isConnected } = useAccount();
@@ -19,13 +20,21 @@ export function TreasuryPage() {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   
-  // State for pagination and backward search (similar to governance proposals)
-  const [allPayouts, setAllPayouts] = useState<any[]>([]);
-  const [oldestLoadedBlock, setOldestLoadedBlock] = useState<bigint | null>(null);
+  // Use context for persistent state across page navigation
+  const {
+    allPayouts,
+    setAllPayouts,
+    oldestLoadedPayoutBlock: oldestLoadedBlock,
+    setOldestLoadedPayoutBlock: setOldestLoadedBlock,
+    noMorePayouts,
+    setNoMorePayouts,
+    hasAutoSearchedPayouts: hasAutoSearched,
+    setHasAutoSearchedPayouts: setHasAutoSearched,
+  } = useDataContext();
+  
+  // Local state for UI-only concerns
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [searchProgress, setSearchProgress] = useState<string | null>(null);
-  const [noMorePayouts, setNoMorePayouts] = useState(false);
-  const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
   const [rateLimitError, setRateLimitError] = useState(false);
 
@@ -71,6 +80,10 @@ export function TreasuryPage() {
   
   const { data: latestPayouts = [], refetch: refetchLatestPayouts, isLoading: isLoadingPayouts } = useQuery({
     queryKey: ['latestPayouts', CONTRACTS.SEPOLIA.TREASURY_PROXY],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false, // Don't refetch if data exists
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!publicClient) return [];
       
@@ -306,12 +319,12 @@ export function TreasuryPage() {
         const blocksInChunk = newToBlock - newFromBlock + 1n;
         totalBlocksChecked += blocksInChunk;
         
-        // Update search progress
+        // Update search progress (just indicate we're searching, no block counts)
         const payoutsFoundSoFar = allFoundPayouts.length;
         setSearchProgress(
           payoutsFoundSoFar > 0
-            ? `Found ${payoutsFoundSoFar} payout(s)... (checked ${totalBlocksChecked.toLocaleString()} blocks)`
-            : `Searching for payouts... (checked ${totalBlocksChecked.toLocaleString()} blocks so far)`
+            ? `Found ${payoutsFoundSoFar} payout(s)...`
+            : 'Searching...'
         );
         
         console.log(`Loading older payouts: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
@@ -452,14 +465,15 @@ export function TreasuryPage() {
         const oldestFoundBlock = Math.min(...allFoundPayouts.map(p => Number(p.blockNumber)));
         setOldestLoadedBlock(BigInt(oldestFoundBlock));
         
-        setSearchProgress(`Found ${allFoundPayouts.length} payout(s) after checking ${totalBlocksChecked.toLocaleString()} blocks`);
+        setSearchProgress(`Found ${allFoundPayouts.length} payout(s)`);
       } else {
         // No payouts found after searching multiple chunks
         if (currentOldestBlock <= DEPLOYMENT_BLOCK) {
           setNoMorePayouts(true);
           setSearchProgress(`No more payouts found. Reached the deployment block.`);
         } else {
-          setSearchProgress(`No payouts found in ${totalBlocksChecked.toLocaleString()} blocks. Try loading more.`);
+          // Don't show "no payouts found" message - just clear progress silently
+          setSearchProgress(null);
         }
         // Still update oldest loaded block so we don't search the same range again
         setOldestLoadedBlock(currentOldestBlock > DEPLOYMENT_BLOCK ? currentOldestBlock : DEPLOYMENT_BLOCK);
@@ -738,6 +752,7 @@ export function TreasuryPage() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Recent Payouts</h2>
         {(isLoadingPayouts || (isLoadingOlder && payouts.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && payouts.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
             <p>{searchProgress || 'Loading payout history...'}</p>
           </div>
         ) : (!isLoadingPayouts && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && payouts.length === 0) ? (
@@ -803,7 +818,7 @@ export function TreasuryPage() {
                 >
                   {isLoadingOlder ? (
                     <>
-                      <span className="inline-block animate-spin mr-2">⏳</span>
+                      <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
                       {searchProgress || 'Loading older payouts...'}
                     </>
                   ) : noMorePayouts ? (

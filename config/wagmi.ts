@@ -5,24 +5,30 @@ import { metaMask, injected } from 'wagmi/connectors';
 // Support custom RPC URLs for decentralization
 // Users can provide their own RPC endpoint via environment variable
 // Falls back to public RPCs if not provided
-const getRpcUrl = () => {
-  // Check for custom RPC URL first (user's own node)
+const getSepoliaRpcUrl = () => {
+  // Check for Sepolia-specific RPC URL (e.g., Alchemy)
+  if (process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL) {
+    return process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL;
+  }
+  
+  // Fallback to general RPC URL if provided
   if (process.env.NEXT_PUBLIC_RPC_URL) {
     return process.env.NEXT_PUBLIC_RPC_URL;
   }
   
-  // Fallback to public RPC endpoints (in order of preference)
-  // These are decentralized/public options
+  // Fallback to public RPC endpoints
   return undefined; // Will use wagmi's default public RPCs
 };
 
 // Use fallback transport for redundancy - tries multiple RPC endpoints
-const rpcUrl = getRpcUrl();
-const transports = rpcUrl
+// Note: Alchemy may have limitations on eth_getLogs block ranges
+// The fallback will automatically use public RPCs when Alchemy fails
+const sepoliaRpcUrl = getSepoliaRpcUrl();
+const transports = sepoliaRpcUrl
   ? {
       [sepolia.id]: fallback([
-        http(rpcUrl), // User's custom RPC first
-        http(), // Fallback to public RPCs
+        http(sepoliaRpcUrl), // Custom RPC first (e.g., Alchemy)
+        http(), // Fallback to public RPCs if custom fails (handles large block ranges)
       ]),
       [mainnet.id]: http(), // Mainnet uses default public RPCs
     }
