@@ -20,6 +20,21 @@ export function ConstitutionPage() {
   
   // Check if on correct network
   const isCorrectNetwork = chainId === sepolia.id;
+  
+  // Handler for navigating to membership page with expand parameter
+  // This ensures query parameters are preserved in static builds
+  const handleBecomeMember = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = '/membership?expand=membership';
+    // Update URL directly first to ensure it's set (MembershipPage listens for this)
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', url);
+      // Trigger popstate event so MembershipPage detects the change immediately
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    // Use router.push for Next.js navigation (works in both dev and static builds)
+    router.push(url);
+  };
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isAllowlistFormExpanded, setIsAllowlistFormExpanded] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -323,12 +338,13 @@ export function ConstitutionPage() {
                           <p className="text-yellow-800 dark:text-yellow-200 text-xs font-medium">
                             You need to be a member to add recipients to the allowlist. Please become a member first.
                           </p>
-                          <Link
+                          <a
                             href="/membership?expand=membership"
-                            className="inline-block px-3 py-1.5 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-xs font-medium"
+                            onClick={handleBecomeMember}
+                            className="inline-block px-3 py-1.5 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-xs font-medium cursor-pointer"
                           >
                             Become a Member
-                          </Link>
+                          </a>
                         </div>
                       </div>
                     )}

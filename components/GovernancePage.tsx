@@ -45,6 +45,21 @@ export function GovernancePage() {
   
   // Check if on correct network
   const isCorrectNetwork = chainId === sepolia.id;
+  
+  // Handler for navigating to membership page with expand parameter
+  // This ensures query parameters are preserved in static builds
+  const handleBecomeMember = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = '/membership?expand=membership';
+    // Update URL directly first to ensure it's set (MembershipPage listens for this)
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', url);
+      // Trigger popstate event so MembershipPage detects the change immediately
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    // Use router.push for Next.js navigation (works in both dev and static builds)
+    router.push(url);
+  };
   const [description, setDescription] = useState('');
   const [targets, setTargets] = useState('');
   const [calldatas, setCalldatas] = useState('');
@@ -1476,12 +1491,13 @@ export function GovernancePage() {
                 <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium">
                   You need to be a member to create a proposal. Please become a member first.
                 </p>
-                <Link
+                <a
                   href="/membership?expand=membership"
-                  className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
+                  onClick={handleBecomeMember}
+                  className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium cursor-pointer"
                 >
                   Become a Member
-                </Link>
+                </a>
               </div>
             </div>
           )}
@@ -1493,12 +1509,13 @@ export function GovernancePage() {
                   <p className="text-red-800 dark:text-red-200 text-sm font-medium">
                     Transaction failed. You need to be a member to create a proposal.
                   </p>
-                  <Link
+                  <a
                     href="/membership?expand=membership"
-                    className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
+                    onClick={handleBecomeMember}
+                    className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium cursor-pointer"
                   >
                     Become a Member
-                  </Link>
+                  </a>
                 </div>
               ) : (
                 <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
