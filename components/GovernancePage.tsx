@@ -322,11 +322,11 @@ export function GovernancePage() {
   // Process proposals data - transform from contract calls
   const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
     queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY, proposalCountNum],
-    staleTime: 10_000, // Reduced to 10 seconds for faster updates
+    staleTime: 5_000, // Reduced to 5 seconds for faster updates
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    refetchInterval: 15_000, // Refetch every 15 seconds to catch state changes
+    refetchInterval: 12_000, // Refetch every 12 seconds (roughly every block) to catch state changes including vote endings
     queryFn: async () => {
       if (!publicClient || !proposalsData || !Array.isArray(proposalsData) || proposalsData.length === 0) return [];
 
@@ -546,8 +546,14 @@ export function GovernancePage() {
 
         const proposals = (await Promise.all(proposalPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
         
-        // Sort by proposalId (newest first)
-        return proposals.sort((a, b) => Number(BigInt(b.id) - BigInt(a.id)));
+        // Sort by blockNumber (reverse chronological - newest first), then by proposalId as tiebreaker
+        return proposals.sort((a, b) => {
+          // Primary sort: blockNumber (higher block = newer = should come first)
+          const blockDiff = (b.blockNumber || 0) - (a.blockNumber || 0);
+          if (blockDiff !== 0) return blockDiff;
+          // Secondary sort: proposalId (higher ID = newer = should come first)
+          return Number(BigInt(b.id) - BigInt(a.id));
+        });
       } catch (error: any) {
         console.error('Error fetching proposals:', error);
         return [];
@@ -590,22 +596,57 @@ export function GovernancePage() {
   useEffect(() => {
     if (!currentBlockNumber || !latestProposals || latestProposals.length === 0) return;
 
-    // Check if any proposal's deadline has passed but state hasn't updated
-    const needsRefetch = latestProposals.some((p: any) => {
+    // Check if any proposal's deadline has passed - refetch all proposals when any deadline passes
+    const hasDeadlinePassed = latestProposals.some((p: any) => {
       if (!p.voteEnd) return false;
       const deadlinePassed = currentBlockNumber > BigInt(p.voteEnd);
-      const stillShowsActive = p.state === 'Active' || p.stateLabel?.includes('Voting') || p.stateLabel?.includes('Open');
-      return deadlinePassed && stillShowsActive;
+      return deadlinePassed;
     });
 
-    if (needsRefetch) {
+    if (hasDeadlinePassed) {
       // Refetch immediately when a proposal deadline passes
       console.log('Proposal deadline passed, refetching state...');
-      refetchLatestProposals();
-      // Also refetch the underlying proposals data
-      refetchProposalsData();
+      // First refetch the underlying proposals data to get updated states
+      refetchProposalsData().then(() => {
+        // Then refetch the processed proposals after a short delay
+        setTimeout(() => {
+          refetchLatestProposals();
+        }, 1000);
+      });
     }
   }, [currentBlockNumber, latestProposals, refetchLatestProposals, refetchProposalsData]);
+  
+  // Also set up a periodic check for proposals that are about to end or have ended
+  useEffect(() => {
+    if (!publicClient || !latestProposals || latestProposals.length === 0) return;
+    
+    // Check every 12 seconds (roughly every block) if any proposal's voting period has ended
+    const checkInterval = setInterval(async () => {
+      try {
+        const block = await publicClient.getBlock({ blockTag: 'latest' });
+        const currentBlock = block.number;
+        
+        // Check if any proposal's voteEnd has passed
+        const hasEnded = latestProposals.some((p: any) => {
+          if (!p.voteEnd) return false;
+          return currentBlock > BigInt(p.voteEnd);
+        });
+        
+        if (hasEnded) {
+          console.log('Detected proposal voting period ended, refetching...');
+          refetchProposalsData().then(() => {
+            setTimeout(() => {
+              refetchLatestProposals();
+            }, 1000);
+          });
+        }
+      } catch (error) {
+        console.error('Error checking proposal deadlines:', error);
+      }
+    }, 12000); // Check every 12 seconds
+    
+    return () => clearInterval(checkInterval);
+  }, [publicClient, latestProposals, refetchLatestProposals, refetchProposalsData]);
 
   // Update proposals directly from the new on-chain query (no backward search needed)
   // Use a ref to track previous proposals to avoid infinite loops
