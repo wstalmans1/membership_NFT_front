@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAccount, useBalance, useReadContract, usePublicClient } from 'wagmi';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useAccount, useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { Constitution } from '@/abis/Constitution';
 import { TreasuryExecutor } from '@/abis/TreasuryExecutor';
+import { MembershipNFT } from '@/abis/MembershipNFT';
 import { formatEther, parseEther, formatAddress } from '@/lib/utils';
 import { encodeFunctionData, Address, decodeEventLog } from 'viem';
-import { HelpCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { HelpCircle, ExternalLink, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,7 +18,11 @@ import { useDataContext } from '@/contexts/DataContext';
 
 export function TreasuryPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const router = useRouter();
+  
+  // Check if on correct network
+  const isCorrectNetwork = chainId === sepolia.id;
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   
@@ -37,6 +43,7 @@ export function TreasuryPage() {
   const [searchProgress, setSearchProgress] = useState<string | null>(null);
   const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
   const [rateLimitError, setRateLimitError] = useState(false);
+  const [isPayoutSectionExpanded, setIsPayoutSectionExpanded] = useState(false);
 
   // Get treasury balance
   const { data: treasuryBalance } = useBalance({
@@ -62,13 +69,26 @@ export function TreasuryPage() {
     functionName: 'epochDuration',
   });
 
+  // Check membership status
+  const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
+    address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+    abi: MembershipNFT,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  
+  const isMember = address && !isLoadingMembership && membershipBalance !== undefined
+    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
+    : undefined;
+
   // Check if recipient is allowed
   const { data: isRecipientAllowed } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
     functionName: 'isRecipientAllowed',
     args: recipient ? [recipient as Address] : undefined,
-    query: { enabled: !!recipient && recipient.length === 42 && recipient.startsWith('0x') },
+    query: { enabled: !!recipient && recipient.length === 42 && recipient.startsWith('0x') && isMember === true },
   });
 
 
@@ -95,14 +115,16 @@ export function TreasuryPage() {
     },
   });
 
-  // Transform transfers data to match existing format
-  const latestPayouts = (Array.isArray(recentTransfersData) ? recentTransfersData : []).map((transfer: any) => ({
-    recipient: transfer.to as Address,
-    amount: transfer.amount as bigint,
-    blockNumber: transfer.blockNumber as bigint,
-    timestamp: Number(transfer.timestamp),
-    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`, // Not stored on-chain, use placeholder
-  })).sort((a: any, b: any) => Number(b.blockNumber - a.blockNumber));
+  // Transform transfers data to match existing format - memoized to prevent infinite loops
+  const latestPayouts = useMemo(() => {
+    return (Array.isArray(recentTransfersData) ? recentTransfersData : []).map((transfer: any) => ({
+      recipient: transfer.to as Address,
+      amount: transfer.amount as bigint,
+      blockNumber: transfer.blockNumber as bigint,
+      timestamp: Number(transfer.timestamp),
+      transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`, // Not stored on-chain, use placeholder
+    })).sort((a: any, b: any) => Number(b.blockNumber - a.blockNumber));
+  }, [recentTransfersData]);
 
   // Legacy constants for backward compatibility (no longer used)
   const publicClient = usePublicClient();
@@ -128,14 +150,30 @@ export function TreasuryPage() {
     return () => clearInterval(interval);
   }, [publicClient]);
 
+  // Track previous payouts to prevent unnecessary updates
+  const prevPayoutsRef = useRef<any[]>([]);
+  
   // Update payouts directly from the new on-chain query (no backward search needed)
   useEffect(() => {
-    if (latestPayouts.length > 0) {
-      setAllPayouts(latestPayouts);
-    } else {
-      setAllPayouts([]);
+    // Only update if the data actually changed (compare length and first/last block numbers)
+    const prevLength = prevPayoutsRef.current.length;
+    const currentLength = latestPayouts.length;
+    const prevFirstBlock = prevPayoutsRef.current[0]?.blockNumber;
+    const currentFirstBlock = latestPayouts[0]?.blockNumber;
+    
+    const payoutsChanged = 
+      prevLength !== currentLength || 
+      (currentLength > 0 && prevFirstBlock !== currentFirstBlock);
+    
+    if (payoutsChanged) {
+      if (latestPayouts.length > 0) {
+        setAllPayouts(latestPayouts);
+      } else {
+        setAllPayouts([]);
+      }
+      prevPayoutsRef.current = latestPayouts;
     }
-  }, [latestPayouts]);
+  }, [latestPayouts, setAllPayouts]);
 
   // Removed: loadOlderPayouts function - no longer needed since we fetch all transfers directly via getRecentTransfers()
   // This function was used for backward event scanning, which is now replaced by on-chain enumerability
@@ -282,25 +320,55 @@ export function TreasuryPage() {
         </div>
       </div>
 
-      {/* How to Execute Payouts */}
-      {isConnected && (
+      {/* Execute Treasury Payouts - Collapsible */}
+      {isConnected && isCorrectNetwork && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <div>
-            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-              How to Execute Treasury Payouts
-            </h3>
-              <p className="text-blue-800 dark:text-blue-300 mb-2">
-                Treasury payouts are executed through governance proposals. To create a payout-proposal, fill in the fields below and click on the button "Create Governance Proposal".
-              </p>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-                <span className="font-medium">Note:</span> The recipient address must be on the{' '}
-                <Link href="/constitution" className="underline hover:text-blue-900 dark:hover:text-blue-200">
-                  allowed recipients list
-                </Link>
-                {' '}managed in the Constitution. Only addresses on this list can receive funds from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury.
-              </p>
-              
-              <div className="space-y-4 mt-4">
+            <button
+              onClick={() => setIsPayoutSectionExpanded(!isPayoutSectionExpanded)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200">
+                Execute Treasury Payouts
+              </h3>
+              {isPayoutSectionExpanded ? (
+                <ChevronUp className="w-5 h-5 text-blue-900 dark:text-blue-200" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-blue-900 dark:text-blue-200" />
+              )}
+            </button>
+            
+            {isPayoutSectionExpanded && (
+              <>
+                {/* Show membership requirement message if not a member */}
+                {isMember === false && (
+                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="space-y-3">
+                      <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium">
+                        You need to be a member to create treasury payout proposals. Please become a member first.
+                      </p>
+                      <Link
+                        href="/membership?expand=membership"
+                        className="inline-block px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
+                      >
+                        Become a Member
+                      </Link>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-blue-800 dark:text-blue-300 mb-2 mt-4">
+                  Treasury payouts are executed through governance proposals. To create a payout-proposal, fill in the fields below and click on the button "Create Governance Proposal".
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                  <span className="font-medium">Note:</span> The recipient address must be on the{' '}
+                  <Link href="/constitution" className="underline hover:text-blue-900 dark:hover:text-blue-200">
+                    allowed recipients list
+                  </Link>
+                  {' '}managed in the Constitution. Only addresses on this list can receive funds from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury.
+                </p>
+                
+                <div className="space-y-4 mt-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
@@ -321,7 +389,8 @@ export function TreasuryPage() {
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="0x..."
-                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                    disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
                   />
                   {recipient && (
                     <p className={`mt-1 text-xs ${isRecipientAllowed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -355,7 +424,8 @@ export function TreasuryPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.0"
-                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
                   />
                   {amount && perTxCap && (() => {
                     try {
@@ -373,12 +443,14 @@ export function TreasuryPage() {
 
                 <button
                   onClick={handleCreateProposal}
-                  disabled={!recipient || !amount || isRecipientAllowed === false || (isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x'))}
+                  disabled={isMember === false || (isMember === undefined && isLoadingMembership) || !recipient || !amount || isRecipientAllowed === false || (isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x'))}
                   className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
-                  Create Governance Proposal
+                  {isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Create Governance Proposal'}
                 </button>
               </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 interface DataContextType {
   // Payouts state
@@ -37,22 +37,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [noMoreProposals, setNoMoreProposals] = useState(false);
   const [hasAutoSearchedProposals, setHasAutoSearchedProposals] = useState(false);
 
-  // Wrapper functions to support functional updates
-  const setAllPayouts = (payouts: any[] | ((prev: any[]) => any[])) => {
+  // Wrapper functions to support functional updates - wrapped in useCallback to prevent infinite loops
+  const setAllPayouts = useCallback((payouts: any[] | ((prev: any[]) => any[])) => {
     if (typeof payouts === 'function') {
       setAllPayoutsState(payouts);
     } else {
       setAllPayoutsState(payouts);
     }
-  };
+  }, []);
 
-  const setAllProposals = (proposals: any[] | ((prev: any[]) => any[])) => {
+  const setAllProposals = useCallback((proposals: any[] | ((prev: any[]) => any[])) => {
     if (typeof proposals === 'function') {
       setAllProposalsState(proposals);
     } else {
       setAllProposalsState(proposals);
     }
-  };
+  }, []);
 
   return (
     <DataContext.Provider

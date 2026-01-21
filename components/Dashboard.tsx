@@ -1,6 +1,7 @@
 'use client';
 
-import { useAccount, useBalance, useReadContract, usePublicClient } from 'wagmi';
+import { useAccount, useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { formatEther } from '@/lib/utils';
@@ -17,8 +18,12 @@ import { decodeEventLog, type Address } from 'viem';
 
 export function Dashboard() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const publicClient = usePublicClient();
   const router = useRouter();
+  
+  // Check if on correct network
+  const isCorrectNetwork = chainId === sepolia.id;
   
   // Add a timeout to prevent infinite loading
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -229,8 +234,8 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Only show "Become a Member" when membership status is definitively loaded and user is not a member */}
-      {hasInitialized && isConnectedStable && isMember === false && (
+      {/* Only show "Become a Member" when membership status is definitively loaded and user is not a member AND on correct network */}
+      {hasInitialized && isConnectedStable && isCorrectNetwork && isMember === false && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-blue-900 dark:text-blue-200 mb-2">Become a Member</h2>
           <p className="text-blue-700 dark:text-blue-300 mb-4">

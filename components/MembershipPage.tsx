@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWatchContractEvent } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWatchContractEvent, useChainId } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatEther } from '@/lib/utils';
 import { CONTRACTS } from '@/config/contracts';
@@ -18,8 +19,12 @@ import { useSearchParams, usePathname } from 'next/navigation';
 
 export function MembershipPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
+  
+  // Check if on correct network
+  const isCorrectNetwork = chainId === sepolia.id;
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +65,25 @@ export function MembershipPage() {
   };
   
   const initialExpandParam = getInitialExpandParam();
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(initialExpandParam === 'membership');
-  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(initialExpandParam === 'all-members');
+  // Initialize expanded state from URL - check both initial param and window.location for static builds
+  const getInitialMembershipExpanded = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('expand') === 'membership';
+    }
+    return initialExpandParam === 'membership';
+  };
+  
+  const getInitialAllMembersExpanded = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('expand') === 'all-members';
+    }
+    return initialExpandParam === 'all-members';
+  };
+  
+  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(getInitialMembershipExpanded);
+  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(getInitialAllMembersExpanded);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   
   // Privacy expanded state - initialized from isMember when balance loads
@@ -191,17 +213,63 @@ export function MembershipPage() {
     
     // Check multiple times with delays to catch URL updates at different stages
     // This is necessary because Next.js Link navigation updates URL asynchronously
+    // Also important for static builds/IPFS where navigation might be handled differently
     const timeouts = [
       setTimeout(checkAndExpand, 0),
       setTimeout(checkAndExpand, 50),
       setTimeout(checkAndExpand, 150),
       setTimeout(checkAndExpand, 300),
+      setTimeout(checkAndExpand, 500),
+      setTimeout(checkAndExpand, 1000),
     ];
+    
+    // Also listen for popstate events (back/forward navigation)
+    const handlePopState = () => {
+      setTimeout(checkAndExpand, 0);
+      setTimeout(checkAndExpand, 100);
+    };
+    window.addEventListener('popstate', handlePopState);
+    
+    // Listen for hashchange (some routers use this)
+    const handleHashChange = () => {
+      setTimeout(checkAndExpand, 0);
+      setTimeout(checkAndExpand, 100);
+    };
+    window.addEventListener('hashchange', handleHashChange);
     
     return () => {
       timeouts.forEach(timeout => clearTimeout(timeout));
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handleHashChange);
     };
   }, [expandParam, searchParams, pathname]);
+  
+  // Additional effect to check on mount and when window.location changes
+  // This is especially important for static builds/IPFS
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const checkOnMount = () => {
+      const params = new URLSearchParams(window.location.search);
+      const currentParam = params.get('expand');
+      
+      if (currentParam === 'membership') {
+        setIsMembershipStatusExpanded(true);
+        setIsAllMembersExpanded(false);
+      } else if (currentParam === 'all-members') {
+        setIsAllMembersExpanded(true);
+        setIsMembershipStatusExpanded(false);
+      }
+    };
+    
+    // Check immediately on mount
+    checkOnMount();
+    
+    // Also check after a short delay to catch any async URL updates
+    const timeout = setTimeout(checkOnMount, 100);
+    
+    return () => clearTimeout(timeout);
+  }, []); // Empty dependency array - only run on mount
 
   // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
   // This must be after isMember is declared
@@ -917,8 +985,8 @@ export function MembershipPage() {
                     <p>Loading membership details...</p>
                   </div>
                 )
-              ) : isMember === false ? (
-                // Non-member view - show mint form immediately
+              ) : isMember === false && isCorrectNetwork ? (
+                // Non-member view - show mint form immediately (only on correct network)
                 <div className="space-y-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-gray-700 dark:text-gray-300">

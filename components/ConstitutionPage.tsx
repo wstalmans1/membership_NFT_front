@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, useReadContract, useChainId } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { CONTRACTS } from '@/config/contracts';
 import { Constitution } from '@/abis/Constitution';
 import { DAOGovernor } from '@/abis/DAOGovernor';
+import { MembershipNFT } from '@/abis/MembershipNFT';
 import { formatEther } from '@/lib/utils';
 import { encodeFunctionData, Address } from 'viem';
 import { HelpCircle, ExternalLink, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
@@ -13,7 +15,11 @@ import Link from 'next/link';
 
 export function ConstitutionPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const router = useRouter();
+  
+  // Check if on correct network
+  const isCorrectNetwork = chainId === sepolia.id;
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isAllowlistFormExpanded, setIsAllowlistFormExpanded] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -73,6 +79,19 @@ export function ConstitutionPage() {
     abi: DAOGovernor,
     functionName: 'quorumNumerator',
   });
+
+  // Check membership status
+  const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
+    address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+    abi: MembershipNFT,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  
+  const isMember = address && !isLoadingMembership && membershipBalance !== undefined
+    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
+    : undefined;
 
   // Fetch allowed recipients directly from contract (using new enumerable function)
   // This is public data, so it should be available even when wallet is not connected
@@ -278,7 +297,7 @@ export function ConstitutionPage() {
             </div>
 
             {/* Add Recipient to Allowlist Form - Discrete, collapsed by default */}
-            {isConnected && (
+            {isConnected && isCorrectNetwork && (
               <div className="mb-4 min-w-0 overflow-hidden">
                 <button
                   onClick={() => setIsAllowlistFormExpanded(!isAllowlistFormExpanded)}
@@ -297,6 +316,23 @@ export function ConstitutionPage() {
                 
                 {isAllowlistFormExpanded && (
                   <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600 rounded-lg min-w-0 overflow-hidden">
+                    {/* Show membership requirement message if not a member */}
+                    {isMember === false && (
+                      <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <div className="space-y-2">
+                          <p className="text-yellow-800 dark:text-yellow-200 text-xs font-medium">
+                            You need to be a member to add recipients to the allowlist. Please become a member first.
+                          </p>
+                          <Link
+                            href="/membership?expand=membership"
+                            className="inline-block px-3 py-1.5 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-xs font-medium"
+                          >
+                            Become a Member
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 break-words">
                       Fill in the address below and click "Create Governance Proposal". The proposal will need to be voted on and executed through governance.
                     </p>
@@ -322,7 +358,8 @@ export function ConstitutionPage() {
                           value={recipientAddress}
                           onChange={(e) => setRecipientAddress(e.target.value)}
                           placeholder="0x..."
-                          className="w-full min-w-0 max-w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono box-border"
+                          disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                          className="w-full min-w-0 max-w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono box-border disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
                         />
                         {recipientAddress && (
                           <p className={`mt-1 text-xs min-w-0 break-words ${isAddressAllowed === true ? 'text-green-600 dark:text-green-400' : isAddressAllowed === false ? 'text-gray-500 dark:text-gray-400' : 'text-blue-600 dark:text-blue-400'}`}>
@@ -341,10 +378,10 @@ export function ConstitutionPage() {
 
                       <button
                         onClick={handleCreateAllowlistProposal}
-                        disabled={!recipientAddress || recipientAddress.length !== 42 || !recipientAddress.startsWith('0x') || isAddressAllowed === true}
+                        disabled={isMember === false || (isMember === undefined && isLoadingMembership) || !recipientAddress || recipientAddress.length !== 42 || !recipientAddress.startsWith('0x') || isAddressAllowed === true}
                         className="w-full px-3 py-2 text-sm bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       >
-                        Create Governance Proposal
+                        {isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Create Governance Proposal'}
                       </button>
                     </div>
                   </div>

@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance, useChainId, useReadContract } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
 import { formatEther } from '@/lib/utils';
 import { AlertCircle, ExternalLink } from 'lucide-react';
+import { CONTRACTS } from '@/config/contracts';
+import { MembershipNFT } from '@/abis/MembershipNFT';
 
 const SEPOLIA_FAUCETS = [
   { name: 'Alchemy Sepolia Faucet', url: 'https://sepoliafaucet.com/' },
@@ -14,9 +17,26 @@ const SEPOLIA_FAUCETS = [
 
 export function BalanceCheck() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { data: balance, isLoading } = useBalance({
     address: address,
   });
+  
+  // Check membership status
+  const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
+    address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+    abi: MembershipNFT,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  
+  const isMember = address && !isLoadingMembership && membershipBalance !== undefined
+    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
+    : undefined;
+  
+  // Only show balance check when on the correct network (Sepolia)
+  const isCorrectNetwork = chainId === sepolia.id;
   
   // Stabilize connection state to prevent flickering (similar to Dashboard)
   const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
@@ -39,12 +59,22 @@ export function BalanceCheck() {
   
   const isConnectedStable = stableIsConnected ?? false;
 
+  // Don't show if not on correct network
+  if (!isCorrectNetwork) {
+    return null;
+  }
+
   if (!hasInitialized || !isConnectedStable || !address) {
     return null;
   }
 
-  // Don't render anything until balance is loaded to avoid false positives
-  if (isLoading || balance === undefined) {
+  // Don't show if not a member
+  if (isMember === false) {
+    return null;
+  }
+
+  // Don't render anything until balance and membership are loaded to avoid false positives
+  if (isLoading || balance === undefined || isLoadingMembership || isMember === undefined) {
     return null;
   }
 
