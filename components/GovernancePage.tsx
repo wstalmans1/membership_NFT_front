@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { DAOGovernor } from '@/abis/DAOGovernor';
@@ -216,147 +216,80 @@ export function GovernancePage() {
   // Check if all governance parameters are loaded
   const isLoadingGovernanceParams = isLoadingProposalThreshold || isLoadingVotingDelay || isLoadingVotingPeriod || isLoadingTimelockDelay;
 
-  // Fetch latest proposals from ProposalCreated events (last 800 blocks)
-  const CHUNK_SIZE = 800n;
-  // Block number of the first proposal ever created in the QAWL DAO
-  const FIRST_PROPOSAL_BLOCK = 9983760n;
+  // Get proposal count using new on-chain enumerability
+  const { data: proposalCount, isLoading: isLoadingProposalCount } = useReadContract({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    functionName: 'proposalCount',
+  });
+
+  // Ensure proposalCount is a number
+  const proposalCountNum = typeof proposalCount === 'bigint' ? Number(proposalCount) : (typeof proposalCount === 'number' ? proposalCount : 0);
+
+  // Fetch all proposals using proposalDetailsAt (new on-chain enumerability)
+  // Create contracts array for all proposals
+  const proposalContracts = Array.from(
+    { length: proposalCountNum },
+    (_, i) => ({
+      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY as Address,
+      abi: DAOGovernor,
+      functionName: 'proposalDetailsAt' as const,
+      args: [BigInt(i)] as [bigint],
+    })
+  );
+
+  const { data: proposalsData, isLoading: isLoadingProposalsData } = useReadContracts({
+    contracts: proposalContracts,
+    query: {
+      enabled: proposalCountNum > 0,
+      staleTime: 30_000, // Cache for 30 seconds
+    },
+  });
+
+  // Process proposals data - transform from contract calls
   const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
-    queryKey: ['latestProposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY],
+    queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY, proposalCountNum],
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: false, // Don't refetch if data exists
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (!publicClient) return [];
+      if (!publicClient || !proposalsData || !Array.isArray(proposalsData) || proposalsData.length === 0) return [];
 
       try {
-        // Get current block number
-        const currentBlock = await publicClient.getBlock({ blockTag: 'latest' });
-        const currentBlockNumber = currentBlock.number;
-        
-        // Fetch only the last 800 blocks for immediate display (but not before the first proposal)
-        const fromBlock = currentBlockNumber > CHUNK_SIZE 
-          ? (currentBlockNumber - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
-              ? currentBlockNumber - CHUNK_SIZE 
-              : FIRST_PROPOSAL_BLOCK)
-          : FIRST_PROPOSAL_BLOCK;
+        // Map state enum to string
+        const stateMap: Record<number, string> = {
+          0: 'Pending',
+          1: 'Active',
+          2: 'Canceled',
+          3: 'Defeated',
+          4: 'Succeeded',
+          5: 'Queued',
+          6: 'Expired',
+          7: 'Executed',
+        };
 
-        console.log('Fetching latest proposals from block', fromBlock.toString(), 'to', currentBlockNumber.toString(), `(${Number(currentBlockNumber - fromBlock)} blocks)`);
-        
-        // Verify event signature is found
-        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
-        if (!proposalCreatedEvent) {
-          console.error('ProposalCreated event not found in ABI!');
-          return [];
-        }
+        // User-friendly state labels
+        const stateLabels: Record<number, string> = {
+          0: '⏳ Waiting to Start',
+          1: '🗳️ Voting Open',
+          2: '❌ Canceled',
+          3: '❌ Defeated',
+          4: '✅ Proposal Passed',
+          5: '⏳ Scheduled',
+          6: '⏰ Expired',
+          7: '✅ Executed',
+        };
 
-        // Fetch logs for the latest chunk with retry logic
-        let logs: any[] = [];
-        let retries = 3;
-        let lastError: any = null;
-        
-        while (retries > 0) {
+        // Process each proposal
+        const proposalPromises = proposalsData.map(async (result: any, index: number) => {
+          if (!result || !result.result || !Array.isArray(result.result)) return null;
+          
+          const [proposalId, targets, values, calldatas, descriptionHash] = result.result as [bigint, Address[], bigint[], `0x${string}`[], `0x${string}`];
+          
           try {
-            logs = await publicClient.getLogs({
-              address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-              event: proposalCreatedEvent as any,
-              fromBlock: fromBlock,
-              toBlock: currentBlockNumber,
-            });
-            break; // Success, exit retry loop
-          } catch (error: any) {
-            lastError = error;
-            retries--;
-            if (retries > 0) {
-              // Wait before retrying (exponential backoff)
-              const delay = (4 - retries) * 1000; // 1s, 2s, 3s
-              console.warn(`RPC request failed, retrying in ${delay}ms... (${retries} retries left)`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-            }
-          }
-        }
-        
-        if (logs.length === 0 && lastError) {
-          console.warn('Failed to fetch proposal logs after retries:', lastError);
-          // Return empty array instead of throwing - UI will show "No proposals yet"
-          return [];
-        }
-        
-        console.log(`Found ${logs.length} proposal logs in latest ${CHUNK_SIZE.toString()} blocks`);
-
-        // Process logs - they should already be decoded
-        const proposalPromises = logs.map(async (log: any) => {
-          try {
-            // Check if log has args (decoded) or needs decoding
-            let proposalId: bigint;
-            let proposer: Address;
-            let description: string;
-            let targets: Address[];
-            let values: bigint[];
-            let calldatas: `0x${string}`[];
-            let voteStart: bigint;
-            let voteEnd: bigint;
-
-            if (log.args) {
-              // Already decoded
-              proposalId = log.args.proposalId as bigint;
-              proposer = log.args.proposer as Address;
-              description = log.args.description as string;
-              targets = log.args.targets as Address[];
-              values = log.args.values as bigint[] || [];
-              calldatas = log.args.calldatas as `0x${string}`[] || [];
-              voteStart = log.args.voteStart as bigint;
-              voteEnd = log.args.voteEnd as bigint;
-            } else {
-              // Need to decode manually
-              const { decodeEventLog } = await import('viem');
-              const decoded = decodeEventLog({
-                abi: DAOGovernor,
-                data: log.data,
-                topics: log.topics,
-              });
-              if (!decoded.args || !Array.isArray(decoded.args)) {
-                console.error('Decoded log has no args or args is not an array:', decoded);
-                return null;
-              }
-              const args = decoded.args as any;
-              proposalId = args.proposalId as bigint;
-              proposer = args.proposer as Address;
-              description = args.description as string;
-              targets = args.targets as Address[];
-              values = args.values as bigint[] || [];
-              calldatas = args.calldatas as `0x${string}`[] || [];
-              voteStart = args.voteStart as bigint;
-              voteEnd = args.voteEnd as bigint;
-            }
-            
-            // Map state enum to string (define before use)
-            const stateMap: Record<number, string> = {
-              0: 'Pending',
-              1: 'Active',
-              2: 'Canceled',
-              3: 'Defeated',
-              4: 'Succeeded',
-              5: 'Queued',
-              6: 'Expired',
-              7: 'Executed',
-            };
-
-            // User-friendly state labels
-            const stateLabels: Record<number, string> = {
-              0: '⏳ Waiting to Start',
-              1: '🗳️ Voting Open',
-              2: '❌ Canceled',
-              3: '❌ Defeated',
-              4: '✅ Proposal Passed',
-              5: '⏳ Scheduled',
-              6: '⏰ Expired',
-              7: '✅ Executed',
-            };
-
-            // Fetch proposal state and vote counts
-            const currentBlockForState = await publicClient.getBlockNumber();
-            const [state, proposalVotesResult, proposalSnapshot, proposalDeadline] = await Promise.all([
+            // Fetch proposal state, votes, and other details
+            const [state, proposalVotesResult, proposalSnapshot, proposalDeadline, proposalEtaResult] = await Promise.all([
               publicClient.readContract({
                 address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
                 abi: DAOGovernor,
@@ -368,7 +301,7 @@ export function GovernancePage() {
                 abi: DAOGovernor,
                 functionName: 'proposalVotes',
                 args: [proposalId],
-              }).catch(() => null), // If proposalVotes fails, continue without vote counts
+              }).catch(() => null),
               publicClient.readContract({
                 address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
                 abi: DAOGovernor,
@@ -381,9 +314,36 @@ export function GovernancePage() {
                 functionName: 'proposalDeadline',
                 args: [proposalId],
               }).catch(() => null),
+              publicClient.readContract({
+                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                abi: DAOGovernor,
+                functionName: 'proposalEta',
+                args: [proposalId],
+              }).catch(() => null),
             ]);
 
-            // Fetch quorum for the proposal snapshot (if snapshot is available)
+            // Get proposal creation block from events (for display purposes)
+            // We'll use a fallback - try to get from the first event or use current block
+            let blockNumber = 0;
+            try {
+              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+              if (proposalCreatedEvent && publicClient) {
+                const logs = await publicClient.getLogs({
+                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                  event: proposalCreatedEvent as any,
+                  args: { proposalId },
+                  fromBlock: 0n,
+                  toBlock: 'latest',
+                });
+                if (logs.length > 0) {
+                  blockNumber = Number(logs[0].blockNumber);
+                }
+              }
+            } catch (err) {
+              console.warn('Could not fetch proposal creation block:', err);
+            }
+
+            // Fetch quorum
             let quorumResult: bigint | null = null;
             if (proposalSnapshot) {
               try {
@@ -395,29 +355,12 @@ export function GovernancePage() {
                 })) as bigint;
               } catch (err) {
                 console.warn('Failed to fetch quorum:', err);
-                quorumResult = null;
               }
             }
 
-            // Debug logging for proposal state
-            console.log('Proposal state debug:', {
-              proposalId: proposalId.toString(),
-              state: Number(state),
-              stateName: stateMap[Number(state)] || 'Unknown',
-              currentBlock: currentBlockForState.toString(),
-              voteStart: Number(voteStart),
-              voteEnd: Number(voteEnd),
-              proposalSnapshot: proposalSnapshot ? Number(proposalSnapshot) : null,
-              proposalDeadline: proposalDeadline ? Number(proposalDeadline) : null,
-              blocksUntilStart: proposalSnapshot ? Number(proposalSnapshot) - Number(currentBlockForState) : null,
-              blocksUntilEnd: proposalDeadline ? Number(proposalDeadline) - Number(currentBlockForState) : null,
-            });
-
-            // proposalVotes returns a tuple: [againstVotes, forVotes, abstainVotes]
+            // Calculate vote analysis
             const proposalVotes = proposalVotesResult as [bigint, bigint, bigint] | null;
             const quorum = quorumResult as bigint | null;
-
-            // Calculate vote analysis
             let voteAnalysis: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null = null;
             
             if (proposalVotes && quorum !== null) {
@@ -428,7 +371,6 @@ export function GovernancePage() {
               const quorumReached = totalVotes >= quorum;
               const voteSucceeded = forVotes > againstVotes;
               
-              // Determine reason for success/failure
               let reason = '';
               if (quorumReached && voteSucceeded) {
                 reason = `Quorum reached (${totalVotes.toLocaleString()} votes ≥ ${quorum.toLocaleString()} required) and majority for (${forVotes.toLocaleString()} for vs ${againstVotes.toLocaleString()} against)`;
@@ -441,48 +383,78 @@ export function GovernancePage() {
               voteAnalysis = { quorumReached, voteSucceeded, reason };
             }
 
-            // Debug logging for vote counts and quorum calculation
-            console.log(`Proposal ${proposalId.toString()} vote analysis:`, {
-              proposalSnapshot: proposalSnapshot?.toString() || 'N/A',
-              againstVotes: proposalVotes?.[0]?.toString() || '0',
-              forVotes: proposalVotes?.[1]?.toString() || '0',
-              abstainVotes: proposalVotes?.[2]?.toString() || '0',
-              totalVotesForQuorum: proposalVotes ? (proposalVotes[1] || 0n) + (proposalVotes[2] || 0n) : 0n,
-              quorum: quorum?.toString() || 'N/A',
-              quorumReached: voteAnalysis?.quorumReached || false,
-              voteSucceeded: voteAnalysis?.voteSucceeded || false,
-              reason: voteAnalysis?.reason || 'N/A',
-            });
-
-            // Fetch proposal ETA if queued
-            let proposalEta: bigint | null = null;
-            if (Number(state) === 5) { // Queued state
-              try {
-                proposalEta = (await publicClient.readContract({
+            // Get proposer from events (fallback)
+            let proposer: Address = '0x0000000000000000000000000000000000000000' as Address;
+            try {
+              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+              if (proposalCreatedEvent && publicClient) {
+                const logs = await publicClient.getLogs({
                   address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                  abi: DAOGovernor,
-                  functionName: 'proposalEta',
-                  args: [proposalId],
-                })) as bigint;
-              } catch (err) {
-                console.warn('Failed to fetch proposal ETA:', err);
+                  event: proposalCreatedEvent as any,
+                  args: { proposalId },
+                  fromBlock: 0n,
+                  toBlock: 'latest',
+                });
+                if (logs.length > 0) {
+                  const decoded = decodeEventLog({
+                    abi: DAOGovernor,
+                    data: logs[0].data,
+                    topics: logs[0].topics,
+                  });
+                  if (decoded.args && typeof decoded.args === 'object' && 'proposer' in decoded.args) {
+                    proposer = (decoded.args as any).proposer as Address;
+                  }
+                }
               }
+            } catch (err) {
+              console.warn('Could not fetch proposer:', err);
             }
 
+            // Get description from events (fallback)
+            let description = `Proposal ${proposalId.toString()}`;
+            try {
+              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+              if (proposalCreatedEvent && publicClient) {
+                const logs = await publicClient.getLogs({
+                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+                  event: proposalCreatedEvent as any,
+                  args: { proposalId },
+                  fromBlock: 0n,
+                  toBlock: 'latest',
+                });
+                if (logs.length > 0) {
+                  const decoded = decodeEventLog({
+                    abi: DAOGovernor,
+                    data: logs[0].data,
+                    topics: logs[0].topics,
+                  });
+                  if (decoded.args && typeof decoded.args === 'object' && 'description' in decoded.args) {
+                    description = (decoded.args as any).description as string;
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('Could not fetch description:', err);
+            }
+
+            const voteStart = proposalSnapshot ? Number(proposalSnapshot) : 0;
+            const voteEnd = proposalDeadline ? Number(proposalDeadline) : 0;
+            const proposalEta = proposalEtaResult && typeof proposalEtaResult === 'bigint' && proposalEtaResult > 0n ? Number(proposalEtaResult) : null;
+
             return {
-              id: proposalId.toString(), // Use string to avoid BigInt precision issues
+              id: proposalId.toString(),
               proposalId: proposalId.toString(),
               proposer,
               description,
-              targets,
-              values: values.map(v => v.toString()),
+              targets: targets as Address[],
+              values: values.map((v: bigint) => v.toString()),
               calldatas: calldatas as `0x${string}`[],
-              voteStart: Number(voteStart),
-              voteEnd: Number(voteEnd),
+              voteStart,
+              voteEnd,
               state: stateMap[Number(state)] || 'Unknown',
               stateLabel: stateLabels[Number(state)] || 'Unknown',
-              blockNumber: Number(log.blockNumber),
-              proposalEta: proposalEta ? Number(proposalEta) : null,
+              blockNumber: blockNumber || voteStart,
+              proposalEta,
               votes: proposalVotes ? {
                 againstVotes: proposalVotes[0]?.toString() || '0',
                 forVotes: proposalVotes[1]?.toString() || '0',
@@ -492,32 +464,27 @@ export function GovernancePage() {
               voteAnalysis,
             };
           } catch (err) {
-            console.error('Error decoding proposal event:', err, log);
+            console.error('Error processing proposal:', err);
             return null;
           }
         });
 
         const proposals = (await Promise.all(proposalPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
         
-        console.log('Decoded proposals:', proposals.length);
-        
-        // Sort by blockNumber (newest first) to ensure correct chronological order
-        return proposals.sort((a, b) => b.blockNumber - a.blockNumber);
+        // Sort by proposalId (newest first)
+        return proposals.sort((a, b) => Number(BigInt(b.id) - BigInt(a.id)));
       } catch (error: any) {
         console.error('Error fetching proposals:', error);
-        console.error('Error details:', {
-          message: error?.message,
-          code: error?.code,
-          name: error?.name,
-          stack: error?.stack,
-        });
-        // Return empty array on error to prevent UI crash
         return [];
       }
     },
-    enabled: !!publicClient,
-    refetchInterval: 30000, // Refetch every 30 seconds to show new proposals immediately
+    enabled: !!publicClient && !!proposalsData && proposalsData.length > 0,
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // Legacy constants for backward compatibility (no longer used for event scanning)
+  const CHUNK_SIZE = 800n;
+  const FIRST_PROPOSAL_BLOCK = 9983760n;
 
   // Get current block number for auto-search
   useEffect(() => {
@@ -538,381 +505,32 @@ export function GovernancePage() {
     return () => clearInterval(interval);
   }, [publicClient]);
 
-  // Merge latest proposals with accumulated older proposals, removing duplicates
-  useEffect(() => {
-    if (latestProposals.length > 0) {
-      setAllProposals((prev) => {
-        // Create a map of existing proposals by ID for quick lookup
-        const existingMap = new Map(prev.map(p => [p.id, p]));
-        
-        // Add/update latest proposals (they take precedence for state updates)
-        latestProposals.forEach(proposal => {
-          existingMap.set(proposal.id, proposal);
-        });
-        
-        // Convert back to array and sort by block number (newest first)
-        return Array.from(existingMap.values()).sort((a, b) => b.blockNumber - a.blockNumber);
-      });
-      
-      // Set oldest loaded block on initial load (find the oldest block number from proposals)
-      if (oldestLoadedBlock === null && latestProposals.length > 0) {
-        const oldestBlock = Math.min(...latestProposals.map(p => p.blockNumber));
-        setOldestLoadedBlock(BigInt(oldestBlock));
-      }
-    } else if (latestProposals.length === 0 && !isLoadingProposals && !hasAutoSearched && currentBlockNumber && oldestLoadedBlock === null) {
-      // No proposals found in initial query - automatically search backwards
-      console.log('No proposals found in initial query, automatically searching backwards...');
-      const initialOldestBlock = currentBlockNumber > CHUNK_SIZE 
-        ? (currentBlockNumber - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
-            ? currentBlockNumber - CHUNK_SIZE 
-            : FIRST_PROPOSAL_BLOCK)
-        : FIRST_PROPOSAL_BLOCK;
-      
-      setOldestLoadedBlock(initialOldestBlock);
-      setHasAutoSearched(true);
-    }
-  }, [latestProposals, oldestLoadedBlock, isLoadingProposals, hasAutoSearched, currentBlockNumber]);
+  // Update proposals directly from the new on-chain query (no backward search needed)
+  // Use a ref to track previous proposals to avoid infinite loops
+  const prevProposalsRef = useRef<any[]>([]);
   
-  // Auto-trigger backward search when oldestLoadedBlock is set but no proposals found yet
   useEffect(() => {
-    if (oldestLoadedBlock && oldestLoadedBlock > FIRST_PROPOSAL_BLOCK && hasAutoSearched && allProposals.length === 0 && !isLoadingOlder && publicClient) {
-      // Small delay to ensure state is settled, then trigger the existing loadOlderProposals function
-      const timer = setTimeout(() => {
-        // Use the existing loadOlderProposals function which will handle the search
-        loadOlderProposals();
-      }, 500);
-      return () => clearTimeout(timer);
+    // Only update if proposals actually changed (compare by length and IDs)
+    const proposalsChanged = 
+      latestProposals.length !== prevProposalsRef.current.length ||
+      latestProposals.some((p: any, i: number) => 
+        !prevProposalsRef.current[i] || p.id !== prevProposalsRef.current[i].id
+      );
+    
+    if (proposalsChanged) {
+      setAllProposals(latestProposals);
+      prevProposalsRef.current = latestProposals;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oldestLoadedBlock, hasAutoSearched, allProposals.length, isLoadingOlder, publicClient]);
+  }, [latestProposals, setAllProposals]);
 
-  // Function to load older proposals (auto-continue until proposals found)
+  // Removed: loadOlderProposals function - no longer needed since we fetch all proposals directly via proposalDetailsAt()
+  // This function was used for backward event scanning, which is now replaced by on-chain enumerability
   const loadOlderProposals = async () => {
-    if (!publicClient || !oldestLoadedBlock || oldestLoadedBlock === 0n || isLoadingOlder) return;
-    
-    setIsLoadingOlder(true);
-    setSearchProgress(null);
-    
-    try {
-      // Check if we've reached the first proposal block
-      if (oldestLoadedBlock <= FIRST_PROPOSAL_BLOCK) {
-        setNoMoreProposals(true);
-        setSearchProgress('No more proposals available. Reached the first proposal in the QAWL DAO.');
-        setTimeout(() => {
-          setSearchProgress(null);
-        }, 3000);
-        setIsLoadingOlder(false);
-        return;
-      }
-      
-      const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
-      if (!proposalCreatedEvent) {
-        console.error('ProposalCreated event not found in ABI!');
-        return;
-      }
-      
-      let currentOldestBlock = oldestLoadedBlock;
-      let totalBlocksChecked = 0n;
-      let allFoundProposals: any[] = [];
-      const MAX_CHUNKS_TO_SEARCH = 10; // Limit to prevent infinite loops
-      const MIN_PROPOSALS_TO_LOAD = 5; // Load at least 5 proposals before stopping
-      let chunksSearched = 0;
-      
-      // Keep searching chunks until we find at least MIN_PROPOSALS_TO_LOAD proposals or hit limits
-      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > FIRST_PROPOSAL_BLOCK && allFoundProposals.length < MIN_PROPOSALS_TO_LOAD) {
-        const newFromBlock = currentOldestBlock > CHUNK_SIZE 
-          ? (currentOldestBlock - CHUNK_SIZE > FIRST_PROPOSAL_BLOCK 
-              ? currentOldestBlock - CHUNK_SIZE 
-              : FIRST_PROPOSAL_BLOCK)
-          : FIRST_PROPOSAL_BLOCK;
-        const newToBlock = currentOldestBlock - 1n;
-        const blocksInChunk = newToBlock - newFromBlock + 1n;
-        totalBlocksChecked += blocksInChunk;
-        
-        // Update search progress (just indicate we're searching, no block counts)
-        const proposalsFoundSoFar = allFoundProposals.length;
-        const remainingNeeded = Math.max(0, MIN_PROPOSALS_TO_LOAD - proposalsFoundSoFar);
-        setSearchProgress(
-          proposalsFoundSoFar > 0
-            ? `Found ${proposalsFoundSoFar} proposal(s), searching for ${remainingNeeded} more...`
-            : 'Searching...'
-        );
-        
-        console.log(`Loading older proposals: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
-        
-        try {
-          // Fetch logs with retry logic
-          let logs: any[] = [];
-          let retries = 3;
-          let lastError: any = null;
-          
-          while (retries > 0) {
-            try {
-              logs = await publicClient.getLogs({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                event: proposalCreatedEvent as any,
-                fromBlock: newFromBlock,
-                toBlock: newToBlock,
-              });
-              break; // Success, exit retry loop
-            } catch (error: any) {
-              lastError = error;
-              retries--;
-              if (retries > 0) {
-                // Wait before retrying (exponential backoff)
-                const delay = (4 - retries) * 1000; // 1s, 2s, 3s
-                console.warn(`RPC request failed for chunk ${chunksSearched + 1}, retrying in ${delay}ms... (${retries} retries left)`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-              }
-            }
-          }
-          
-          if (logs.length === 0 && lastError) {
-            console.warn(`Failed to fetch logs for chunk ${chunksSearched + 1} after retries:`, lastError);
-            // Continue to next chunk on error
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            await new Promise(resolve => setTimeout(resolve, 200));
-            continue;
-          }
-          
-          console.log(`Found ${logs.length} proposal logs in chunk ${chunksSearched + 1}`);
-          
-          // If we found proposals, process them and stop searching
-          if (logs.length > 0) {
-            // Process logs (same processing logic as latest proposals)
-            const proposalPromises = logs.map(async (log: any) => {
-              try {
-                let proposalId: bigint;
-                let proposer: Address;
-                let description: string;
-                let targets: Address[];
-                let values: bigint[];
-                let calldatas: `0x${string}`[];
-                let voteStart: bigint;
-                let voteEnd: bigint;
-
-                if (log.args) {
-                  proposalId = log.args.proposalId as bigint;
-                  proposer = log.args.proposer as Address;
-                  description = log.args.description as string;
-                  targets = log.args.targets as Address[];
-                  values = log.args.values as bigint[] || [];
-                  calldatas = log.args.calldatas as `0x${string}`[] || [];
-                  voteStart = log.args.voteStart as bigint;
-                  voteEnd = log.args.voteEnd as bigint;
-                } else {
-                  const { decodeEventLog } = await import('viem');
-                  const decoded = decodeEventLog({
-                    abi: DAOGovernor,
-                    data: log.data,
-                    topics: log.topics,
-                  });
-                  if (!decoded.args || !Array.isArray(decoded.args)) {
-                    return null;
-                  }
-                  const args = decoded.args as any;
-                  proposalId = args.proposalId as bigint;
-                  proposer = args.proposer as Address;
-                  description = args.description as string;
-                  targets = args.targets as Address[];
-                  values = args.values as bigint[] || [];
-                  calldatas = args.calldatas as `0x${string}`[] || [];
-                  voteStart = args.voteStart as bigint;
-                  voteEnd = args.voteEnd as bigint;
-                }
-                
-                const stateMap: Record<number, string> = {
-                  0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated',
-                  4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed',
-                };
-                const stateLabels: Record<number, string> = {
-                  0: '⏳ Waiting to Start', 1: '🗳️ Voting Open', 2: '❌ Canceled',
-                  3: '❌ Defeated', 4: '✅ Proposal Passed', 5: '⏳ Scheduled',
-                  6: '⏰ Expired', 7: '✅ Executed',
-                };
-
-                const [state, proposalVotesResult, proposalSnapshot, proposalDeadline] = await Promise.all([
-                  publicClient.readContract({
-                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                    abi: DAOGovernor,
-                    functionName: 'state',
-                    args: [proposalId],
-                  }),
-                  publicClient.readContract({
-                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                    abi: DAOGovernor,
-                    functionName: 'proposalVotes',
-                    args: [proposalId],
-                  }).catch(() => null),
-                  publicClient.readContract({
-                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                    abi: DAOGovernor,
-                    functionName: 'proposalSnapshot',
-                    args: [proposalId],
-                  }).catch(() => null),
-                  publicClient.readContract({
-                    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                    abi: DAOGovernor,
-                    functionName: 'proposalDeadline',
-                    args: [proposalId],
-                  }).catch(() => null),
-                ]);
-
-                let quorumResult: bigint | null = null;
-                if (proposalSnapshot) {
-                  try {
-                    quorumResult = (await publicClient.readContract({
-                      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                      abi: DAOGovernor,
-                      functionName: 'quorum',
-                      args: [proposalSnapshot],
-                    })) as bigint;
-                  } catch (err) {
-                    quorumResult = null;
-                  }
-                }
-
-                const proposalVotes = proposalVotesResult as [bigint, bigint, bigint] | null;
-                const quorum = quorumResult as bigint | null;
-
-                let voteAnalysis: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null = null;
-                if (proposalVotes && quorum !== null) {
-                  const againstVotes = proposalVotes[0] || 0n;
-                  const forVotes = proposalVotes[1] || 0n;
-                  const abstainVotes = proposalVotes[2] || 0n;
-                  const totalVotes = forVotes + abstainVotes;
-                  const quorumReached = totalVotes >= quorum;
-                  const voteSucceeded = forVotes > againstVotes;
-                  
-                  let reason = '';
-                  if (quorumReached && voteSucceeded) {
-                    reason = `Quorum reached (${totalVotes.toLocaleString()} votes ≥ ${quorum.toLocaleString()} required) and majority for (${forVotes.toLocaleString()} for vs ${againstVotes.toLocaleString()} against)`;
-                  } else if (!quorumReached) {
-                    reason = `Quorum not reached (${totalVotes.toLocaleString()} votes < ${quorum.toLocaleString()} required)`;
-                  } else if (!voteSucceeded) {
-                    reason = `Quorum reached but majority against (${againstVotes.toLocaleString()} against vs ${forVotes.toLocaleString()} for)`;
-                  }
-                  voteAnalysis = { quorumReached, voteSucceeded, reason };
-                }
-
-                let proposalEta: bigint | null = null;
-                if (Number(state) === 5) {
-                  try {
-                    proposalEta = (await publicClient.readContract({
-                      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                      abi: DAOGovernor,
-                      functionName: 'proposalEta',
-                      args: [proposalId],
-                    })) as bigint;
-                  } catch (err) {
-                    // Ignore
-                  }
-                }
-
-                return {
-                  id: proposalId.toString(),
-                  proposalId: proposalId.toString(),
-                  proposer,
-                  description,
-                  targets,
-                  values: values.map(v => v.toString()),
-                  calldatas: calldatas as `0x${string}`[],
-                  voteStart: Number(voteStart),
-                  voteEnd: Number(voteEnd),
-                  state: stateMap[Number(state)] || 'Unknown',
-                  stateLabel: stateLabels[Number(state)] || 'Unknown',
-                  blockNumber: Number(log.blockNumber),
-                  proposalEta: proposalEta ? Number(proposalEta) : null,
-                  votes: proposalVotes ? {
-                    againstVotes: proposalVotes[0]?.toString() || '0',
-                    forVotes: proposalVotes[1]?.toString() || '0',
-                    abstainVotes: proposalVotes[2]?.toString() || '0',
-                  } : undefined,
-                  quorum: quorum?.toString() || undefined,
-                  voteAnalysis,
-                };
-              } catch (err) {
-                console.error('Error decoding older proposal event:', err);
-                return null;
-              }
-            });
-
-            const chunkProposals = (await Promise.all(proposalPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
-            allFoundProposals.push(...chunkProposals);
-            
-            // Update current oldest block to continue searching backwards
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            
-            // If we've found enough proposals, stop searching
-            if (allFoundProposals.length >= MIN_PROPOSALS_TO_LOAD) {
-              break;
-            }
-            
-            // Add a small delay between chunks to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
-          } else {
-            // No proposals in this chunk, continue searching
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            
-            // Add a small delay between chunks to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        } catch (chunkError: any) {
-          console.error(`Error fetching chunk ${chunksSearched + 1}:`, chunkError);
-          // Continue to next chunk on error
-          currentOldestBlock = newFromBlock;
-          chunksSearched++;
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
-      
-      // Merge found proposals with existing proposals
-      if (allFoundProposals.length > 0) {
-        setAllProposals((prev) => {
-          const existingMap = new Map(prev.map(p => [p.id, p]));
-          allFoundProposals.forEach(proposal => {
-            existingMap.set(proposal.id, proposal);
-          });
-          return Array.from(existingMap.values()).sort((a, b) => b.blockNumber - a.blockNumber);
-        });
-        
-        // Update oldest loaded block to the oldest block we searched
-        const oldestFoundBlock = Math.min(...allFoundProposals.map(p => p.blockNumber));
-        setOldestLoadedBlock(BigInt(oldestFoundBlock));
-        
-        setSearchProgress(`Found ${allFoundProposals.length} proposal(s)`);
-      } else {
-        // No proposals found after searching multiple chunks
-        if (currentOldestBlock <= FIRST_PROPOSAL_BLOCK) {
-          setNoMoreProposals(true);
-          setSearchProgress(`No more proposals found. Reached the first proposal in the QAWL DAO.`);
-        } else {
-          // Don't show "no proposals found" message - just clear progress silently
-          setSearchProgress(null);
-        }
-        // Still update oldest loaded block so we don't search the same range again
-        setOldestLoadedBlock(currentOldestBlock > FIRST_PROPOSAL_BLOCK ? currentOldestBlock : FIRST_PROPOSAL_BLOCK);
-      }
-      
-      // Clear search progress after a delay
-      setTimeout(() => {
-        setSearchProgress(null);
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error loading older proposals:', error);
-      setSearchProgress(`Error: ${error.message || 'Failed to load proposals'}`);
-      setTimeout(() => {
-        setSearchProgress(null);
-      }, 3000);
-    } finally {
-      setIsLoadingOlder(false);
-    }
+    // No-op: All proposals are now fetched directly via proposalDetailsAt()
+    console.log('loadOlderProposals called but no longer needed - all proposals fetched via proposalDetailsAt()');
   };
 
-  // Use merged proposals for display
+  // Use proposals directly from the new on-chain query
   const proposals = allProposals;
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
@@ -1260,20 +878,16 @@ export function GovernancePage() {
     setSuccess(null);
 
     try {
-      const targets = proposal.targets as Address[] || [];
-      const values = proposal.values ? proposal.values.map((v: string) => BigInt(v)) : targets.map(() => 0n);
-      const calldatas = proposal.calldatas as `0x${string}`[] || targets.map(() => '0x' as `0x${string}`);
-      const descriptionHash = keccak256(toBytes(proposal.description));
-
-      console.log('Queueing proposal:', { proposalId: proposal.id, targets, values, calldatas, descriptionHash });
+      console.log('Queueing proposal:', { proposalId: proposal.id });
       
       setQueueingProposalId(proposal.id);
       
+      // Simplified: only need proposalId with the new GovernorStorage implementation
       writeQueue({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
         functionName: 'queue',
-        args: [targets, values, calldatas, descriptionHash],
+        args: [BigInt(proposal.id)],
       });
     } catch (err: any) {
       console.error('Error queueing proposal:', err);
@@ -1333,12 +947,7 @@ export function GovernancePage() {
         }
       }
 
-      const targets = proposal.targets as Address[] || [];
-      const values = proposal.values ? proposal.values.map((v: string) => BigInt(v)) : targets.map(() => 0n);
-      const calldatas = proposal.calldatas as `0x${string}`[] || targets.map(() => '0x' as `0x${string}`);
-      const descriptionHash = keccak256(toBytes(proposal.description));
-
-      console.log('Executing proposal:', { proposalId: proposal.id, targets, values, calldatas, descriptionHash });
+      console.log('Executing proposal:', { proposalId: proposal.id });
       
       // Use a fixed gas limit instead of estimating (estimation fails when execution would revert)
       // The execution itself will provide a better error message if it fails
@@ -1348,11 +957,12 @@ export function GovernancePage() {
       // Skip gas estimation - it fails when execution would revert anyway
       // Use a safe default gas limit and let the execution fail with a clear error if needed
       setExecutingProposalId(proposal.id);
+      // Simplified: only need proposalId with the new GovernorStorage implementation
       writeExecute({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
         functionName: 'execute',
-        args: [targets, values, calldatas, descriptionHash],
+        args: [BigInt(proposal.id)],
         gas: SAFE_DEFAULT_GAS,
       });
     } catch (err: any) {
@@ -1969,41 +1579,7 @@ export function GovernancePage() {
               );
             })}
             
-            {/* Pagination: Load older proposals */}
-            {oldestLoadedBlock !== null && oldestLoadedBlock > 0n && (
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-                <button
-                  onClick={loadOlderProposals}
-                  disabled={isLoadingOlder || noMoreProposals}
-                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {isLoadingOlder ? (
-                    <>
-                      <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
-                      {searchProgress || 'Loading older proposals...'}
-                    </>
-                  ) : noMoreProposals ? (
-                    <>
-                      No more older proposals
-                    </>
-                  ) : (
-                    <>
-                      Load older proposals
-                    </>
-                  )}
-                </button>
-                {searchProgress && !isLoadingOlder && (
-                  <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                    {searchProgress}
-                  </p>
-                )}
-                {oldestLoadedBlock > 0n && !searchProgress && !noMoreProposals && (
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Currently showing proposals from block {oldestLoadedBlock.toLocaleString()} onwards
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Pagination removed: All proposals are now fetched directly via proposalDetailsAt() */}
           </div>
         )}
       </div>

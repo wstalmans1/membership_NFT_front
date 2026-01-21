@@ -286,6 +286,33 @@ export function Dashboard() {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Your Status</h3>
+              <div className="relative group">
+                <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Your Status</p>
+                  <p className="text-gray-300">
+                    Indicates whether your connected wallet address has minted a membership NFT. Members can vote on proposals and participate in <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> governance.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {isConnectedStable ? (isMember ? 'Member' : 'Not a Member') : 'Not Connected'}
+            </p>
+            {isMember === true && (
+              <a 
+                href="/membership?expand=membership" 
+                onClick={handleMintMembership}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block cursor-pointer"
+              >
+                View membership →
+              </a>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 mb-2">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
               <div className="relative group">
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
@@ -322,33 +349,6 @@ export function Dashboard() {
             <Link href="/governance" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
               View all →
             </Link>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Your Status</h3>
-              <div className="relative group">
-                <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Your Status</p>
-                  <p className="text-gray-300">
-                    Indicates whether your connected wallet address has minted a membership NFT. Members can vote on proposals and participate in <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> governance.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isConnectedStable ? (isMember ? 'Member' : 'Not a Member') : 'Not Connected'}
-            </p>
-            {isMember === true && (
-              <a 
-                href="/membership?expand=membership" 
-                onClick={handleMintMembership}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block cursor-pointer"
-              >
-                View membership →
-              </a>
-            )}
           </div>
         </div>
       )}

@@ -72,137 +72,42 @@ export function TreasuryPage() {
   });
 
 
-  // Query recent payouts from PayoutExecuted events
-  // Using chunked queries similar to governance proposals to avoid RPC limits
-  const publicClient = usePublicClient();
-  const CHUNK_SIZE = 800n; // Same as governance page to stay under RPC limits
-  const DEPLOYMENT_BLOCK = 9944847n; // From CONTRACT_ADDRESSES.md
-  
-  const { data: latestPayouts = [], refetch: refetchLatestPayouts, isLoading: isLoadingPayouts } = useQuery({
-    queryKey: ['latestPayouts', CONTRACTS.SEPOLIA.TREASURY_PROXY],
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: false, // Don't refetch if data exists
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      if (!publicClient) return [];
-      
-      try {
-        // Find the PayoutExecuted event in the ABI
-        const payoutEvent = TreasuryExecutor.find((item: any) => 
-          item.type === 'event' && item.name === 'PayoutExecuted'
-        );
-        
-        if (!payoutEvent) {
-          console.error('PayoutExecuted event not found in ABI!');
-          return [];
-        }
-
-        const currentBlock = await publicClient.getBlockNumber();
-        
-        // Query only the latest chunk to avoid RPC limits
-        // Start from deployment block or currentBlock - CHUNK_SIZE, whichever is more recent
-        const fromBlock = currentBlock > CHUNK_SIZE 
-          ? (currentBlock - CHUNK_SIZE > DEPLOYMENT_BLOCK 
-              ? currentBlock - CHUNK_SIZE 
-              : DEPLOYMENT_BLOCK)
-          : DEPLOYMENT_BLOCK;
-        
-        console.log('Fetching recent payouts from block', fromBlock.toString(), 'to', currentBlock.toString(), `(${Number(currentBlock - fromBlock)} blocks)`);
-        
-        // Fetch logs with retry logic (similar to governance proposals)
-        let logs: any[] = [];
-        let retries = 3;
-        let lastError: any = null;
-        
-        while (retries > 0) {
-          try {
-            logs = await publicClient.getLogs({
-              address: CONTRACTS.SEPOLIA.TREASURY_PROXY as Address,
-              event: payoutEvent as any,
-              fromBlock: fromBlock,
-              toBlock: currentBlock,
-            });
-            break; // Success, exit retry loop
-          } catch (error: any) {
-            lastError = error;
-            retries--;
-            if (retries > 0) {
-              // Wait before retrying (exponential backoff)
-              const delay = (4 - retries) * 1000; // 1s, 2s, 3s
-              console.warn(`RPC request failed, retrying in ${delay}ms... (${retries} retries left)`, {
-                message: error?.message,
-                code: error?.code,
-                name: error?.name,
-              });
-              await new Promise(resolve => setTimeout(resolve, delay));
-            }
-          }
-        }
-        
-        if (logs.length === 0 && lastError) {
-          console.warn('Failed to fetch payout logs after retries:', {
-            message: lastError?.message,
-            code: lastError?.code,
-            name: lastError?.name,
-            stack: lastError?.stack,
-          });
-          // Return empty array instead of throwing - UI will show "No payout history available"
-          return [];
-        }
-
-        console.log(`Found ${logs.length} payout event(s) in latest ${CHUNK_SIZE.toString()} blocks`);
-
-        // Decode events and sort by block number (newest first)
-        const payouts = await Promise.all(
-          logs.map(async (log) => {
-            try {
-              const decoded = decodeEventLog({
-                abi: TreasuryExecutor,
-                data: log.data,
-                topics: log.topics,
-              });
-              
-              const args = decoded.args as any;
-              if (!args) {
-                throw new Error('Decoded event has no args');
-              }
-              
-              const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-              
-              return {
-                recipient: args.to as Address,
-                amount: args.amount as bigint,
-                blockNumber: log.blockNumber,
-                timestamp: Number(block.timestamp),
-                transactionHash: log.transactionHash,
-              };
-            } catch (err) {
-              console.warn('Failed to decode payout event:', err, log);
-              return null;
-            }
-          })
-        );
-
-        // Filter out nulls and sort by block number (newest first)
-        return payouts
-          .filter((p): p is NonNullable<typeof payouts[0]> => p !== null)
-          .sort((a, b) => Number(b.blockNumber - a.blockNumber));
-      } catch (err: any) {
-        console.error('Error fetching recent payouts:', err);
-        console.error('Error details:', {
-          message: err?.message,
-          code: err?.code,
-          name: err?.name,
-          stack: err?.stack,
-        });
-        // Return empty array on error to prevent UI crash
-        return [];
-      }
-    },
-    enabled: !!publicClient, // Run even when not connected (for viewing historical payouts)
-    refetchInterval: 30000, // Refetch every 30 seconds
+  // Get transfer count using new on-chain enumerability
+  const { data: transferCount } = useReadContract({
+    address: CONTRACTS.SEPOLIA.TREASURY_PROXY,
+    abi: TreasuryExecutor,
+    functionName: 'transferCount',
   });
+
+  // Ensure transferCount is a number
+  const transferCountNum = typeof transferCount === 'bigint' ? Number(transferCount) : (typeof transferCount === 'number' ? transferCount : 0);
+
+  // Get recent transfers using new on-chain enumerability (last 50)
+  const RECENT_COUNT = 50;
+  const { data: recentTransfersData, refetch: refetchLatestPayouts, isLoading: isLoadingPayouts } = useReadContract({
+    address: CONTRACTS.SEPOLIA.TREASURY_PROXY,
+    abi: TreasuryExecutor,
+    functionName: 'getRecentTransfers',
+    args: [BigInt(RECENT_COUNT)],
+    query: {
+      enabled: transferCountNum > 0,
+      staleTime: 30_000, // Cache for 30 seconds
+    },
+  });
+
+  // Transform transfers data to match existing format
+  const latestPayouts = (Array.isArray(recentTransfersData) ? recentTransfersData : []).map((transfer: any) => ({
+    recipient: transfer.to as Address,
+    amount: transfer.amount as bigint,
+    blockNumber: transfer.blockNumber as bigint,
+    timestamp: Number(transfer.timestamp),
+    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`, // Not stored on-chain, use placeholder
+  })).sort((a: any, b: any) => Number(b.blockNumber - a.blockNumber));
+
+  // Legacy constants for backward compatibility (no longer used)
+  const publicClient = usePublicClient();
+  const CHUNK_SIZE = 800n;
+  const DEPLOYMENT_BLOCK = 9944847n;
 
   // Get current block number for auto-search
   useEffect(() => {
@@ -223,292 +128,23 @@ export function TreasuryPage() {
     return () => clearInterval(interval);
   }, [publicClient]);
 
-  // Merge latest payouts with accumulated older payouts, removing duplicates
+  // Update payouts directly from the new on-chain query (no backward search needed)
   useEffect(() => {
     if (latestPayouts.length > 0) {
-      setAllPayouts((prev) => {
-        // Create a map of existing payouts by transaction hash for quick lookup
-        const existingMap = new Map(prev.map(p => [p.transactionHash, p]));
-        
-        // Add/update latest payouts (they take precedence)
-        latestPayouts.forEach(payout => {
-          existingMap.set(payout.transactionHash, payout);
-        });
-        
-        // Convert back to array and sort by block number (newest first)
-        return Array.from(existingMap.values()).sort((a, b) => Number(b.blockNumber - a.blockNumber));
-      });
-      
-      // Set oldest loaded block on initial load
-      if (oldestLoadedBlock === null && latestPayouts.length > 0) {
-        const oldestBlock = Math.min(...latestPayouts.map(p => Number(p.blockNumber)));
-        setOldestLoadedBlock(BigInt(oldestBlock));
-      }
-    } else if (latestPayouts.length === 0 && !isLoadingPayouts && !hasAutoSearched && currentBlockNumber && oldestLoadedBlock === null) {
-      // No payouts found in initial query - automatically search backwards
-      console.log('No payouts found in initial query, automatically searching backwards...');
-      const initialOldestBlock = currentBlockNumber > CHUNK_SIZE 
-        ? (currentBlockNumber - CHUNK_SIZE > DEPLOYMENT_BLOCK 
-            ? currentBlockNumber - CHUNK_SIZE 
-            : DEPLOYMENT_BLOCK)
-        : DEPLOYMENT_BLOCK;
-      
-      setOldestLoadedBlock(initialOldestBlock);
-      setHasAutoSearched(true);
+      setAllPayouts(latestPayouts);
+    } else {
+      setAllPayouts([]);
     }
-  }, [latestPayouts, oldestLoadedBlock, isLoadingPayouts, hasAutoSearched, currentBlockNumber]);
+  }, [latestPayouts]);
 
-  // Auto-trigger backward search when oldestLoadedBlock is set but no payouts found yet
-  useEffect(() => {
-    if (oldestLoadedBlock && oldestLoadedBlock > DEPLOYMENT_BLOCK && hasAutoSearched && allPayouts.length === 0 && !isLoadingOlder && publicClient) {
-      // Small delay to ensure state is settled, then trigger the existing loadOlderPayouts function
-      const timer = setTimeout(() => {
-        loadOlderPayouts();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oldestLoadedBlock, hasAutoSearched, allPayouts.length, isLoadingOlder, publicClient]);
-
-  // Function to load older payouts (auto-continue until payouts found)
+  // Removed: loadOlderPayouts function - no longer needed since we fetch all transfers directly via getRecentTransfers()
+  // This function was used for backward event scanning, which is now replaced by on-chain enumerability
   const loadOlderPayouts = async () => {
-    if (!publicClient || !oldestLoadedBlock || oldestLoadedBlock === 0n || isLoadingOlder) return;
-    
-    setIsLoadingOlder(true);
-    setSearchProgress(null);
-    
-    try {
-      // Check if we've reached the deployment block
-      if (oldestLoadedBlock <= DEPLOYMENT_BLOCK) {
-        setNoMorePayouts(true);
-        setSearchProgress('No more payouts available. Reached the deployment block.');
-        setTimeout(() => {
-          setSearchProgress(null);
-        }, 3000);
-        setIsLoadingOlder(false);
-        return;
-      }
-      
-      const payoutEvent = TreasuryExecutor.find((item: any) => 
-        item.type === 'event' && item.name === 'PayoutExecuted'
-      );
-      if (!payoutEvent) {
-        console.error('PayoutExecuted event not found in ABI!');
-        setIsLoadingOlder(false);
-        return;
-      }
-      
-      let currentOldestBlock = oldestLoadedBlock;
-      let totalBlocksChecked = 0n;
-      let allFoundPayouts: any[] = [];
-      const MAX_CHUNKS_TO_SEARCH = 5; // Reduced from 10 to limit automatic search depth
-      let chunksSearched = 0;
-      const CHUNK_DELAY_MS = 750; // Increased from 200ms to reduce rate limit hits
-      
-      // Reset rate limit error state
-      setRateLimitError(false);
-      
-      // Keep searching chunks until we find payouts or hit limits
-      while (chunksSearched < MAX_CHUNKS_TO_SEARCH && currentOldestBlock > DEPLOYMENT_BLOCK) {
-        const newFromBlock = currentOldestBlock > CHUNK_SIZE 
-          ? (currentOldestBlock - CHUNK_SIZE > DEPLOYMENT_BLOCK 
-              ? currentOldestBlock - CHUNK_SIZE 
-              : DEPLOYMENT_BLOCK)
-          : DEPLOYMENT_BLOCK;
-        const newToBlock = currentOldestBlock - 1n;
-        const blocksInChunk = newToBlock - newFromBlock + 1n;
-        totalBlocksChecked += blocksInChunk;
-        
-        // Update search progress (just indicate we're searching, no block counts)
-        const payoutsFoundSoFar = allFoundPayouts.length;
-        setSearchProgress(
-          payoutsFoundSoFar > 0
-            ? `Found ${payoutsFoundSoFar} payout(s)...`
-            : 'Searching...'
-        );
-        
-        console.log(`Loading older payouts: blocks ${newFromBlock.toString()}-${newToBlock.toString()}`);
-        
-        try {
-          // Fetch logs with retry logic
-          let logs: any[] = [];
-          let retries = 3;
-          let lastError: any = null;
-          
-          while (retries > 0) {
-            try {
-              logs = await publicClient.getLogs({
-                address: CONTRACTS.SEPOLIA.TREASURY_PROXY as Address,
-                event: payoutEvent as any,
-                fromBlock: newFromBlock,
-                toBlock: newToBlock,
-              });
-              break; // Success, exit retry loop
-            } catch (error: any) {
-              lastError = error;
-              
-              // Check for rate limit error (429 or "Too Many Requests")
-              const isRateLimit = error?.status === 429 || 
-                                  error?.message?.includes('429') || 
-                                  error?.message?.includes('Too Many Requests') ||
-                                  error?.code === 429;
-              
-              if (isRateLimit) {
-                console.warn(`Rate limit hit for chunk ${chunksSearched + 1}`);
-                setRateLimitError(true);
-                // Stop searching on rate limit
-                throw new Error('Rate limit exceeded. Please try again later or load older payouts manually.');
-              }
-              
-              retries--;
-              if (retries > 0) {
-                // Wait before retrying (exponential backoff)
-                const delay = (4 - retries) * 1000; // 1s, 2s, 3s
-                console.warn(`RPC request failed for chunk ${chunksSearched + 1}, retrying in ${delay}ms... (${retries} retries left)`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-              }
-            }
-          }
-          
-          if (logs.length === 0 && lastError) {
-            console.warn(`Failed to fetch logs for chunk ${chunksSearched + 1} after retries:`, lastError);
-            // Continue to next chunk on error (unless rate limited)
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
-            continue;
-          }
-          
-          console.log(`Found ${logs.length} payout logs in chunk ${chunksSearched + 1}`);
-          
-          // If we found payouts, process them
-          if (logs.length > 0) {
-            // Process logs
-            const payoutPromises = logs.map(async (log: any) => {
-              try {
-                const decoded = decodeEventLog({
-                  abi: TreasuryExecutor,
-                  data: log.data,
-                  topics: log.topics,
-                });
-                
-                const args = decoded.args as any;
-                if (!args) {
-                  throw new Error('Decoded event has no args');
-                }
-                
-                const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-                
-                return {
-                  recipient: args.to as Address,
-                  amount: args.amount as bigint,
-                  blockNumber: log.blockNumber,
-                  timestamp: Number(block.timestamp),
-                  transactionHash: log.transactionHash,
-                };
-              } catch (err) {
-                console.error('Error decoding older payout event:', err);
-                return null;
-              }
-            });
-
-            const chunkPayouts = (await Promise.all(payoutPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
-            allFoundPayouts.push(...chunkPayouts);
-            
-            // Update current oldest block
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            
-            // Stop searching once we find payouts - user can manually load more if needed
-            break;
-          } else {
-            // No payouts in this chunk, continue searching
-            currentOldestBlock = newFromBlock;
-            chunksSearched++;
-            
-            // Add delay between chunks to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
-          }
-        } catch (chunkError: any) {
-          console.error(`Error fetching chunk ${chunksSearched + 1}:`, chunkError);
-          
-          // Check for rate limit error
-          const isRateLimit = chunkError?.status === 429 || 
-                              chunkError?.message?.includes('429') || 
-                              chunkError?.message?.includes('Too Many Requests') ||
-                              chunkError?.message?.includes('Rate limit') ||
-                              chunkError?.code === 429;
-          
-          if (isRateLimit) {
-            setRateLimitError(true);
-            throw new Error('Rate limit exceeded. Please try again later or load older payouts manually.');
-          }
-          
-          // Continue to next chunk on other errors
-          currentOldestBlock = newFromBlock;
-          chunksSearched++;
-          await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS));
-        }
-      }
-      
-      // Merge found payouts with existing payouts
-      if (allFoundPayouts.length > 0) {
-        setAllPayouts((prev) => {
-          const existingMap = new Map(prev.map(p => [p.transactionHash, p]));
-          allFoundPayouts.forEach(payout => {
-            existingMap.set(payout.transactionHash, payout);
-          });
-          return Array.from(existingMap.values()).sort((a, b) => Number(b.blockNumber - a.blockNumber));
-        });
-        
-        // Update oldest loaded block to the oldest block we searched
-        const oldestFoundBlock = Math.min(...allFoundPayouts.map(p => Number(p.blockNumber)));
-        setOldestLoadedBlock(BigInt(oldestFoundBlock));
-        
-        setSearchProgress(`Found ${allFoundPayouts.length} payout(s)`);
-      } else {
-        // No payouts found after searching multiple chunks
-        if (currentOldestBlock <= DEPLOYMENT_BLOCK) {
-          setNoMorePayouts(true);
-          setSearchProgress(`No more payouts found. Reached the deployment block.`);
-        } else {
-          // Don't show "no payouts found" message - just clear progress silently
-          setSearchProgress(null);
-        }
-        // Still update oldest loaded block so we don't search the same range again
-        setOldestLoadedBlock(currentOldestBlock > DEPLOYMENT_BLOCK ? currentOldestBlock : DEPLOYMENT_BLOCK);
-      }
-      
-      // Clear search progress after a delay
-      setTimeout(() => {
-        setSearchProgress(null);
-      }, 3000);
-    } catch (error: any) {
-      console.error('Error loading older payouts:', error);
-      
-      // Check if it's a rate limit error
-      const isRateLimit = error?.status === 429 || 
-                          error?.message?.includes('429') || 
-                          error?.message?.includes('Too Many Requests') ||
-                          error?.message?.includes('Rate limit') ||
-                          error?.code === 429;
-      
-      if (isRateLimit) {
-        setRateLimitError(true);
-        setSearchProgress('Rate limit exceeded. Please wait a moment and try loading older payouts manually.');
-      } else {
-        setSearchProgress(`Error: ${error.message || 'Failed to load payouts'}`);
-      }
-      
-      setTimeout(() => {
-        setSearchProgress(null);
-      }, 5000); // Longer timeout for error messages
-    } finally {
-      setIsLoadingOlder(false);
-    }
+    // No-op: All transfers are now fetched directly via getRecentTransfers()
+    console.log('loadOlderPayouts called but no longer needed - all transfers fetched via getRecentTransfers()');
   };
 
-  // Use merged payouts for display
+  // Use payouts directly from the new on-chain query
   const payouts = allPayouts;
 
   const handleCreateProposal = () => {
@@ -806,34 +442,7 @@ export function TreasuryPage() {
               </div>
             )}
             
-            {oldestLoadedBlock !== null && oldestLoadedBlock > 0n && (
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">
-                <button
-                  onClick={() => {
-                    setRateLimitError(false); // Reset rate limit error when manually retrying
-                    loadOlderPayouts();
-                  }}
-                  disabled={isLoadingOlder || noMorePayouts}
-                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {isLoadingOlder ? (
-                    <>
-                      <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
-                      {searchProgress || 'Loading older payouts...'}
-                    </>
-                  ) : noMorePayouts ? (
-                    'No more older payouts'
-                  ) : (
-                    'Load older payouts'
-                  )}
-                </button>
-                {oldestLoadedBlock > 0n && !searchProgress && !noMorePayouts && (
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Currently showing payouts from block {oldestLoadedBlock.toLocaleString()} onwards
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Pagination removed: All transfers are now fetched directly via getRecentTransfers() */}
           </div>
         )}
       </div>
