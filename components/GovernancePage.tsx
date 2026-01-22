@@ -181,23 +181,36 @@ const useCurrentBlockNumber = () => {
   return useSyncExternalStore(subscribeToBlockNumber, getBlockNumberSnapshot, getBlockNumberSnapshot);
 };
 
+const sortProposals = (list: any[]) =>
+  list
+    .slice()
+    .sort((a, b) => {
+      const blockDiff = (b.blockNumber || 0) - (a.blockNumber || 0);
+      if (blockDiff !== 0) return blockDiff;
+      return Number(BigInt(b.id) - BigInt(a.id));
+    });
+
 const mergeProposals = (prev: any[], next: any[]) => {
   if (next.length === 0) return prev;
-  if (prev.length === 0) return next;
+  if (prev.length === 0) return sortProposals(next);
 
   const prevById = new Map(prev.map((proposal) => [proposal.id, proposal]));
-  let hasChanges = prev.length !== next.length;
+  const mergedById = new Map(prevById);
+  let hasChanges = false;
 
-  const merged = next.map((proposal) => {
+  next.forEach((proposal) => {
     const previous = prevById.get(proposal.id);
     if (previous && areProposalsEqual(previous, proposal)) {
-      return previous;
+      mergedById.set(proposal.id, previous);
+    } else {
+      mergedById.set(proposal.id, proposal);
+      hasChanges = true;
     }
-    hasChanges = true;
-    return proposal;
   });
 
-  if (!hasChanges) {
+  const merged = sortProposals(Array.from(mergedById.values()));
+
+  if (!hasChanges && merged.length === prev.length) {
     for (let i = 0; i < merged.length; i += 1) {
       if (merged[i] !== prev[i]) {
         hasChanges = true;
@@ -721,7 +734,7 @@ export function GovernancePage() {
         // This ensures we get at least one more refetch after voteEnd passes
         if (currentBlock <= voteEndBigInt + 5n) {
           // Check if we already have final state
-          const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired';
+          const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired' || p.state === 'Queued';
           // If not final yet, keep monitoring
           if (!isFinalState) return true;
         }
@@ -944,8 +957,7 @@ export function GovernancePage() {
       // Refetch proposals after a short delay to allow block to be mined
       // Refetch proposalCount first so we can incrementally load new proposals
       setTimeout(() => {
-        // Invalidate all proposal-related queries to force fresh fetch
-        queryClient.invalidateQueries({ queryKey: ['proposals'] });
+        // Invalidate proposalCount so incremental loading can fetch the new proposal
         queryClient.invalidateQueries({ queryKey: ['proposalCount'] });
         
         // First refetch proposalCount to get the updated count
@@ -1845,7 +1857,7 @@ export function GovernancePage() {
       {/* Proposals List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Proposals</h2>
-        {(isLoadingProposals || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
+        {((isLoadingProposals && proposals.length === 0) || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
             <p>{searchProgress || 'Loading proposals...'}</p>
@@ -1941,7 +1953,7 @@ function ProposalStateRefresher({
 
     proposalsToCheck.forEach((p: any) => {
       // Skip proposals that are already in final states
-      const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired';
+      const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired' || p.state === 'Queued';
       
       // Log proposal details for debugging
       if (p.voteEnd && currentBlockNumber >= BigInt(p.voteEnd)) {
