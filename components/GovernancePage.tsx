@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo, useSyncExternalStore } from 'react';
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,11 +37,184 @@ const formatViemError = (err: unknown) => {
   return 'Failed to execute proposal. Please try again.';
 };
 
+const areArraysEqual = (a?: any[], b?: any[]) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const areVotesEqual = (a?: { forVotes: string; againstVotes: string; abstainVotes: string }, b?: { forVotes: string; againstVotes: string; abstainVotes: string }) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.forVotes === b.forVotes && a.againstVotes === b.againstVotes && a.abstainVotes === b.abstainVotes;
+};
+
+const areVoteAnalysisEqual = (a?: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null, b?: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.quorumReached === b.quorumReached && a.voteSucceeded === b.voteSucceeded && a.reason === b.reason;
+};
+
+const areProposalsEqual = (a: any, b: any) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  return (
+    a.id === b.id &&
+    a.state === b.state &&
+    a.voteStart === b.voteStart &&
+    a.voteEnd === b.voteEnd &&
+    a.proposalEta === b.proposalEta &&
+    a.blockNumber === b.blockNumber &&
+    a.description === b.description &&
+    a.proposer === b.proposer &&
+    a.descriptionHash === b.descriptionHash &&
+    a.quorum === b.quorum &&
+    areArraysEqual(a.targets, b.targets) &&
+    areArraysEqual(a.values, b.values) &&
+    areArraysEqual(a.calldatas, b.calldatas) &&
+    areVotesEqual(a.votes, b.votes) &&
+    areVoteAnalysisEqual(a.voteAnalysis, b.voteAnalysis)
+  );
+};
+
+const PROPOSAL_STATE_MAP: Record<number, string> = {
+  0: 'Pending',
+  1: 'Active',
+  2: 'Canceled',
+  3: 'Defeated',
+  4: 'Succeeded',
+  5: 'Queued',
+  6: 'Expired',
+  7: 'Executed',
+};
+
+const PROPOSAL_STATE_LABELS: Record<number, string> = {
+  0: '⏳ Waiting to Start',
+  1: '🗳️ Voting Open',
+  2: '❌ Canceled',
+  3: '❌ Defeated',
+  4: '✅ Proposal Passed',
+  5: '⏳ Scheduled',
+  6: '⏰ Expired',
+  7: '✅ Executed',
+};
+
+type BlockListener = () => void;
+
+let blockNumberSnapshot: bigint | null = null;
+let blockListeners = new Set<BlockListener>();
+let blockInterval: ReturnType<typeof setInterval> | null = null;
+let blockClient: ReturnType<typeof usePublicClient> | null = null;
+let blockFetchInFlight = false;
+
+const notifyBlockListeners = () => {
+  blockListeners.forEach((listener) => listener());
+};
+
+const fetchBlockNumber = async () => {
+  if (!blockClient || blockFetchInFlight) return;
+  blockFetchInFlight = true;
+  try {
+    const block = await blockClient.getBlock({ blockTag: 'latest' });
+    if (blockNumberSnapshot !== block.number) {
+      blockNumberSnapshot = block.number;
+      notifyBlockListeners();
+    }
+  } catch (error) {
+    console.error('Error fetching current block number:', error);
+  } finally {
+    blockFetchInFlight = false;
+  }
+};
+
+const startBlockPolling = () => {
+  if (blockInterval || !blockClient) return;
+  fetchBlockNumber();
+  blockInterval = setInterval(fetchBlockNumber, 12000);
+};
+
+const stopBlockPolling = () => {
+  if (blockInterval) {
+    clearInterval(blockInterval);
+    blockInterval = null;
+  }
+};
+
+const subscribeToBlockNumber = (listener: BlockListener) => {
+  blockListeners.add(listener);
+  if (blockListeners.size === 1) {
+    startBlockPolling();
+  }
+  return () => {
+    blockListeners.delete(listener);
+    if (blockListeners.size === 0) {
+      stopBlockPolling();
+    }
+  };
+};
+
+const getBlockNumberSnapshot = () => blockNumberSnapshot;
+
+const useCurrentBlockNumber = () => {
+  const publicClient = usePublicClient();
+
+  useEffect(() => {
+    blockClient = publicClient ?? null;
+    if (!blockClient) {
+      stopBlockPolling();
+      if (blockNumberSnapshot !== null) {
+        blockNumberSnapshot = null;
+        notifyBlockListeners();
+      }
+      return;
+    }
+    if (blockListeners.size > 0) {
+      startBlockPolling();
+    }
+  }, [publicClient]);
+
+  return useSyncExternalStore(subscribeToBlockNumber, getBlockNumberSnapshot, getBlockNumberSnapshot);
+};
+
+const mergeProposals = (prev: any[], next: any[]) => {
+  if (next.length === 0) return prev;
+  if (prev.length === 0) return next;
+
+  const prevById = new Map(prev.map((proposal) => [proposal.id, proposal]));
+  let hasChanges = prev.length !== next.length;
+
+  const merged = next.map((proposal) => {
+    const previous = prevById.get(proposal.id);
+    if (previous && areProposalsEqual(previous, proposal)) {
+      return previous;
+    }
+    hasChanges = true;
+    return proposal;
+  });
+
+  if (!hasChanges) {
+    for (let i = 0; i < merged.length; i += 1) {
+      if (merged[i] !== prev[i]) {
+        hasChanges = true;
+        break;
+      }
+    }
+  }
+
+  return hasChanges ? merged : prev;
+};
+
 export function GovernancePage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const router = useRouter();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const proposalsDataVersionRef = useRef(0);
   
   // Check if on correct network
   const isCorrectNetwork = chainId === sepolia.id;
@@ -90,7 +263,6 @@ export function GovernancePage() {
   // Local state for UI-only concerns
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [searchProgress, setSearchProgress] = useState<string | null>(null);
-  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
 
   // Check for pre-filled proposal data from Treasury page or Constitution page
   useEffect(() => {
@@ -142,6 +314,9 @@ export function GovernancePage() {
   const { writeContract: writeExecute, data: executeHash, isPending: isExecuting, error: executeError } = useWriteContract();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
+  const proposalsQueryKey = useMemo(() => ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] as const, []);
+  const lastProposalCountRef = useRef<number | null>(null);
+  const isFetchingNewProposalsRef = useRef(false);
   
   // Check membership status
   const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
@@ -310,238 +485,264 @@ export function GovernancePage() {
     );
   }, [proposalCountNum]);
 
-  const { data: proposalsData, isLoading: isLoadingProposalsData, refetch: refetchProposalsData } = useReadContracts({
+  const { data: proposalsData, isLoading: isLoadingProposalsData } = useReadContracts({
     contracts: proposalContracts,
     query: {
       enabled: proposalCountNum > 0 && proposalContracts.length > 0,
-      staleTime: 10_000, // Reduced cache time to 10 seconds for faster updates
-      refetchInterval: 15_000, // Refetch every 15 seconds to catch new proposals
+      staleTime: 5_000, // Reduced cache time to 5 seconds for faster updates
+      // Only refetch proposalsData if there might be new proposals (proposalCount could change)
+      // But we don't need to continuously refetch if all proposals are final
+      // The latestProposals query will handle selective refetching
+      refetchInterval: false, // Don't continuously refetch - let latestProposals handle it
     },
   });
 
+  const buildProposalFromDetails = useCallback(async (proposalDetails: any) => {
+    if (!publicClient || !proposalDetails || !Array.isArray(proposalDetails)) return null;
+
+    const [proposalId, targets, values, calldatas, descriptionHash] = proposalDetails as [
+      bigint,
+      Address[],
+      bigint[],
+      `0x${string}`[],
+      `0x${string}`
+    ];
+
+    try {
+      // Fetch proposal state, votes, and other details
+      // CRITICAL: Always read fresh state from contract - never use cache
+      const [state, proposalVotesResult, proposalSnapshot, proposalDeadline, proposalEtaResult] = await Promise.all([
+        publicClient.readContract({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          abi: DAOGovernor,
+          functionName: 'state',
+          args: [proposalId],
+          blockTag: 'latest', // Explicitly use latest block to ensure fresh state
+        }),
+        publicClient.readContract({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          abi: DAOGovernor,
+          functionName: 'proposalVotes',
+          args: [proposalId],
+        }).catch(() => null),
+        publicClient.readContract({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          abi: DAOGovernor,
+          functionName: 'proposalSnapshot',
+          args: [proposalId],
+        }).catch(() => null),
+        publicClient.readContract({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          abi: DAOGovernor,
+          functionName: 'proposalDeadline',
+          args: [proposalId],
+        }).catch(() => null),
+        publicClient.readContract({
+          address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+          abi: DAOGovernor,
+          functionName: 'proposalEta',
+          args: [proposalId],
+        }).catch(() => null),
+      ]);
+
+      // Get proposal creation block from events (for display purposes)
+      // We'll use a fallback - try to get from the first event or use current block
+      let blockNumber = 0;
+      try {
+        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+        if (proposalCreatedEvent && publicClient) {
+          const logs = await publicClient.getLogs({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            event: proposalCreatedEvent as any,
+            args: { proposalId },
+            fromBlock: 0n,
+            toBlock: 'latest',
+          });
+          if (logs.length > 0) {
+            blockNumber = Number(logs[0].blockNumber);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch proposal creation block:', err);
+      }
+
+      // Fetch quorum
+      let quorumResult: bigint | null = null;
+      const currentBlockSnapshot = getBlockNumberSnapshot();
+      const snapshot = typeof proposalSnapshot === 'bigint' ? proposalSnapshot : null;
+      const canReadQuorum = snapshot !== null && currentBlockSnapshot !== null && currentBlockSnapshot > snapshot;
+      if (canReadQuorum) {
+        try {
+          quorumResult = (await publicClient.readContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'quorum',
+            args: [snapshot],
+          })) as bigint;
+        } catch (err) {
+          console.warn('Failed to fetch quorum:', err);
+        }
+      }
+
+      // Calculate vote analysis
+      const proposalVotes = proposalVotesResult as [bigint, bigint, bigint] | null;
+      const quorum = quorumResult as bigint | null;
+      let voteAnalysis: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null = null;
+      
+      if (proposalVotes && quorum !== null) {
+        const againstVotes = proposalVotes[0] || 0n;
+        const forVotes = proposalVotes[1] || 0n;
+        const abstainVotes = proposalVotes[2] || 0n;
+        const totalVotes = forVotes + abstainVotes;
+        const quorumReached = totalVotes >= quorum;
+        const voteSucceeded = forVotes > againstVotes;
+        
+        let reason = '';
+        if (quorumReached && voteSucceeded) {
+          reason = `Quorum reached (${totalVotes.toLocaleString()} votes ≥ ${quorum.toLocaleString()} required) and majority for (${forVotes.toLocaleString()} for vs ${againstVotes.toLocaleString()} against)`;
+        } else if (!quorumReached) {
+          reason = `Quorum not reached (${totalVotes.toLocaleString()} votes < ${quorum.toLocaleString()} required)`;
+        } else if (!voteSucceeded) {
+          reason = `Quorum reached but majority against (${againstVotes.toLocaleString()} against vs ${forVotes.toLocaleString()} for)`;
+        }
+        
+        voteAnalysis = { quorumReached, voteSucceeded, reason };
+      }
+
+      // Get proposer from events (fallback)
+      let proposer: Address = '0x0000000000000000000000000000000000000000' as Address;
+      try {
+        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+        if (proposalCreatedEvent && publicClient) {
+          const logs = await publicClient.getLogs({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            event: proposalCreatedEvent as any,
+            args: { proposalId },
+            fromBlock: 0n,
+            toBlock: 'latest',
+          });
+          if (logs.length > 0) {
+            const decoded = decodeEventLog({
+              abi: DAOGovernor,
+              data: logs[0].data,
+              topics: logs[0].topics,
+            });
+            if (decoded.args && typeof decoded.args === 'object' && 'proposer' in decoded.args) {
+              proposer = (decoded.args as any).proposer as Address;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch proposer:', err);
+      }
+
+      // Get description from events (fallback)
+      let description = `Proposal ${proposalId.toString()}`;
+      try {
+        const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
+        if (proposalCreatedEvent && publicClient) {
+          const logs = await publicClient.getLogs({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            event: proposalCreatedEvent as any,
+            args: { proposalId },
+            fromBlock: 0n,
+            toBlock: 'latest',
+          });
+          if (logs.length > 0) {
+            const decoded = decodeEventLog({
+              abi: DAOGovernor,
+              data: logs[0].data,
+              topics: logs[0].topics,
+            });
+            if (decoded.args && typeof decoded.args === 'object' && 'description' in decoded.args) {
+              description = (decoded.args as any).description as string;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch description:', err);
+      }
+
+      const voteStart = proposalSnapshot ? Number(proposalSnapshot) : 0;
+      const voteEnd = proposalDeadline ? Number(proposalDeadline) : 0;
+      const proposalEta = proposalEtaResult && typeof proposalEtaResult === 'bigint' && proposalEtaResult > 0n ? Number(proposalEtaResult) : null;
+
+      return {
+        id: proposalId.toString(),
+        proposalId: proposalId.toString(),
+        proposer,
+        description,
+        targets: targets as Address[],
+        values: values.map((v: bigint) => v.toString()),
+        calldatas: calldatas as `0x${string}`[],
+        descriptionHash: descriptionHash as `0x${string}`,
+        voteStart,
+        voteEnd,
+        state: PROPOSAL_STATE_MAP[Number(state)] || 'Unknown',
+        stateLabel: PROPOSAL_STATE_LABELS[Number(state)] || 'Unknown',
+        blockNumber: blockNumber || voteStart,
+        proposalEta,
+        votes: proposalVotes ? {
+          againstVotes: proposalVotes[0]?.toString() || '0',
+          forVotes: proposalVotes[1]?.toString() || '0',
+          abstainVotes: proposalVotes[2]?.toString() || '0',
+        } : undefined,
+        quorum: quorum?.toString() || undefined,
+        voteAnalysis,
+      };
+    } catch (err) {
+      console.error('Error processing proposal:', err);
+      return null;
+    }
+  }, [publicClient]);
+
   // Process proposals data - transform from contract calls
   const { data: latestProposals = [], refetch: refetchLatestProposals, isLoading: isLoadingProposals } = useQuery({
-    queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY, proposalCountNum],
-    staleTime: 5_000, // Reduced to 5 seconds for faster updates
+    queryKey: proposalsQueryKey,
+    staleTime: 3_000, // 3 seconds cache time
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    refetchInterval: 12_000, // Refetch every 12 seconds (roughly every block) to catch state changes including vote endings
+    // Dynamic refetchInterval: only refetch if there are proposals that need monitoring (not final)
+    refetchInterval: (query) => {
+      const proposals = query.state.data as any[] | undefined;
+      const currentBlock = getBlockNumberSnapshot();
+      
+      if (!proposals || !currentBlock) return 8_000; // Default 8 seconds if no data yet
+      
+      // Check if any proposal is not yet final (currentBlock <= voteEnd)
+      // Also check if any proposal's voteEnd just passed (within last few blocks) - might need one more refetch
+      const hasNonFinalProposals = proposals.some((p: any) => {
+        if (!p.voteEnd) return true; // If voteEnd unknown, keep monitoring
+        const voteEndBigInt = BigInt(p.voteEnd);
+        // Keep monitoring if vote hasn't ended yet
+        if (currentBlock <= voteEndBigInt) return true;
+        // Also keep monitoring if voteEnd just passed (within last 5 blocks) to catch final state
+        // This ensures we get at least one more refetch after voteEnd passes
+        if (currentBlock <= voteEndBigInt + 5n) {
+          // Check if we already have final state
+          const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired';
+          // If not final yet, keep monitoring
+          if (!isFinalState) return true;
+        }
+        return false;
+      });
+      
+      // Only refetch continuously if there are non-final proposals or proposals that just ended
+      return hasNonFinalProposals ? 8_000 : false; // false = stop refetching
+    },
     queryFn: async () => {
-      if (!publicClient || !proposalsData || !Array.isArray(proposalsData) || proposalsData.length === 0) return [];
+      console.log('🔄 queryFn EXECUTING - reading fresh state from contract');
+      if (!publicClient || !proposalsData || !Array.isArray(proposalsData) || proposalsData.length === 0) {
+        console.log('⚠️ queryFn: Missing requirements, returning empty array');
+        return [];
+      }
 
       try {
-        // Map state enum to string
-        const stateMap: Record<number, string> = {
-          0: 'Pending',
-          1: 'Active',
-          2: 'Canceled',
-          3: 'Defeated',
-          4: 'Succeeded',
-          5: 'Queued',
-          6: 'Expired',
-          7: 'Executed',
-        };
-
-        // User-friendly state labels
-        const stateLabels: Record<number, string> = {
-          0: '⏳ Waiting to Start',
-          1: '🗳️ Voting Open',
-          2: '❌ Canceled',
-          3: '❌ Defeated',
-          4: '✅ Proposal Passed',
-          5: '⏳ Scheduled',
-          6: '⏰ Expired',
-          7: '✅ Executed',
-        };
-
         // Process each proposal
-        const proposalPromises = proposalsData.map(async (result: any, index: number) => {
+        const proposalPromises = proposalsData.map(async (result: any) => {
           if (!result || !result.result || !Array.isArray(result.result)) return null;
-          
-          const [proposalId, targets, values, calldatas, descriptionHash] = result.result as [bigint, Address[], bigint[], `0x${string}`[], `0x${string}`];
-          
-          try {
-            // Fetch proposal state, votes, and other details
-            const [state, proposalVotesResult, proposalSnapshot, proposalDeadline, proposalEtaResult] = await Promise.all([
-              publicClient.readContract({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                abi: DAOGovernor,
-                functionName: 'state',
-                args: [proposalId],
-              }),
-              publicClient.readContract({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                abi: DAOGovernor,
-                functionName: 'proposalVotes',
-                args: [proposalId],
-              }).catch(() => null),
-              publicClient.readContract({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                abi: DAOGovernor,
-                functionName: 'proposalSnapshot',
-                args: [proposalId],
-              }).catch(() => null),
-              publicClient.readContract({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                abi: DAOGovernor,
-                functionName: 'proposalDeadline',
-                args: [proposalId],
-              }).catch(() => null),
-              publicClient.readContract({
-                address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                abi: DAOGovernor,
-                functionName: 'proposalEta',
-                args: [proposalId],
-              }).catch(() => null),
-            ]);
-
-            // Get proposal creation block from events (for display purposes)
-            // We'll use a fallback - try to get from the first event or use current block
-            let blockNumber = 0;
-            try {
-              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
-              if (proposalCreatedEvent && publicClient) {
-                const logs = await publicClient.getLogs({
-                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                  event: proposalCreatedEvent as any,
-                  args: { proposalId },
-                  fromBlock: 0n,
-                  toBlock: 'latest',
-                });
-                if (logs.length > 0) {
-                  blockNumber = Number(logs[0].blockNumber);
-                }
-              }
-            } catch (err) {
-              console.warn('Could not fetch proposal creation block:', err);
-            }
-
-            // Fetch quorum
-            let quorumResult: bigint | null = null;
-            if (proposalSnapshot) {
-              try {
-                quorumResult = (await publicClient.readContract({
-                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                  abi: DAOGovernor,
-                  functionName: 'quorum',
-                  args: [proposalSnapshot],
-                })) as bigint;
-              } catch (err) {
-                console.warn('Failed to fetch quorum:', err);
-              }
-            }
-
-            // Calculate vote analysis
-            const proposalVotes = proposalVotesResult as [bigint, bigint, bigint] | null;
-            const quorum = quorumResult as bigint | null;
-            let voteAnalysis: { quorumReached: boolean; voteSucceeded: boolean; reason: string } | null = null;
-            
-            if (proposalVotes && quorum !== null) {
-              const againstVotes = proposalVotes[0] || 0n;
-              const forVotes = proposalVotes[1] || 0n;
-              const abstainVotes = proposalVotes[2] || 0n;
-              const totalVotes = forVotes + abstainVotes;
-              const quorumReached = totalVotes >= quorum;
-              const voteSucceeded = forVotes > againstVotes;
-              
-              let reason = '';
-              if (quorumReached && voteSucceeded) {
-                reason = `Quorum reached (${totalVotes.toLocaleString()} votes ≥ ${quorum.toLocaleString()} required) and majority for (${forVotes.toLocaleString()} for vs ${againstVotes.toLocaleString()} against)`;
-              } else if (!quorumReached) {
-                reason = `Quorum not reached (${totalVotes.toLocaleString()} votes < ${quorum.toLocaleString()} required)`;
-              } else if (!voteSucceeded) {
-                reason = `Quorum reached but majority against (${againstVotes.toLocaleString()} against vs ${forVotes.toLocaleString()} for)`;
-              }
-              
-              voteAnalysis = { quorumReached, voteSucceeded, reason };
-            }
-
-            // Get proposer from events (fallback)
-            let proposer: Address = '0x0000000000000000000000000000000000000000' as Address;
-            try {
-              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
-              if (proposalCreatedEvent && publicClient) {
-                const logs = await publicClient.getLogs({
-                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                  event: proposalCreatedEvent as any,
-                  args: { proposalId },
-                  fromBlock: 0n,
-                  toBlock: 'latest',
-                });
-                if (logs.length > 0) {
-                  const decoded = decodeEventLog({
-                    abi: DAOGovernor,
-                    data: logs[0].data,
-                    topics: logs[0].topics,
-                  });
-                  if (decoded.args && typeof decoded.args === 'object' && 'proposer' in decoded.args) {
-                    proposer = (decoded.args as any).proposer as Address;
-                  }
-                }
-              }
-            } catch (err) {
-              console.warn('Could not fetch proposer:', err);
-            }
-
-            // Get description from events (fallback)
-            let description = `Proposal ${proposalId.toString()}`;
-            try {
-              const proposalCreatedEvent = DAOGovernor.find((item: any) => item.type === 'event' && item.name === 'ProposalCreated');
-              if (proposalCreatedEvent && publicClient) {
-                const logs = await publicClient.getLogs({
-                  address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
-                  event: proposalCreatedEvent as any,
-                  args: { proposalId },
-                  fromBlock: 0n,
-                  toBlock: 'latest',
-                });
-                if (logs.length > 0) {
-                  const decoded = decodeEventLog({
-                    abi: DAOGovernor,
-                    data: logs[0].data,
-                    topics: logs[0].topics,
-                  });
-                  if (decoded.args && typeof decoded.args === 'object' && 'description' in decoded.args) {
-                    description = (decoded.args as any).description as string;
-                  }
-                }
-              }
-            } catch (err) {
-              console.warn('Could not fetch description:', err);
-            }
-
-            const voteStart = proposalSnapshot ? Number(proposalSnapshot) : 0;
-            const voteEnd = proposalDeadline ? Number(proposalDeadline) : 0;
-            const proposalEta = proposalEtaResult && typeof proposalEtaResult === 'bigint' && proposalEtaResult > 0n ? Number(proposalEtaResult) : null;
-
-            return {
-              id: proposalId.toString(),
-              proposalId: proposalId.toString(),
-              proposer,
-              description,
-              targets: targets as Address[],
-              values: values.map((v: bigint) => v.toString()),
-              calldatas: calldatas as `0x${string}`[],
-              descriptionHash: descriptionHash as `0x${string}`,
-              voteStart,
-              voteEnd,
-              state: stateMap[Number(state)] || 'Unknown',
-              stateLabel: stateLabels[Number(state)] || 'Unknown',
-              blockNumber: blockNumber || voteStart,
-              proposalEta,
-              votes: proposalVotes ? {
-                againstVotes: proposalVotes[0]?.toString() || '0',
-                forVotes: proposalVotes[1]?.toString() || '0',
-                abstainVotes: proposalVotes[2]?.toString() || '0',
-              } : undefined,
-              quorum: quorum?.toString() || undefined,
-              voteAnalysis,
-            };
-          } catch (err) {
-            console.error('Error processing proposal:', err);
-            return null;
-          }
+          return buildProposalFromDetails(result.result);
         });
 
         const proposals = (await Promise.all(proposalPromises)).filter((p): p is NonNullable<typeof p> => p !== null);
@@ -566,104 +767,61 @@ export function GovernancePage() {
   const CHUNK_SIZE = 800n;
   const FIRST_PROPOSAL_BLOCK = 9983760n;
 
-  // Get current block number for auto-search
+  const fetchNewProposals = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (!publicClient || toIndex <= fromIndex || isFetchingNewProposalsRef.current) return;
+    isFetchingNewProposalsRef.current = true;
+    try {
+      const indices = Array.from({ length: toIndex - fromIndex }, (_, i) => fromIndex + i);
+      const details = await Promise.all(
+        indices.map((index) =>
+          publicClient
+            .readContract({
+              address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+              abi: DAOGovernor,
+              functionName: 'proposalDetailsAt',
+              args: [BigInt(index)],
+            })
+            .catch(() => null)
+        )
+      );
+      const proposalPromises = details.map((detail) => (detail ? buildProposalFromDetails(detail) : null));
+      const newProposals = (await Promise.all(proposalPromises)).filter(
+        (p): p is NonNullable<typeof p> => p !== null
+      );
+
+      if (newProposals.length > 0) {
+        queryClient.setQueryData(proposalsQueryKey, (prev: any[] | undefined) => {
+          const prevList = Array.isArray(prev) ? prev : [];
+          return mergeProposals(prevList, newProposals);
+        });
+      }
+    } finally {
+      isFetchingNewProposalsRef.current = false;
+    }
+  }, [publicClient, buildProposalFromDetails, proposalsQueryKey, queryClient]);
+
+  // Incrementally fetch new proposals when proposalCount increases
   useEffect(() => {
     if (!publicClient) return;
-    
-    const fetchBlockNumber = async () => {
-      try {
-        const block = await publicClient.getBlock({ blockTag: 'latest' });
-        setCurrentBlockNumber(block.number);
-      } catch (error) {
-        console.error('Error fetching current block number:', error);
-      }
-    };
-    
-    fetchBlockNumber();
-    // Refresh block number more frequently (every 12 seconds, roughly every block on Sepolia)
-    const interval = setInterval(fetchBlockNumber, 12000);
-    return () => clearInterval(interval);
-  }, [publicClient]);
 
-  // Refetch proposals data when proposalCount changes
-  useEffect(() => {
-    if (proposalCountNum > 0 && proposalContracts.length > 0) {
-      refetchProposalsData();
+    if (lastProposalCountRef.current === null) {
+      lastProposalCountRef.current = proposalCountNum;
+      return;
     }
-  }, [proposalCountNum, refetchProposalsData, proposalContracts.length]);
 
-  // Refetch proposals when current block number changes and proposals might have expired
-  useEffect(() => {
-    if (!currentBlockNumber || !latestProposals || latestProposals.length === 0) return;
-
-    // Check if any proposal's deadline has passed - refetch all proposals when any deadline passes
-    const hasDeadlinePassed = latestProposals.some((p: any) => {
-      if (!p.voteEnd) return false;
-      const deadlinePassed = currentBlockNumber > BigInt(p.voteEnd);
-      return deadlinePassed;
-    });
-
-    if (hasDeadlinePassed) {
-      // Refetch immediately when a proposal deadline passes
-      console.log('Proposal deadline passed, refetching state...');
-      // First refetch the underlying proposals data to get updated states
-      refetchProposalsData().then(() => {
-        // Then refetch the processed proposals after a short delay
-        setTimeout(() => {
-          refetchLatestProposals();
-        }, 1000);
-      });
+    if (proposalCountNum <= lastProposalCountRef.current) {
+      lastProposalCountRef.current = proposalCountNum;
+      return;
     }
-  }, [currentBlockNumber, latestProposals, refetchLatestProposals, refetchProposalsData]);
-  
-  // Also set up a periodic check for proposals that are about to end or have ended
-  useEffect(() => {
-    if (!publicClient || !latestProposals || latestProposals.length === 0) return;
-    
-    // Check every 12 seconds (roughly every block) if any proposal's voting period has ended
-    const checkInterval = setInterval(async () => {
-      try {
-        const block = await publicClient.getBlock({ blockTag: 'latest' });
-        const currentBlock = block.number;
-        
-        // Check if any proposal's voteEnd has passed
-        const hasEnded = latestProposals.some((p: any) => {
-          if (!p.voteEnd) return false;
-          return currentBlock > BigInt(p.voteEnd);
-        });
-        
-        if (hasEnded) {
-          console.log('Detected proposal voting period ended, refetching...');
-          refetchProposalsData().then(() => {
-            setTimeout(() => {
-              refetchLatestProposals();
-            }, 1000);
-          });
-        }
-      } catch (error) {
-        console.error('Error checking proposal deadlines:', error);
-      }
-    }, 12000); // Check every 12 seconds
-    
-    return () => clearInterval(checkInterval);
-  }, [publicClient, latestProposals, refetchLatestProposals, refetchProposalsData]);
+
+    const previousCount = lastProposalCountRef.current;
+    lastProposalCountRef.current = proposalCountNum;
+    fetchNewProposals(previousCount, proposalCountNum);
+  }, [proposalCountNum, publicClient, fetchNewProposals]);
 
   // Update proposals directly from the new on-chain query (no backward search needed)
-  // Use a ref to track previous proposals to avoid infinite loops
-  const prevProposalsRef = useRef<any[]>([]);
-  
   useEffect(() => {
-    // Only update if proposals actually changed (compare by length and IDs)
-    const proposalsChanged = 
-      latestProposals.length !== prevProposalsRef.current.length ||
-      latestProposals.some((p: any, i: number) => 
-        !prevProposalsRef.current[i] || p.id !== prevProposalsRef.current[i].id
-      );
-    
-    if (proposalsChanged) {
-      setAllProposals(latestProposals);
-      prevProposalsRef.current = latestProposals;
-    }
+    setAllProposals((prev) => mergeProposals(prev, latestProposals));
   }, [latestProposals, setAllProposals]);
 
   // Removed: loadOlderProposals function - no longer needed since we fetch all proposals directly via proposalDetailsAt()
@@ -770,9 +928,13 @@ export function GovernancePage() {
     }
   };
 
+  // Track if proposal was just submitted to keep button disabled
+  const [justSubmitted, setJustSubmitted] = useState(false);
+  
   // Reset form and show success message, then refresh proposals
   useEffect(() => {
     if (isConfirmed) {
+      setJustSubmitted(true); // Keep button disabled
       setSuccess('Proposal submitted successfully! Refreshing proposals...');
       setDescription('');
       setTargets('');
@@ -780,7 +942,7 @@ export function GovernancePage() {
       setWithOnChainExecution(false);
       
       // Refetch proposals after a short delay to allow block to be mined
-      // Need to refetch proposalCount first, then proposalsData, then latestProposals
+      // Refetch proposalCount first so we can incrementally load new proposals
       setTimeout(() => {
         // Invalidate all proposal-related queries to force fresh fetch
         queryClient.invalidateQueries({ queryKey: ['proposals'] });
@@ -788,15 +950,14 @@ export function GovernancePage() {
         
         // First refetch proposalCount to get the updated count
         refetchProposalCount().then(() => {
-          // Then refetch the underlying proposals data (which depends on proposalCount)
+          // Then refetch the processed proposals (states/votes) without rebuilding the full list
           setTimeout(() => {
-            refetchProposalsData();
-            
-            // Then refetch the processed proposals
+            refetchLatestProposals();
+            // Reset justSubmitted after proposals are refreshed and form is closed
             setTimeout(() => {
-              refetchLatestProposals();
+              setJustSubmitted(false);
             }, 1000);
-          }, 500);
+          }, 1000);
         });
         
         setTimeout(() => {
@@ -805,7 +966,7 @@ export function GovernancePage() {
         }, 4000);
       }, 2000);
     }
-  }, [isConfirmed, refetchLatestProposals, refetchProposalsData, refetchProposalCount, queryClient]);
+  }, [isConfirmed, refetchLatestProposals, refetchProposalCount, queryClient]);
 
   // Handle queue errors
   useEffect(() => {
@@ -923,30 +1084,20 @@ export function GovernancePage() {
       
       // Immediately refetch proposals to update state
       refetchLatestProposals();
-      if (refetchProposalsData) {
-        refetchProposalsData();
-      }
-      
       // Refetch multiple times with delays to ensure state has updated on-chain
       setTimeout(() => {
         refetchLatestProposals();
-        if (refetchProposalsData) {
-          refetchProposalsData();
-        }
       }, 2000);
       setTimeout(() => {
         refetchLatestProposals();
-        if (refetchProposalsData) {
-          refetchProposalsData();
-        }
         // Also invalidate queries to force refresh
-        queryClient.invalidateQueries({ queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
+        queryClient.invalidateQueries({ queryKey: proposalsQueryKey });
         setTimeout(() => {
           setSuccess(null);
         }, 3000);
       }, 5000);
     }
-  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchLatestProposals, refetchProposalsData, queryClient]);
+  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchLatestProposals, queryClient, proposalsQueryKey]);
 
   // Clean up tracking when proposal state updates to Queued - use actual ETA from contract
   useEffect(() => {
@@ -982,7 +1133,7 @@ export function GovernancePage() {
       setVotingProposalId(null);
       
       // Invalidate cache immediately
-      queryClient.invalidateQueries({ queryKey: ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] });
+      queryClient.invalidateQueries({ queryKey: proposalsQueryKey });
       
       // Refetch immediately
       console.log('Refetching proposals immediately after vote confirmation...');
@@ -1061,7 +1212,7 @@ export function GovernancePage() {
     }
   };
 
-  const handleQueue = async (proposal: any) => {
+  const handleQueue = useCallback(async (proposal: any) => {
     if (!address || !isConnected) {
       setError('Please connect your wallet to queue the proposal');
       return;
@@ -1129,9 +1280,9 @@ export function GovernancePage() {
       setError(err.message || 'Failed to queue proposal. Please try again.');
       setQueueingProposalId(null);
     }
-  };
+  }, [address, isConnected, writeQueue, setError, setSuccess, setQueueingProposalId]);
 
-  const handleExecute = async (proposal: any) => {
+  const handleExecute = useCallback(async (proposal: any) => {
     if (!address || !isConnected) {
       setError('Please connect your wallet to execute the proposal');
       return;
@@ -1240,10 +1391,16 @@ export function GovernancePage() {
       setError(formatViemError(err));
       setExecutingProposalId(null);
     }
-  };
+  }, [address, isConnected, writeExecute, publicClient, setError, setSuccess, setExecutingProposalId]);
 
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
+      <ProposalStateRefresher
+        latestProposals={latestProposals}
+        proposalsQueryKey={proposalsQueryKey}
+        queryClient={queryClient}
+        refetchLatestProposals={refetchLatestProposals}
+      />
       {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}
 
@@ -1507,17 +1664,7 @@ export function GovernancePage() {
             {showCreateForm ? 'Cancel' : 'Create Proposal'}
           </button>
         )}
-        {currentBlockNumber !== null && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-            <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            <div className="text-right">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Current Block</div>
-              <div className="text-base font-mono font-semibold text-gray-900 dark:text-white">
-                {currentBlockNumber.toLocaleString()}
-              </div>
-            </div>
-          </div>
-        )}
+        <CurrentBlockBanner />
       </div>
 
       {/* Create Proposal Form */}
@@ -1681,10 +1828,10 @@ export function GovernancePage() {
             )}
             <button
               type="submit"
-              disabled={isPending || isConfirming || isMember === false || (isMember === undefined && isLoadingMembership)}
+              disabled={isPending || isConfirming || justSubmitted || isMember === false || (isMember === undefined && isLoadingMembership)}
               className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending || isConfirming ? 'Submitting...' : isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Submit Proposal'}
+              {isPending || isConfirming || justSubmitted ? 'Submitting...' : isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Submit Proposal'}
             </button>
             {hash && (
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
@@ -1716,177 +1863,38 @@ export function GovernancePage() {
                 <p className="text-sm">{searchProgress}</p>
               </div>
             )}
-            {proposals.map((proposal, index) => {
+            {proposals.map((proposal) => {
               const isExpanded = expandedProposal === proposal.id;
-              const isVoting = votingProposalId === proposal.id;
               const canVote = proposal.state === 'Active' && isConnected;
               const isQueued = proposal.state === 'Queued' || queuedProposalIds.has(proposal.id);
               const isLocallyExecuted = executedProposalIds.has(proposal.id);
+              const queuedProposalETA = queuedProposalETAs.get(proposal.id);
+              const isQueueingForProposal = queueingProposalId === proposal.id;
+              const isExecutingForProposal = executingProposalId === proposal.id;
+              const queueHashForProposal = queueHash && isQueueingForProposal ? queueHash : undefined;
+              const executeHashForProposal = executeHash && isExecutingForProposal ? executeHash : undefined;
 
               return (
-                <div
+                <ProposalCard
                   key={proposal.id}
-                  className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
-                  onClick={() => setExpandedProposal(isExpanded ? null : proposal.id)}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Proposal from block {proposal.blockNumber.toLocaleString()}</h3>
-                        <CopyableProposalId proposalId={proposal.id} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            proposal.state === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
-                            proposal.state === 'Succeeded' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' :
-                            proposal.state === 'Defeated' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300' :
-                            proposal.state === 'Executed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' :
-                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                          }`}>
-                            {proposal.state}
-                          </span>
-                          <div className="relative group">
-                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                            <div className="absolute left-0 bottom-full mb-2 w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                              <p className="mb-2 font-semibold">Proposal State: {proposal.state}</p>
-                              <p className="text-gray-300 mb-3">
-                                {proposal.state === 'Pending' && 'Voting has not started yet. Waiting for the voting delay period to pass.'}
-                                {proposal.state === 'Active' && 'Voting is currently open. Members can cast their votes now.'}
-                                {proposal.state === 'Succeeded' && 'The proposal passed! Quorum was reached and "For" votes exceeded "Against" votes. It can now be queued for execution.'}
-                                {proposal.state === 'Defeated' && 'The proposal failed. Either quorum was not reached or "Against" votes exceeded "For" votes.'}
-                                {proposal.state === 'Executed' && 'The proposal has been executed. All actions specified in the proposal have been carried out.'}
-                                {proposal.state === 'Canceled' && 'The proposal was canceled before voting ended.'}
-                                {proposal.state === 'Queued' && 'The proposal is queued for execution after the timelock delay period.'}
-                                {proposal.state === 'Expired' && 'The proposal expired before it could be executed.'}
-                              </p>
-                              <div className="border-t border-gray-700 pt-2 mt-2">
-                                <p className="text-gray-400 mb-1 font-semibold">State Codes:</p>
-                                <div className="text-gray-300 space-y-0.5 font-mono text-xs">
-                                  <div>0 = Pending {proposal.state === 'Pending' && '← this is what you\'re seeing'}</div>
-                                  <div>1 = Active {proposal.state === 'Active' && '← this is what you\'re seeing'}</div>
-                                  <div>2 = Canceled {proposal.state === 'Canceled' && '← this is what you\'re seeing'}</div>
-                                  <div>3 = Defeated {proposal.state === 'Defeated' && '← this is what you\'re seeing'}</div>
-                                  <div>4 = Succeeded {proposal.state === 'Succeeded' && '← this is what you\'re seeing'}</div>
-                                  <div>5 = Queued {proposal.state === 'Queued' && '← this is what you\'re seeing'}</div>
-                                  <div>6 = Expired {proposal.state === 'Expired' && '← this is what you\'re seeing'}</div>
-                                  <div>7 = Executed {proposal.state === 'Executed' && '← this is what you\'re seeing'}</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">{proposal.description}</p>
-                      <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-                        <span>Proposer: <a href={`https://eth-sepolia.blockscout.com/address/${proposal.proposer}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-mono" onClick={(e) => e.stopPropagation()}>{formatAddress(proposal.proposer)}</a></span>
-                        <span>Vote Start: Block {proposal.voteStart.toLocaleString()}</span>
-                        <span>Vote End: Block {proposal.voteEnd.toLocaleString()}</span>
-                        {currentBlockNumber !== null && (
-                          <span>Current Block: <span className="font-mono font-semibold">{currentBlockNumber.toLocaleString()}</span></span>
-                        )}
-                        <a
-                          href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.GOVERNOR_PROXY}/logs?topic0=0xc4baf157fa0e6e50f69f54e4abeb1902a7c192153b11f6442c3ea6b2e6211b6a&topic1=${pad(toHex(BigInt(proposal.id)), { size: 32 }).slice(2)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          View on Blockscout
-                        </a>
-                        {proposal.state === 'Active' && (
-                          <span className="text-green-600 dark:text-green-400">
-                            Voting period active
-                          </span>
-                        )}
-                        {proposal.state === 'Defeated' && proposal.voteAnalysis && (
-                          <span className="text-red-600 dark:text-red-400">
-                            {proposal.voteAnalysis.reason}
-                          </span>
-                        )}
-                        {proposal.state === 'Succeeded' && proposal.voteAnalysis && (
-                          <span className="text-blue-600 dark:text-blue-400">
-                            {proposal.voteAnalysis.reason}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <VoteCountsWithDirectRead proposalId={proposal.id} initialVotes={proposal.votes} canVote={canVote} />
-
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-                    <ProposalTimeline 
-                      proposal={proposal}
-                      currentBlockNumber={currentBlockNumber}
-                      timelockDelaySeconds={timelockDelaySeconds}
-                      queuedProposalETA={queuedProposalETAs.get(proposal.id)}
-                      onQueue={handleQueue}
-                      isQueueing={isQueueing || isQueueConfirming}
-                      isConnected={isConnected}
-                      queueHash={queueHash}
-                      queueingProposalId={queueingProposalId}
-                      onExecute={handleExecute}
-                      isExecuting={isExecuting || isExecuteConfirming}
-                      executeHash={executeHash}
-                      executingProposalId={executingProposalId}
-                      queuedProposalIds={queuedProposalIds}
-                    />
-                  </div>
-
-                  {proposal.state === 'Succeeded' && !isQueued && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-                      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 mt-0.5">
-                            <span className="text-2xl">✅</span>
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
-                              Proposal Passed!
-                            </h4>
-                            <p className="text-xs text-blue-800 dark:text-blue-300">
-                              This proposal received enough votes to pass. Use the "Schedule" button in the timeline above to queue it for execution after a safety delay period.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {isQueued && proposal.state !== 'Queued' && !isLocallyExecuted && queuedProposalETAs.has(proposal.id) && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-                      <QueuedProposalStatus 
-                        proposal={{
-                          ...proposal,
-                          state: 'Queued',
-                          proposalEta: queuedProposalETAs.get(proposal.id)!
-                        }} 
-                        onExecute={handleExecute} 
-                        isExecuting={isExecuting || isExecuteConfirming} 
-                        isConnected={isConnected} 
-                        executeHash={executeHash} 
-                      />
-                    </div>
-                  )}
-
-                  {proposal.state === 'Queued' && typeof proposal.state !== 'number' && !isLocallyExecuted && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-                      <QueuedProposalStatus proposal={proposal} onExecute={handleExecute} isExecuting={isExecuting || isExecuteConfirming} isConnected={isConnected} executeHash={executeHash} />
-                    </div>
-                  )}
-
-                  {isExpanded && !canVote && proposal.state === 'Active' && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-                      Connect your wallet to vote on this proposal. Need help? <Link href="/getting-started" className="underline text-blue-600 dark:text-blue-400">See getting started guide</Link>.
-                    </div>
-                  )}
-
-                  {isExpanded && proposal.state !== 'Active' && proposal.state !== 'Succeeded' && proposal.state !== 'Queued' && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-                      This proposal is in "{proposal.state}" state.
-                    </div>
-                  )}
-
-                </div>
+                  proposal={proposal}
+                  isExpanded={isExpanded}
+                  canVote={canVote}
+                  isQueued={isQueued}
+                  isLocallyExecuted={isLocallyExecuted}
+                  queuedProposalETA={queuedProposalETA}
+                  timelockDelaySeconds={timelockDelaySeconds}
+                  isConnected={isConnected}
+                  onQueue={handleQueue}
+                  onExecute={handleExecute}
+                  isQueueing={isQueueing || isQueueConfirming}
+                  isQueueingForProposal={isQueueingForProposal}
+                  queueHash={queueHashForProposal}
+                  isExecuting={isExecuting || isExecuteConfirming}
+                  isExecutingForProposal={isExecutingForProposal}
+                  executeHash={executeHashForProposal}
+                  setExpandedProposal={setExpandedProposal}
+                />
               );
             })}
           </div>
@@ -1895,6 +1903,431 @@ export function GovernancePage() {
     </div>
   );
 }
+
+function ProposalStateRefresher({
+  latestProposals,
+  proposalsQueryKey,
+  queryClient,
+  refetchLatestProposals,
+}: {
+  latestProposals: any[] | undefined;
+  proposalsQueryKey: readonly [string, Address];
+  queryClient: ReturnType<typeof useQueryClient>;
+  refetchLatestProposals: () => Promise<any>;
+}) {
+  const currentBlockNumber = useCurrentBlockNumber();
+  const proposalBlockCountersRef = useRef<Map<string, {
+    voteStartBlocksAgo: number | null;
+    voteEndBlocksAgo: number | null;
+    voteEndBlocksRemaining: number | null;
+  }>>(new Map());
+
+  useEffect(() => {
+    const proposalsFromCache = queryClient.getQueryData(proposalsQueryKey) as any[] | undefined;
+    const proposalsToCheck = proposalsFromCache ?? latestProposals;
+
+    console.log('🔍 Counter-based check running:', {
+      currentBlock: currentBlockNumber?.toString(),
+      proposalsCount: proposalsToCheck?.length || 0,
+      source: proposalsFromCache ? 'cache' : 'state',
+    });
+
+    if (!currentBlockNumber || !proposalsToCheck || proposalsToCheck.length === 0) {
+      console.log('⚠️ Counter check skipped: missing data');
+      return;
+    }
+
+    const proposalsNeedingRefresh: string[] = [];
+
+    proposalsToCheck.forEach((p: any) => {
+      // Skip proposals that are already in final states
+      const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired';
+      
+      // Log proposal details for debugging
+      if (p.voteEnd && currentBlockNumber >= BigInt(p.voteEnd)) {
+        console.log(`🔍 Checking proposal ${p.id}: state=${p.state}, voteEnd=${p.voteEnd}, currentBlock=${currentBlockNumber}, isFinalState=${isFinalState}`);
+      }
+      
+      if (isFinalState) {
+        // Remove from tracking if final
+        proposalBlockCountersRef.current.delete(p.id);
+        return;
+      }
+
+      // Calculate current block counters
+      let voteStartBlocksAgo: number | null = null;
+      let voteEndBlocksAgo: number | null = null;
+      let voteEndBlocksRemaining: number | null = null;
+
+      if (p.voteStart && currentBlockNumber >= BigInt(p.voteStart)) {
+        voteStartBlocksAgo = Number(currentBlockNumber - BigInt(p.voteStart));
+      }
+
+      if (p.voteEnd) {
+        const voteEndBigInt = BigInt(p.voteEnd);
+        if (currentBlockNumber >= voteEndBigInt) {
+          // voteEnd has been reached or passed
+          voteEndBlocksAgo = Number(currentBlockNumber - voteEndBigInt);
+        } else {
+          voteEndBlocksRemaining = Number(voteEndBigInt - currentBlockNumber);
+        }
+      }
+
+      // Get previous counters
+      const previousCounters = proposalBlockCountersRef.current.get(p.id);
+
+      // ALWAYS check if state matches what it should be based on current block numbers
+      // Don't wait for counters to change - check every time
+      let stateIsStale = false;
+
+      // If voteStart has passed, state should be Active or later (not Pending)
+      if (p.voteStart && currentBlockNumber >= BigInt(p.voteStart)) {
+        if (p.state === 'Pending') {
+          console.log(`🚨 STATE STALE: Proposal ${p.id} shows voteStart passed (currentBlock ${currentBlockNumber} >= voteStart ${p.voteStart}) but state is still Pending`);
+          stateIsStale = true;
+        }
+      }
+
+      // If voteEnd has been reached or passed, state MUST be final
+      if (p.voteEnd && currentBlockNumber >= BigInt(p.voteEnd)) {
+        if (!isFinalState) {
+          console.log(`🚨 STATE STALE: Proposal ${p.id} shows voteEnd passed (currentBlock ${currentBlockNumber} >= voteEnd ${p.voteEnd}, ${voteEndBlocksAgo} blocks ago) but state is not final (${p.state})`);
+          stateIsStale = true;
+        }
+      }
+
+      // Check if counters changed (for logging)
+      const countersChanged = !previousCounters || 
+        previousCounters.voteStartBlocksAgo !== voteStartBlocksAgo ||
+        previousCounters.voteEndBlocksAgo !== voteEndBlocksAgo ||
+        previousCounters.voteEndBlocksRemaining !== voteEndBlocksRemaining;
+
+      if (countersChanged) {
+        console.log(`🔄 Counter changed for proposal ${p.id}:`, {
+          previous: previousCounters,
+          current: { voteStartBlocksAgo, voteEndBlocksAgo, voteEndBlocksRemaining },
+          state: p.state
+        });
+      }
+
+      // Update counters
+      proposalBlockCountersRef.current.set(p.id, {
+        voteStartBlocksAgo,
+        voteEndBlocksAgo,
+        voteEndBlocksRemaining
+      });
+
+      // If state is stale (regardless of whether counters changed), mark for refresh
+      if (stateIsStale) {
+        proposalsNeedingRefresh.push(p.id);
+      }
+    });
+
+    if (proposalsNeedingRefresh.length > 0) {
+      console.log(`🚨 FORCING REFRESH: Found ${proposalsNeedingRefresh.length} proposal(s) with stale state`);
+      proposalsNeedingRefresh.forEach((id) => {
+        const p = proposalsToCheck.find((p: any) => p.id === id);
+        console.log(`  - Proposal ${id}: state=${p?.state}, voteStart=${p?.voteStart}, voteEnd=${p?.voteEnd}`);
+      });
+      
+      // CRITICAL: Clear all caches and force complete refetch
+      queryClient.removeQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposalCount'] });
+      
+      // Use exact queryKey match
+      const exactQueryKey = proposalsQueryKey;
+      console.log('🔄 Refetching with queryKey:', exactQueryKey);
+      
+      queryClient.refetchQueries({ 
+        queryKey: exactQueryKey,
+        type: 'active'
+      }).then(() => {
+        console.log('✅ queryClient.refetchQueries completed, now calling refetchLatestProposals');
+        return refetchLatestProposals();
+      }).then((result) => {
+        console.log('✅ Refreshed after counter check, new data:', result.data?.length, 'proposals');
+        if (result.data) {
+          proposalsNeedingRefresh.forEach((proposalId) => {
+            const refreshed = result.data.find((rp: any) => rp.id === proposalId);
+            const oldProposal = proposalsToCheck.find((p: any) => p.id === proposalId);
+            if (refreshed) {
+              console.log(`✅ Proposal ${proposalId} refreshed: ${oldProposal?.state} -> ${refreshed.state}`);
+            } else {
+              console.warn(`⚠️ Proposal ${proposalId} not found in refreshed data`);
+            }
+          });
+        } else {
+          console.warn('⚠️ Refetch returned no data');
+        }
+      }).catch((err) => {
+        console.error('❌ Error during counter-based refresh:', err);
+      });
+    } else {
+      console.log('ℹ️ No proposals need refresh - all states are correct');
+    }
+  }, [currentBlockNumber, latestProposals, proposalsQueryKey, queryClient, refetchLatestProposals]);
+
+  return null;
+}
+
+const CurrentBlockBanner = memo(function CurrentBlockBanner() {
+  const currentBlockNumber = useCurrentBlockNumber();
+
+  if (currentBlockNumber === null) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+      <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+      <div className="text-right">
+        <div className="text-xs text-gray-500 dark:text-gray-400">Current Block</div>
+        <div className="text-base font-mono font-semibold text-gray-900 dark:text-white">
+          {currentBlockNumber.toLocaleString()}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const CurrentBlockInline = memo(function CurrentBlockInline() {
+  const currentBlockNumber = useCurrentBlockNumber();
+
+  if (currentBlockNumber === null) return null;
+
+  return (
+    <span>
+      Current Block: <span className="font-mono font-semibold">{currentBlockNumber.toLocaleString()}</span>
+    </span>
+  );
+});
+
+const PendingStateNotice = memo(function PendingStateNotice({ proposal }: { proposal: any }) {
+  const currentBlockNumber = useCurrentBlockNumber();
+
+  if (proposal.state !== 'Pending' || currentBlockNumber === null) return null;
+
+  return (
+    <div className="mb-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+        ⏳ Waiting for voting to start
+      </p>
+      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+        Voting will begin at block {proposal.voteStart.toLocaleString()}. 
+        {currentBlockNumber < BigInt(proposal.voteStart) && (
+          <> Please be patient - the proposal will automatically become active when the activation block is reached.</>
+        )}
+      </p>
+    </div>
+  );
+});
+
+const ProposalCard = memo(function ProposalCard({
+  proposal,
+  isExpanded,
+  canVote,
+  isQueued,
+  isLocallyExecuted,
+  queuedProposalETA,
+  timelockDelaySeconds,
+  isConnected,
+  onQueue,
+  onExecute,
+  isQueueing,
+  isQueueingForProposal,
+  queueHash,
+  isExecuting,
+  isExecutingForProposal,
+  executeHash,
+  setExpandedProposal,
+}: {
+  proposal: any;
+  isExpanded: boolean;
+  canVote: boolean;
+  isQueued: boolean;
+  isLocallyExecuted: boolean;
+  queuedProposalETA?: number;
+  timelockDelaySeconds: bigint | null | undefined;
+  isConnected: boolean;
+  onQueue: (proposal: any) => void;
+  onExecute: (proposal: any) => void;
+  isQueueing: boolean;
+  isQueueingForProposal: boolean;
+  queueHash?: `0x${string}`;
+  isExecuting: boolean;
+  isExecutingForProposal: boolean;
+  executeHash?: `0x${string}`;
+  setExpandedProposal: (value: string | null) => void;
+}) {
+  const handleToggle = useCallback(() => {
+    setExpandedProposal(isExpanded ? null : proposal.id);
+  }, [setExpandedProposal, isExpanded, proposal.id]);
+
+  return (
+    <div
+      className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
+      onClick={handleToggle}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Proposal from block {proposal.blockNumber.toLocaleString()}</h3>
+            <CopyableProposalId proposalId={proposal.id} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                proposal.state === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
+                proposal.state === 'Succeeded' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' :
+                proposal.state === 'Defeated' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300' :
+                proposal.state === 'Executed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' :
+                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+              }`}>
+                {proposal.state}
+              </span>
+              {/* Show quorum message beside Defeated status */}
+              {proposal.state === 'Defeated' && proposal.voteAnalysis && (
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                  {proposal.voteAnalysis.reason}
+                </span>
+              )}
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Proposal State: {proposal.state}</p>
+                  <p className="text-gray-300 mb-3">
+                    {proposal.state === 'Pending' && 'Voting has not started yet. Waiting for the voting delay period to pass.'}
+                    {proposal.state === 'Active' && 'Voting is currently open. Members can cast their votes now.'}
+                    {proposal.state === 'Succeeded' && 'The proposal passed! Quorum was reached and "For" votes exceeded "Against" votes. It can now be queued for execution.'}
+                    {proposal.state === 'Defeated' && 'The proposal failed. Either quorum was not reached or "Against" votes exceeded "For" votes.'}
+                    {proposal.state === 'Executed' && 'The proposal has been executed. All actions specified in the proposal have been carried out.'}
+                    {proposal.state === 'Canceled' && 'The proposal was canceled before voting ended.'}
+                    {proposal.state === 'Queued' && 'The proposal is queued for execution after the timelock delay period.'}
+                    {proposal.state === 'Expired' && 'The proposal expired before it could be executed.'}
+                  </p>
+                  <div className="border-t border-gray-700 pt-2 mt-2">
+                    <p className="text-gray-400 mb-1 font-semibold">State Codes:</p>
+                    <div className="text-gray-300 space-y-0.5 font-mono text-xs">
+                      <div>0 = Pending {proposal.state === 'Pending' && "← this is what you're seeing"}</div>
+                      <div>1 = Active {proposal.state === 'Active' && "← this is what you're seeing"}</div>
+                      <div>2 = Canceled {proposal.state === 'Canceled' && "← this is what you're seeing"}</div>
+                      <div>3 = Defeated {proposal.state === 'Defeated' && "← this is what you're seeing"}</div>
+                      <div>4 = Succeeded {proposal.state === 'Succeeded' && "← this is what you're seeing"}</div>
+                      <div>5 = Queued {proposal.state === 'Queued' && "← this is what you're seeing"}</div>
+                      <div>6 = Expired {proposal.state === 'Expired' && "← this is what you're seeing"}</div>
+                      <div>7 = Executed {proposal.state === 'Executed' && "← this is what you're seeing"}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {isExpanded && <PendingStateNotice proposal={proposal} />}
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">{proposal.description}</p>
+          <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <span>Proposer: <a href={`https://eth-sepolia.blockscout.com/address/${proposal.proposer}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-mono" onClick={(e) => e.stopPropagation()}>{formatAddress(proposal.proposer)}</a></span>
+            <span>Vote Start: Block {proposal.voteStart.toLocaleString()}</span>
+            <span>Vote End: Block {proposal.voteEnd.toLocaleString()}</span>
+            {isExpanded && <CurrentBlockInline />}
+            <a
+              href={`https://eth-sepolia.blockscout.com/address/${CONTRACTS.SEPOLIA.GOVERNOR_PROXY}/logs?topic0=0xc4baf157fa0e6e50f69f54e4abeb1902a7c192153b11f6442c3ea6b2e6211b6a&topic1=${pad(toHex(BigInt(proposal.id)), { size: 32 }).slice(2)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              View on Blockscout
+            </a>
+            {proposal.state === 'Active' && (
+              <span className="text-green-600 dark:text-green-400">
+                Voting period active
+              </span>
+            )}
+            {proposal.state === 'Succeeded' && proposal.voteAnalysis && (
+              <span className="text-blue-600 dark:text-blue-400">
+                {proposal.voteAnalysis.reason}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <VoteCountsWithDirectRead proposalId={proposal.id} initialVotes={proposal.votes} canVote={canVote} />
+
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+          <ProposalTimeline 
+            proposal={proposal}
+            timelockDelaySeconds={timelockDelaySeconds}
+            queuedProposalETA={queuedProposalETA}
+            onQueue={onQueue}
+            isQueueing={isQueueing}
+            isQueueingForProposal={isQueueingForProposal}
+            isConnected={isConnected}
+            queueHash={queueHash}
+            onExecute={onExecute}
+            isExecuting={isExecuting}
+            isExecutingForProposal={isExecutingForProposal}
+            executeHash={executeHash}
+            isQueued={isQueued}
+          />
+        </div>
+      )}
+
+      {proposal.state === 'Succeeded' && !isQueued && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <span className="text-2xl">✅</span>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                  Proposal Passed!
+                </h4>
+                <p className="text-xs text-blue-800 dark:text-blue-300">
+                  This proposal received enough votes to pass. Use the "Schedule" button in the timeline above to queue it for execution after a safety delay period.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isQueued && proposal.state !== 'Queued' && !isLocallyExecuted && queuedProposalETA !== undefined && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+          <QueuedProposalStatus 
+            proposal={{
+              ...proposal,
+              state: 'Queued',
+              proposalEta: queuedProposalETA
+            }} 
+            onExecute={onExecute} 
+            isExecuting={isExecuting} 
+            isConnected={isConnected} 
+            executeHash={executeHash} 
+          />
+        </div>
+      )}
+
+      {proposal.state === 'Queued' && typeof proposal.state !== 'number' && !isLocallyExecuted && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+          <QueuedProposalStatus proposal={proposal} onExecute={onExecute} isExecuting={isExecuting} isConnected={isConnected} executeHash={executeHash} />
+        </div>
+      )}
+
+      {isExpanded && !canVote && proposal.state === 'Active' && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
+          Connect your wallet to vote on this proposal. Need help? <Link href="/getting-started" className="underline text-blue-600 dark:text-blue-400">See getting started guide</Link>.
+        </div>
+      )}
+
+      {isExpanded && proposal.state !== 'Active' && proposal.state !== 'Succeeded' && proposal.state !== 'Queued' && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
+          This proposal is in "{proposal.state}" state.
+        </div>
+      )}
+
+    </div>
+  );
+});
 
 // Component to display vote counts with direct contract read for real-time updates
 function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { proposalId: string; initialVotes?: { forVotes: string; againstVotes: string; abstainVotes: string }; canVote: boolean }) {
@@ -2059,7 +2492,7 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     }
   }, [proposalId]);
 
-  const handleVote = async (support: number) => {
+  const handleVote = useCallback(async (support: number) => {
     if (!address) return;
     
     setLocalVotingProposalId(proposalId);
@@ -2084,7 +2517,7 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
         localStorage.removeItem(`vote_${proposalId}`);
       }
     }
-  };
+  }, [address, proposalId, writeVote]);
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
@@ -2109,6 +2542,12 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
               <span className="font-semibold text-gray-700 dark:text-gray-300">to abstain</span>
             )}{' '}
             of this proposal
+          </div>
+        </div>
+      ) : address ? (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            You have not voted on this proposal.
           </div>
         </div>
       ) : null}
@@ -2297,45 +2736,44 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
 // Component to display proposal timeline
 function ProposalTimeline({ 
   proposal, 
-  currentBlockNumber, 
   timelockDelaySeconds,
   queuedProposalETA,
   onQueue,
   isQueueing,
+  isQueueingForProposal,
   isConnected,
   queueHash,
-  queueingProposalId,
   onExecute,
   isExecuting,
+  isExecutingForProposal,
   executeHash,
-  executingProposalId,
-  queuedProposalIds
+  isQueued
 }: { 
   proposal: any; 
-  currentBlockNumber: bigint | null;
   timelockDelaySeconds: bigint | null | undefined;
   queuedProposalETA?: number;
   onQueue?: (proposal: any) => void;
   isQueueing?: boolean;
+  isQueueingForProposal?: boolean;
   isConnected?: boolean;
   queueHash?: `0x${string}`;
-  queueingProposalId?: string | null;
   onExecute?: (proposal: any) => void;
   isExecuting?: boolean;
+  isExecutingForProposal?: boolean;
   executeHash?: `0x${string}`;
-  executingProposalId?: string | null;
-  queuedProposalIds?: Set<string>;
+  isQueued?: boolean;
 }) {
+  const currentBlockNumber = useCurrentBlockNumber();
   // Countdown state for queued proposals
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
   
   // Update countdown when proposal is queued
   useEffect(() => {
-    const isQueued = proposal.state === 'Queued' || queuedProposalIds?.has(proposal.id);
+    const queued = proposal.state === 'Queued' || Boolean(isQueued);
     const eta = queuedProposalETA || proposal.proposalEta;
     
-    if (!isQueued || !eta || eta === 0) {
+    if (!queued || !eta || eta === 0) {
       setTimeRemaining('');
       setIsReady(false);
       return;
@@ -2369,13 +2807,14 @@ function ProposalTimeline({
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [queuedProposalETA, proposal.proposalEta, proposal.state, queuedProposalIds, proposal.id]);
+  }, [queuedProposalETA, proposal.proposalEta, proposal.state, isQueued, proposal.id]);
   const getTimelineSteps = () => {
     const steps: Array<{
       label: string;
       block: bigint | null;
       status: 'completed' | 'current' | 'upcoming';
       description: string;
+      quorumMessage?: string;
     }> = [];
 
     // Step 1: Created
@@ -2405,6 +2844,7 @@ function ProposalTimeline({
 
     // Step 4: Result (Succeeded/Defeated) - Always show, status depends on current state
     const hasVotingEnded = ['Succeeded', 'Defeated', 'Queued', 'Executed', 'Canceled', 'Expired'].includes(proposal.state);
+    const isDefeated = proposal.state === 'Defeated';
     steps.push({
       label: hasVotingEnded 
         ? (proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed' ? 'Proposal Passed' : 'Proposal Defeated')
@@ -2415,18 +2855,19 @@ function ProposalTimeline({
         ? (proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed'
           ? 'Proposal received enough votes to pass'
           : 'Proposal did not receive enough votes')
-        : 'Voting results will be determined after voting ends'
+        : 'Voting results will be determined after voting ends',
+      quorumMessage: isDefeated && proposal.voteAnalysis ? proposal.voteAnalysis.reason : undefined
     });
 
     // Step 5: Schedule Execution - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
-    const isQueued = proposal.state === 'Queued' || queuedProposalIds?.has(proposal.id);
-    const canProceedToExecution = proposal.state === 'Succeeded' || proposal.state === 'Queued' || proposal.state === 'Executed' || proposal.state === 'Active' || isQueued;
+    const queued = proposal.state === 'Queued' || Boolean(isQueued);
+    const canProceedToExecution = proposal.state === 'Succeeded' || proposal.state === 'Executed' || proposal.state === 'Active' || queued;
     if (canProceedToExecution) {
-      if (isQueued || proposal.state === 'Executed') {
+      if (queued || proposal.state === 'Executed') {
         steps.push({
           label: 'Scheduled for Execution',
           block: null, // ETA is timestamp-based
-          status: isQueued && proposal.state !== 'Executed' ? 'current' : 'completed',
+          status: queued && proposal.state !== 'Executed' ? 'current' : 'completed',
           description: queuedProposalETA || proposal.proposalEta
             ? `Scheduled to execute at ${new Date((queuedProposalETA || proposal.proposalEta) * 1000).toLocaleString()}`
             : 'Scheduled for execution after timelock delay'
@@ -2450,8 +2891,6 @@ function ProposalTimeline({
 
     // Step 6: Executed - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
     if (canProceedToExecution) {
-      const isQueued = proposal.state === 'Queued' || queuedProposalIds?.has(proposal.id);
-      
       if (proposal.state === 'Executed') {
         steps.push({
           label: 'Executed',
@@ -2459,7 +2898,7 @@ function ProposalTimeline({
           status: 'completed',
           description: 'Proposal has been executed successfully'
         });
-      } else if (isQueued) {
+      } else if (queued) {
         // Show Execute step when queued (even if state hasn't updated yet)
         const eta = queuedProposalETA || proposal.proposalEta;
         steps.push({
@@ -2536,6 +2975,12 @@ function ProposalTimeline({
                   }`}>
                     {step.label}
                   </span>
+                  {/* Show quorum message beside "Proposal Defeated" in timeline */}
+                  {step.label === 'Proposal Defeated' && step.quorumMessage && (
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      {step.quorumMessage}
+                    </span>
+                  )}
                   {isCurrent && (
                     <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
                       Current
@@ -2545,8 +2990,8 @@ function ProposalTimeline({
                   {step.label === 'Schedule Execution' && 
                    proposal.state === 'Succeeded' && 
                    onQueue && 
-                   !queuedProposalIds?.has(proposal.id) && 
-                   queueingProposalId !== proposal.id && (
+                   !isQueued && 
+                   !isQueueingForProposal && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2558,14 +3003,14 @@ function ProposalTimeline({
                           console.error('onQueue is not defined');
                         }
                       }}
-                      disabled={isQueueing || !isConnected || queueingProposalId === proposal.id}
+                      disabled={isQueueing || !isConnected || isQueueingForProposal}
                       className="px-3 py-1 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
                     >
-                      {isQueueing && queueingProposalId === proposal.id ? 'Scheduling...' : 'Schedule'}
+                      {isQueueing && isQueueingForProposal ? 'Scheduling...' : 'Schedule'}
                     </button>
                   )}
                   {/* Show scheduled status with countdown when proposal is queued - appears beside "Schedule Execution" label */}
-                  {step.label === 'Schedule Execution' && (proposal.state === 'Queued' || queuedProposalIds?.has(proposal.id)) && timeRemaining && (
+                  {step.label === 'Schedule Execution' && (proposal.state === 'Queued' || isQueued) && timeRemaining && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <div className="flex items-start gap-2">
                         <span className="text-lg">⏳</span>
@@ -2587,7 +3032,7 @@ function ProposalTimeline({
                   )}
                   {/* Execute button - show next to the "Execute" step when proposal is Queued and ready */}
                   {step.label === 'Execute' && 
-                   (proposal.state === 'Queued' || queuedProposalIds?.has(proposal.id)) && 
+                   (proposal.state === 'Queued' || isQueued) && 
                    onExecute && 
                    (queuedProposalETA || proposal.proposalEta) && (
                     (() => {
@@ -2605,10 +3050,10 @@ function ProposalTimeline({
                               e.stopPropagation();
                               onExecute(proposal);
                             }}
-                            disabled={isExecuting || !isConnected || executingProposalId === proposal.id}
+                            disabled={isExecuting || !isConnected || isExecutingForProposal}
                             className="px-3 py-1 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
                           >
-                            {isExecuting && executingProposalId === proposal.id ? 'Executing...' : 'Execute'}
+                            {isExecuting && isExecutingForProposal ? 'Executing...' : 'Execute'}
                           </button>
                           <span className="text-xs text-green-700 dark:text-green-300 ml-2">
                             The safety delay period has passed. Use the "Execute" button to finalise/execute this proposal.
@@ -2627,13 +3072,13 @@ function ProposalTimeline({
                   </p>
                 )}
                 {/* Show queue transaction hash if available */}
-                {step.label === 'Schedule Execution' && queueHash && queueingProposalId === proposal.id && (
+                {step.label === 'Schedule Execution' && queueHash && isQueueingForProposal && (
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${queueHash}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{queueHash.substring(0, 10)}...</a>
                   </p>
                 )}
                 {/* Show execute transaction hash if available */}
-                {step.label === 'Execute' && executeHash && executingProposalId === proposal.id && (
+                {step.label === 'Execute' && executeHash && isExecutingForProposal && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                     Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${executeHash}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{executeHash.substring(0, 10)}...</a>
                   </p>
@@ -2651,7 +3096,7 @@ function ProposalTimeline({
 function CopyableProposalId({ proposalId }: { proposalId: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async (e: React.MouseEvent) => {
+  const handleCopy = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card expansion when clicking copy
     try {
       await navigator.clipboard.writeText(proposalId);
@@ -2660,7 +3105,7 @@ function CopyableProposalId({ proposalId }: { proposalId: string }) {
     } catch (err) {
       console.error('Failed to copy:', err);
     }
-  };
+  }, [proposalId]);
 
   return (
     <div className="flex items-center gap-1">
