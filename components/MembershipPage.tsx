@@ -994,12 +994,6 @@ export function MembershipPage() {
                 </p>
               </div>
 
-              {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
-                </div>
-              )}
-
               {/* Data Privacy Notice */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -1083,6 +1077,12 @@ export function MembershipPage() {
                       setPrivacyNoticeAccepted(false);
                     }}
                   />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
                 </div>
               )}
             </div>
