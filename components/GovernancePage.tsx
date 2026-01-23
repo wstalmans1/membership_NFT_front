@@ -2606,7 +2606,6 @@ function VoteCountsWithDirectRead({
 }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const [showVoting, setShowVoting] = useState(false);
   const [localVotingProposalId, setLocalVotingProposalId] = useState<string | null>(null);
   
   // Get vote choice from localStorage (set when user votes)
@@ -2755,13 +2754,6 @@ function VoteCountsWithDirectRead({
     refetchHasVoted();
   }, [voteEventBatch, proposalId, refetchDirectVotes, refetchHasVoted]);
 
-  useEffect(() => {
-    if (showVoting && address && proposalSnapshot !== undefined) {
-      refetchVotingPower();
-      refetchHasVoted();
-    }
-  }, [showVoting, address, proposalSnapshot, refetchVotingPower, refetchHasVoted]);
-
   // Load vote choice from localStorage on mount or when proposalId changes
   useEffect(() => {
     if (userVoteChoice === null) {
@@ -2842,7 +2834,7 @@ function VoteCountsWithDirectRead({
                 {votingPower === 0n && ' This usually means you either don\'t have a membership NFT, or you minted your NFT after this proposal was created.'}
               </p>
             </div>
-          ) : showVoting ? (
+          ) : (
             <div className="space-y-2">
               {isVotingPowerLoading ? (
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -2892,17 +2884,6 @@ function VoteCountsWithDirectRead({
                 </>
               )}
             </div>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowVoting(true);
-              }}
-              disabled={isVoting || isVoteConfirming || (votingPower !== undefined && !hasVotingPower)}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cast your vote →
-            </button>
           )}
         </div>
       )}
@@ -3290,7 +3271,7 @@ function ProposalTimeline({
                     </button>
                   )}
                   {/* Show scheduled status with countdown when proposal is queued - appears beside "Start Review Window" label */}
-                  {step.label === 'Start Review Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && (
+                  {step.label === 'Start Review Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && !isReady && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <div className="flex items-start gap-2">
                         <span className="text-lg">⏳</span>
