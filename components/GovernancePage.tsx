@@ -2510,6 +2510,7 @@ const ProposalCard = memo(function ProposalCard({
         canVote={canVote}
         isActive={proposal.state === 'Active'}
         voteEventBatch={voteEventBatch}
+        isExpanded={isExpanded}
       />
 
       {(isExpanded || !isFinalState) && (
@@ -2598,12 +2599,14 @@ function VoteCountsWithDirectRead({
   canVote,
   isActive,
   voteEventBatch,
+  isExpanded,
 }: {
   proposalId: string;
   initialVotes?: { forVotes: string; againstVotes: string; abstainVotes: string };
   canVote: boolean;
   isActive: boolean;
   voteEventBatch: { nonce: number; proposalIds: string[] };
+  isExpanded: boolean;
 }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -2649,7 +2652,7 @@ function VoteCountsWithDirectRead({
     abi: DAOGovernor,
     functionName: 'getVotes',
     args: address && proposalSnapshot ? [address, proposalSnapshot] : undefined,
-    query: { enabled: !!address && !!proposalSnapshot },
+    query: { enabled: !!address && !!proposalSnapshot && (isExpanded || localVotingProposalId === proposalId) },
   });
 
   // Check if user has voted - check for all proposal states, not just when voting is shown
@@ -2679,9 +2682,11 @@ function VoteCountsWithDirectRead({
   // Determine if user can actually vote (has voting power at snapshot)
   const hasVotingPower = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint' && votingPower > 0n;
   const canActuallyVote = canVote && hasVotingPower;
+  const shouldFetchVotingPower = isExpanded || localVotingProposalId === proposalId;
   const isVotingPowerLoading =
-    isVotingPowerQueryLoading ||
-    (votingPower === undefined && !!address && proposalSnapshot !== undefined && !votingPowerError);
+    shouldFetchVotingPower &&
+    (isVotingPowerQueryLoading ||
+      (votingPower === undefined && !!address && proposalSnapshot !== undefined && !votingPowerError));
 
   // Log vote counts and voting power for debugging
   useEffect(() => {
@@ -2763,11 +2768,11 @@ function VoteCountsWithDirectRead({
   }, [voteEventBatch, proposalId, refetchDirectVotes, refetchHasVoted]);
 
   useEffect(() => {
-    if (address && proposalSnapshot !== undefined) {
+    if (address && proposalSnapshot !== undefined && (isExpanded || localVotingProposalId === proposalId)) {
       refetchVotingPower();
       refetchHasVoted();
     }
-  }, [address, proposalSnapshot, refetchVotingPower, refetchHasVoted]);
+  }, [address, proposalSnapshot, refetchVotingPower, refetchHasVoted, isExpanded, localVotingProposalId, proposalId]);
 
   // Load vote choice from localStorage on mount or when proposalId changes
   useEffect(() => {
@@ -2851,13 +2856,13 @@ function VoteCountsWithDirectRead({
             </div>
           ) : (
             <div className="space-y-2">
-              {isVotingPowerLoading ? (
+              {shouldFetchVotingPower && isVotingPowerLoading ? (
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
                     ⏳ Checking your voting power...
                   </p>
                 </div>
-              ) : votingPowerError ? (
+              ) : shouldFetchVotingPower && votingPowerError ? (
                 <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                   <p className="text-xs text-red-800 dark:text-red-200">
                     Unable to load voting power right now. Please refresh and try again.
