@@ -138,19 +138,21 @@ export function TreasuryPage() {
   );
 
   const payoutRange = useMemo(() => {
-    if (!Array.isArray(recentTransfersData) || recentTransfersData.length === 0) return null;
-    let minBlock: bigint | null = null;
-    let maxBlock: bigint | null = null;
-    recentTransfersData.forEach((transfer: any) => {
-      const blockNumber = transfer.blockNumber as bigint;
-      if (minBlock === null || blockNumber < minBlock) minBlock = blockNumber;
-      if (maxBlock === null || blockNumber > maxBlock) maxBlock = blockNumber;
+    const transfers = Array.isArray(recentTransfersData)
+      ? (recentTransfersData as Array<{ blockNumber: bigint }>)
+      : [];
+    if (transfers.length === 0) return null;
+    let minBlock = transfers[0].blockNumber;
+    let maxBlock = transfers[0].blockNumber;
+    transfers.forEach((transfer) => {
+      const blockNumber = transfer.blockNumber;
+      if (blockNumber < minBlock) minBlock = blockNumber;
+      if (blockNumber > maxBlock) maxBlock = blockNumber;
     });
-    if (minBlock === null || maxBlock === null) return null;
     return {
       minBlock,
       maxBlock,
-      key: `${minBlock.toString()}-${maxBlock.toString()}-${recentTransfersData.length}`,
+      key: `${minBlock.toString()}-${maxBlock.toString()}-${transfers.length}`,
     };
   }, [recentTransfersData]);
 
