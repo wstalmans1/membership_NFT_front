@@ -2993,9 +2993,8 @@ function QueuedProposalStatus({ proposal, queuedProposalETA, onExecute, isExecut
         isReady: remaining <= 0 
       });
 
-      // Only show ready if ETA has actually passed (with a buffer to account for clock differences)
-      // Use a larger buffer (10 seconds) to ensure we don't show ready too early
-      if (remaining <= -10) { // 10 second buffer to account for clock differences and ensure ETA has truly passed
+      // Match Execute button timing: show ready once within the 10s buffer
+      if (remaining <= 10) { // same buffer as Execute button (now >= eta - 10)
         setIsReady(true);
         setTimeRemaining('Ready to execute');
       } else {
@@ -3111,7 +3110,7 @@ function ProposalTimeline({
       const etaTimestamp = typeof eta === 'number' ? eta : Number(eta);
       const remaining = etaTimestamp - now;
 
-      if (remaining <= -10) {
+      if (remaining <= 10) {
         setIsReady(true);
         setTimeRemaining('Ready to execute');
       } else {
