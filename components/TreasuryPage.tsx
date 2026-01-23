@@ -20,6 +20,8 @@ export function TreasuryPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const router = useRouter();
+  const publicClient = usePublicClient();
+  const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
   
   // Check if on correct network
   const isCorrectNetwork = chainId === sepolia.id;
@@ -130,6 +132,71 @@ export function TreasuryPage() {
     },
   });
 
+  const payoutEvent = useMemo(
+    () => TreasuryExecutor.find((item: any) => item.type === 'event' && item.name === 'PayoutExecuted'),
+    []
+  );
+
+  const payoutRange = useMemo(() => {
+    if (!Array.isArray(recentTransfersData) || recentTransfersData.length === 0) return null;
+    let minBlock: bigint | null = null;
+    let maxBlock: bigint | null = null;
+    recentTransfersData.forEach((transfer: any) => {
+      const blockNumber = transfer.blockNumber as bigint;
+      if (minBlock === null || blockNumber < minBlock) minBlock = blockNumber;
+      if (maxBlock === null || blockNumber > maxBlock) maxBlock = blockNumber;
+    });
+    if (minBlock === null || maxBlock === null) return null;
+    return {
+      minBlock,
+      maxBlock,
+      key: `${minBlock.toString()}-${maxBlock.toString()}-${recentTransfersData.length}`,
+    };
+  }, [recentTransfersData]);
+
+  const { data: payoutLogs } = useQuery({
+    queryKey: ['payoutLogs', CONTRACTS.SEPOLIA.TREASURY_PROXY, payoutRange?.key],
+    enabled: !!publicClient && !!payoutEvent && !!payoutRange,
+    staleTime: 30_000,
+    queryFn: async () => {
+      if (!publicClient || !payoutEvent || !payoutRange) return [];
+      try {
+        return await publicClient.getLogs({
+          address: CONTRACTS.SEPOLIA.TREASURY_PROXY,
+          event: payoutEvent as any,
+          fromBlock: payoutRange.minBlock,
+          toBlock: payoutRange.maxBlock,
+        });
+      } catch (error) {
+        console.error('Failed to fetch payout logs:', error);
+        return [];
+      }
+    },
+  });
+
+  const payoutTxByKey = useMemo(() => {
+    if (!Array.isArray(payoutLogs)) return new Map<string, `0x${string}`>();
+    const map = new Map<string, `0x${string}`>();
+    payoutLogs.forEach((log: any) => {
+      try {
+        const decoded = decodeEventLog({
+          abi: TreasuryExecutor,
+          data: log.data,
+          topics: log.topics,
+        });
+        const args = decoded.args as any;
+        if (!args) return;
+        const key = `${log.blockNumber?.toString?.() ?? ''}-${String(args.to).toLowerCase()}-${args.amount?.toString?.() ?? ''}-${String(args.data).toLowerCase()}`;
+        if (log.transactionHash) {
+          map.set(key, log.transactionHash as `0x${string}`);
+        }
+      } catch (err) {
+        // ignore decode errors
+      }
+    });
+    return map;
+  }, [payoutLogs]);
+
   // Transform transfers data to match existing format - memoized to prevent infinite loops
   const latestPayouts = useMemo(() => {
     return (Array.isArray(recentTransfersData) ? recentTransfersData : []).map((transfer: any) => ({
@@ -137,12 +204,13 @@ export function TreasuryPage() {
       amount: transfer.amount as bigint,
       blockNumber: transfer.blockNumber as bigint,
       timestamp: Number(transfer.timestamp),
-      transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`, // Not stored on-chain, use placeholder
+      transactionHash: payoutTxByKey.get(
+        `${transfer.blockNumber?.toString?.() ?? ''}-${String(transfer.to).toLowerCase()}-${transfer.amount?.toString?.() ?? ''}-${String(transfer.data).toLowerCase()}`
+      ) || (ZERO_HASH as `0x${string}`),
     })).sort((a: any, b: any) => Number(b.blockNumber - a.blockNumber));
-  }, [recentTransfersData]);
+  }, [recentTransfersData, payoutTxByKey, ZERO_HASH]);
 
   // Legacy constants for backward compatibility (no longer used)
-  const publicClient = usePublicClient();
   const CHUNK_SIZE = 800n;
   const DEPLOYMENT_BLOCK = 9944847n;
 
@@ -175,10 +243,16 @@ export function TreasuryPage() {
     const currentLength = latestPayouts.length;
     const prevFirstBlock = prevPayoutsRef.current[0]?.blockNumber;
     const currentFirstBlock = latestPayouts[0]?.blockNumber;
+    const prevFirstHash = prevPayoutsRef.current[0]?.transactionHash;
+    const currentFirstHash = latestPayouts[0]?.transactionHash;
+    const prevLastHash = prevPayoutsRef.current[prevLength - 1]?.transactionHash;
+    const currentLastHash = latestPayouts[currentLength - 1]?.transactionHash;
     
     const payoutsChanged = 
       prevLength !== currentLength || 
-      (currentLength > 0 && prevFirstBlock !== currentFirstBlock);
+      (currentLength > 0 && prevFirstBlock !== currentFirstBlock) ||
+      (currentLength > 0 && prevFirstHash !== currentFirstHash) ||
+      (currentLength > 0 && prevLastHash !== currentLastHash);
     
     if (payoutsChanged) {
       if (latestPayouts.length > 0) {
@@ -488,7 +562,7 @@ export function TreasuryPage() {
           <div className="space-y-3">
             {payouts.map((payout, index) => (
               <div
-                key={`${payout.transactionHash}-${index}`}
+                key={`${payout.blockNumber.toString()}-${payout.recipient}-${payout.amount.toString()}-${index}`}
                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
               >
                 <div className="flex-1">
@@ -511,11 +585,19 @@ export function TreasuryPage() {
                   </div>
                 </div>
                 <a
-                  href={`https://eth-sepolia.blockscout.com/tx/${payout.transactionHash}`}
+                  href={
+                    payout.transactionHash && payout.transactionHash !== ZERO_HASH
+                      ? `https://eth-sepolia.blockscout.com/tx/${payout.transactionHash}`
+                      : `https://eth-sepolia.blockscout.com/block/${payout.blockNumber.toString()}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                  title="View transaction on Blockscout"
+                  title={
+                    payout.transactionHash && payout.transactionHash !== ZERO_HASH
+                      ? 'View transaction on Blockscout'
+                      : 'View block on Blockscout (tx pending)'
+                  }
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
@@ -537,4 +619,3 @@ export function TreasuryPage() {
     </div>
   );
 }
-
