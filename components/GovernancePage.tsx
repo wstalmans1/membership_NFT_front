@@ -104,6 +104,8 @@ const PROPOSAL_STATE_LABELS: Record<number, string> = {
   7: '✅ Executed',
 };
 
+const PROPOSAL_PAGE_SIZE = 10;
+
 type BlockListener = () => void;
 
 let blockNumberSnapshot: bigint | null = null;
@@ -279,6 +281,8 @@ export function GovernancePage() {
     setNoMoreProposals,
     hasAutoSearchedProposals: hasAutoSearched,
     setHasAutoSearchedProposals: setHasAutoSearched,
+    loadedProposalCount,
+    setLoadedProposalCount,
   } = useDataContext();
   
   // Local state for UI-only concerns
@@ -491,20 +495,33 @@ export function GovernancePage() {
   // Ensure proposalCount is a number
   const proposalCountNum = typeof proposalCount === 'bigint' ? Number(proposalCount) : (typeof proposalCount === 'number' ? proposalCount : 0);
 
-  // Fetch all proposals using proposalDetailsAt (new on-chain enumerability)
-  // Create contracts array for all proposals - memoized to update when count changes
+  useEffect(() => {
+    if (proposalCountNum > 0 && loadedProposalCount === 0) {
+      setLoadedProposalCount(Math.min(PROPOSAL_PAGE_SIZE, proposalCountNum));
+    }
+  }, [proposalCountNum, loadedProposalCount, setLoadedProposalCount]);
+
+  const effectiveLoadedCount = useMemo(() => {
+    if (proposalCountNum === 0) return 0;
+    const baseCount = loadedProposalCount > 0 ? loadedProposalCount : PROPOSAL_PAGE_SIZE;
+    return Math.min(baseCount, proposalCountNum);
+  }, [loadedProposalCount, proposalCountNum]);
+
+  const startIndex = useMemo(() => {
+    if (proposalCountNum === 0) return 0;
+    return Math.max(proposalCountNum - effectiveLoadedCount, 0);
+  }, [proposalCountNum, effectiveLoadedCount]);
+
+  // Fetch proposals in pages using proposalDetailsAt (most recent first by index range)
   const proposalContracts = useMemo(() => {
-    if (proposalCountNum === 0) return [];
-    return Array.from(
-      { length: proposalCountNum },
-      (_, i) => ({
-        address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY as Address,
-        abi: DAOGovernor,
-        functionName: 'proposalDetailsAt' as const,
-        args: [BigInt(i)] as [bigint],
-      })
-    );
-  }, [proposalCountNum]);
+    if (proposalCountNum === 0 || effectiveLoadedCount === 0) return [];
+    return Array.from({ length: effectiveLoadedCount }, (_, i) => ({
+      address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY as Address,
+      abi: DAOGovernor,
+      functionName: 'proposalDetailsAt' as const,
+      args: [BigInt(startIndex + i)] as [bigint],
+    }));
+  }, [proposalCountNum, effectiveLoadedCount, startIndex]);
 
   const { data: proposalsData, isLoading: isLoadingProposalsData } = useReadContracts({
     contracts: proposalContracts,
@@ -874,15 +891,28 @@ export function GovernancePage() {
     setAllProposals((prev) => mergeProposals(prev, latestProposals));
   }, [latestProposals, setAllProposals]);
 
-  // Removed: loadOlderProposals function - no longer needed since we fetch all proposals directly via proposalDetailsAt()
-  // This function was used for backward event scanning, which is now replaced by on-chain enumerability
-  const loadOlderProposals = async () => {
-    // No-op: All proposals are now fetched directly via proposalDetailsAt()
-    console.log('loadOlderProposals called but no longer needed - all proposals fetched via proposalDetailsAt()');
-  };
+  const handleLoadMoreProposals = useCallback(() => {
+    if (isLoadingOlder || proposalCountNum === 0) return;
+    setIsLoadingOlder(true);
+    setLoadedProposalCount((prev) => Math.min((prev || PROPOSAL_PAGE_SIZE) + PROPOSAL_PAGE_SIZE, proposalCountNum));
+  }, [isLoadingOlder, proposalCountNum, setLoadedProposalCount]);
+
+  useEffect(() => {
+    if (!isLoadingOlder) return;
+    if (allProposals.length >= effectiveLoadedCount) {
+      setIsLoadingOlder(false);
+    }
+  }, [isLoadingOlder, allProposals.length, effectiveLoadedCount]);
 
   // Use proposals directly from the new on-chain query
   const proposals = allProposals;
+
+  const visibleProposals = useMemo(() => {
+    if (effectiveLoadedCount <= 0) return [];
+    return proposals.slice(0, Math.min(effectiveLoadedCount, proposals.length));
+  }, [proposals, effectiveLoadedCount]);
+
+  const canLoadMoreProposals = effectiveLoadedCount < proposalCountNum;
 
   const eventRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleGovernanceRefresh = useCallback((reason: string) => {
@@ -2040,12 +2070,12 @@ export function GovernancePage() {
       {/* Proposals List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Proposals</h2>
-        {((isLoadingProposals && proposals.length === 0) || (isLoadingOlder && proposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && proposals.length === 0 && !isLoadingOlder && publicClient)) ? (
+        {((isLoadingProposals && visibleProposals.length === 0) || (isLoadingOlder && visibleProposals.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && visibleProposals.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
             <p>{searchProgress || 'Loading proposals...'}</p>
           </div>
-        ) : (!isLoadingProposals && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && proposals.length === 0) ? (
+        ) : (!isLoadingProposals && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && visibleProposals.length === 0) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <p>No proposals yet.</p>
             <p className="text-sm mt-2">Be the first to create a proposal!</p>
@@ -2058,7 +2088,7 @@ export function GovernancePage() {
                 <p className="text-sm">{searchProgress}</p>
               </div>
             )}
-            {proposals.map((proposal) => {
+            {visibleProposals.map((proposal) => {
               const isExpanded = expandedProposal === proposal.id;
               const canVote = proposal.state === 'Active' && isConnected;
               const isQueued = proposal.state === 'Queued' || queuedProposalIds.has(proposal.id);
@@ -2093,6 +2123,21 @@ export function GovernancePage() {
                 />
               );
             })}
+            {canLoadMoreProposals && (
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={handleLoadMoreProposals}
+                  disabled={isLoadingOlder}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {isLoadingOlder ? 'Loading more...' : `Load ${PROPOSAL_PAGE_SIZE} more`}
+                </button>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Showing {Math.min(visibleProposals.length, proposalCountNum)} of {proposalCountNum} proposals
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -22,6 +22,7 @@ export function TreasuryPage() {
   const router = useRouter();
   const publicClient = usePublicClient();
   const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  const PAYOUT_PAGE_SIZE = 10;
   
   // Check if on correct network
   const isCorrectNetwork = chainId === sepolia.id;
@@ -53,6 +54,8 @@ export function TreasuryPage() {
     setNoMorePayouts,
     hasAutoSearchedPayouts: hasAutoSearched,
     setHasAutoSearchedPayouts: setHasAutoSearched,
+    loadedPayoutCount,
+    setLoadedPayoutCount,
   } = useDataContext();
   
   // Local state for UI-only concerns
@@ -131,6 +134,18 @@ export function TreasuryPage() {
       staleTime: 30_000, // Cache for 30 seconds
     },
   });
+
+  useEffect(() => {
+    if (transferCountNum > 0 && loadedPayoutCount === 0) {
+      setLoadedPayoutCount(Math.min(PAYOUT_PAGE_SIZE, transferCountNum, RECENT_COUNT));
+    }
+  }, [transferCountNum, loadedPayoutCount, setLoadedPayoutCount, PAYOUT_PAGE_SIZE, RECENT_COUNT]);
+
+  const effectiveLoadedPayoutCount = useMemo(() => {
+    if (transferCountNum === 0) return 0;
+    const baseCount = loadedPayoutCount > 0 ? loadedPayoutCount : PAYOUT_PAGE_SIZE;
+    return Math.min(baseCount, transferCountNum, RECENT_COUNT);
+  }, [loadedPayoutCount, transferCountNum, PAYOUT_PAGE_SIZE, RECENT_COUNT]);
 
   const payoutEvent = useMemo(
     () => TreasuryExecutor.find((item: any) => item.type === 'event' && item.name === 'PayoutExecuted'),
@@ -266,15 +281,28 @@ export function TreasuryPage() {
     }
   }, [latestPayouts, setAllPayouts]);
 
-  // Removed: loadOlderPayouts function - no longer needed since we fetch all transfers directly via getRecentTransfers()
-  // This function was used for backward event scanning, which is now replaced by on-chain enumerability
-  const loadOlderPayouts = async () => {
-    // No-op: All transfers are now fetched directly via getRecentTransfers()
-    console.log('loadOlderPayouts called but no longer needed - all transfers fetched via getRecentTransfers()');
+  const handleLoadMorePayouts = () => {
+    if (isLoadingOlder || transferCountNum === 0) return;
+    setIsLoadingOlder(true);
+    setLoadedPayoutCount((prev) => Math.min((prev || PAYOUT_PAGE_SIZE) + PAYOUT_PAGE_SIZE, transferCountNum, RECENT_COUNT));
   };
+
+  useEffect(() => {
+    if (!isLoadingOlder) return;
+    if (allPayouts.length >= effectiveLoadedPayoutCount) {
+      setIsLoadingOlder(false);
+    }
+  }, [isLoadingOlder, allPayouts.length, effectiveLoadedPayoutCount]);
 
   // Use payouts directly from the new on-chain query
   const payouts = allPayouts;
+
+  const visiblePayouts = useMemo(() => {
+    if (effectiveLoadedPayoutCount <= 0) return [];
+    return payouts.slice(0, Math.min(effectiveLoadedPayoutCount, payouts.length));
+  }, [payouts, effectiveLoadedPayoutCount]);
+
+  const canLoadMorePayouts = effectiveLoadedPayoutCount < Math.min(transferCountNum, RECENT_COUNT);
 
   const handleCreateProposal = () => {
     if (!recipient || !amount) {
@@ -550,19 +578,19 @@ export function TreasuryPage() {
       {/* Payout History */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Recent Payouts</h2>
-        {(isLoadingPayouts || (isLoadingOlder && payouts.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && payouts.length === 0 && !isLoadingOlder && publicClient)) ? (
+        {(isLoadingPayouts || (isLoadingOlder && visiblePayouts.length === 0) || (hasAutoSearched && oldestLoadedBlock !== null && visiblePayouts.length === 0 && !isLoadingOlder && publicClient)) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3" />
             <p>{searchProgress || 'Loading payout history...'}</p>
           </div>
-        ) : (!isLoadingPayouts && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && payouts.length === 0) ? (
+        ) : (!isLoadingPayouts && (!hasAutoSearched || (hasAutoSearched && oldestLoadedBlock === null)) && visiblePayouts.length === 0) ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <p>No payout history available.</p>
             <p className="text-sm mt-2">Payouts will appear here after execution.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {payouts.map((payout, index) => (
+            {visiblePayouts.map((payout, index) => (
               <div
                 key={`${payout.blockNumber.toString()}-${payout.recipient}-${payout.amount.toString()}-${index}`}
                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
@@ -614,7 +642,21 @@ export function TreasuryPage() {
               </div>
             )}
             
-            {/* Pagination removed: All transfers are now fetched directly via getRecentTransfers() */}
+            {canLoadMorePayouts && (
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={handleLoadMorePayouts}
+                  disabled={isLoadingOlder}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {isLoadingOlder ? 'Loading more...' : `Load ${PAYOUT_PAGE_SIZE} more`}
+                </button>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Showing {Math.min(visiblePayouts.length, Math.min(transferCountNum, RECENT_COUNT))} of {Math.min(transferCountNum, RECENT_COUNT)} payouts
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
