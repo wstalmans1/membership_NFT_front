@@ -2680,7 +2680,8 @@ function VoteCountsWithDirectRead({
     : initialVotes || { forVotes: '0', againstVotes: '0', abstainVotes: '0' };
 
   // Determine if user can actually vote (has voting power at snapshot)
-  const hasVotingPower = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint' && votingPower > 0n;
+  const votingPowerKnown = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint';
+  const hasVotingPower = votingPowerKnown && votingPower > 0n;
   const canActuallyVote = canVote && hasVotingPower;
   const shouldFetchVotingPower = isExpanded || localVotingProposalId === proposalId;
   const isVotingPowerLoading =
@@ -2811,6 +2812,18 @@ function VoteCountsWithDirectRead({
     }
   }, [address, proposalId, writeVote]);
 
+  const handleVoteWithCheck = useCallback(async (support: number) => {
+    if (!address) return;
+    if (!votingPowerKnown) {
+      setLocalVotingProposalId(proposalId);
+      refetchVotingPower();
+      refetchHasVoted();
+      return;
+    }
+    if (!hasVotingPower) return;
+    handleVote(support);
+  }, [address, votingPowerKnown, hasVotingPower, proposalId, refetchVotingPower, refetchHasVoted, handleVote]);
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
       <div className="mb-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded text-xs text-gray-600 dark:text-gray-300">
@@ -2881,22 +2894,22 @@ function VoteCountsWithDirectRead({
                   
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleVote(1)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      onClick={() => handleVoteWithCheck(1)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
                     </button>
                     <button
-                      onClick={() => handleVote(0)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      onClick={() => handleVoteWithCheck(0)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
                     </button>
                     <button
-                      onClick={() => handleVote(2)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || !hasVotingPower}
+                      onClick={() => handleVoteWithCheck(2)}
+                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}
