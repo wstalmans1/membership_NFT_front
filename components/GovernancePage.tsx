@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo, useSyncExternalStore } from 'react';
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useWatchContractEvent } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useWatchContractEvent, useWatchBlockNumber } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
@@ -116,15 +116,19 @@ const notifyBlockListeners = () => {
   blockListeners.forEach((listener) => listener());
 };
 
+const updateBlockNumberSnapshot = (nextBlock: bigint | null) => {
+  if (blockNumberSnapshot !== nextBlock) {
+    blockNumberSnapshot = nextBlock;
+    notifyBlockListeners();
+  }
+};
+
 const fetchBlockNumber = async () => {
   if (!blockClient || blockFetchInFlight) return;
   blockFetchInFlight = true;
   try {
     const block = await blockClient.getBlock({ blockTag: 'latest' });
-    if (blockNumberSnapshot !== block.number) {
-      blockNumberSnapshot = block.number;
-      notifyBlockListeners();
-    }
+    updateBlockNumberSnapshot(block.number ?? null);
   } catch (error) {
     console.error('Error fetching current block number:', error);
   } finally {
@@ -162,15 +166,19 @@ const getBlockNumberSnapshot = () => blockNumberSnapshot;
 
 const useCurrentBlockNumber = () => {
   const publicClient = usePublicClient();
+  useWatchBlockNumber({
+    chainId: sepolia.id,
+    enabled: !!publicClient,
+    onBlockNumber: (blockNumber) => {
+      updateBlockNumberSnapshot(blockNumber);
+    },
+  });
 
   useEffect(() => {
     blockClient = publicClient ?? null;
     if (!blockClient) {
       stopBlockPolling();
-      if (blockNumberSnapshot !== null) {
-        blockNumberSnapshot = null;
-        notifyBlockListeners();
-      }
+      updateBlockNumberSnapshot(null);
       return;
     }
     if (blockListeners.size > 0) {
@@ -945,6 +953,31 @@ export function GovernancePage() {
     }, 120_000);
     return () => clearInterval(interval);
   }, [isCorrectNetwork, publicClient, refetchProposalCount]);
+
+  useEffect(() => {
+    if (!isCorrectNetwork || !publicClient) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        scheduleGovernanceRefresh('visibility');
+        fetchBlockNumber();
+      }
+    };
+
+    const handleFocus = () => {
+      scheduleGovernanceRefresh('focus');
+      fetchBlockNumber();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isCorrectNetwork, publicClient, scheduleGovernanceRefresh]);
 
   const [voteEventBatch, setVoteEventBatch] = useState<{ nonce: number; proposalIds: string[] }>({
     nonce: 0,
