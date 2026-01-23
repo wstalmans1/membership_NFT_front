@@ -723,26 +723,55 @@ export function GovernancePage() {
       
       if (!proposals || !currentBlock) return 8_000; // Default 8 seconds if no data yet
       
-      // Check if any proposal is not yet final (currentBlock <= voteEnd)
+      // Check if any proposal is still in a non-terminal state (e.g., Pending/Active/Succeeded)
       // Also check if any proposal's voteEnd just passed (within last few blocks) - might need one more refetch
-      const hasNonFinalProposals = proposals.some((p: any) => {
-        if (!p.voteEnd) return true; // If voteEnd unknown, keep monitoring
-        const voteEndBigInt = BigInt(p.voteEnd);
-        // Keep monitoring if vote hasn't ended yet
-        if (currentBlock <= voteEndBigInt) return true;
-        // Also keep monitoring if voteEnd just passed (within last 5 blocks) to catch final state
-        // This ensures we get at least one more refetch after voteEnd passes
-        if (currentBlock <= voteEndBigInt + 5n) {
-          // Check if we already have final state
-          const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired' || p.state === 'Queued';
-          // If not final yet, keep monitoring
-          if (!isFinalState) return true;
+      let hasHighFrequency = false;
+      let hasQueued = false;
+
+      for (const p of proposals) {
+        if (p.state === 'Queued') {
+          hasQueued = true;
         }
-        return false;
-      });
-      
-      // Only refetch continuously if there are non-final proposals or proposals that just ended
-      return hasNonFinalProposals ? 8_000 : false; // false = stop refetching
+
+        const isTerminalState =
+          p.state === 'Defeated' ||
+          p.state === 'Executed' ||
+          p.state === 'Canceled' ||
+          p.state === 'Expired';
+
+        if (!p.voteEnd) {
+          hasHighFrequency = true;
+          break;
+        }
+
+        if (p.state === 'Pending' || p.state === 'Active' || p.state === 'Succeeded') {
+          hasHighFrequency = true;
+          break;
+        }
+
+        const voteEndBigInt = BigInt(p.voteEnd);
+        if (currentBlock <= voteEndBigInt) {
+          hasHighFrequency = true;
+          break;
+        }
+
+        if (currentBlock <= voteEndBigInt + 5n) {
+          const isFinalState = isTerminalState || p.state === 'Succeeded' || p.state === 'Queued';
+          if (!isFinalState) {
+            hasHighFrequency = true;
+            break;
+          }
+        }
+
+        if (!isTerminalState && p.state !== 'Queued') {
+          hasHighFrequency = true;
+          break;
+        }
+      }
+
+      if (hasHighFrequency) return 8_000;
+      if (hasQueued) return 30_000;
+      return false; // stop refetching
     },
     queryFn: async () => {
       console.log('🔄 queryFn EXECUTING - reading fresh state from contract');
@@ -1953,14 +1982,20 @@ function ProposalStateRefresher({
 
     proposalsToCheck.forEach((p: any) => {
       // Skip proposals that are already in final states
-      const isFinalState = p.state === 'Succeeded' || p.state === 'Defeated' || p.state === 'Executed' || p.state === 'Canceled' || p.state === 'Expired' || p.state === 'Queued';
+      const isTerminalState =
+        p.state === 'Defeated' ||
+        p.state === 'Executed' ||
+        p.state === 'Canceled' ||
+        p.state === 'Expired' ||
+        p.state === 'Queued';
+      const isFinalAfterVote = isTerminalState || p.state === 'Succeeded';
       
       // Log proposal details for debugging
       if (p.voteEnd && currentBlockNumber >= BigInt(p.voteEnd)) {
-        console.log(`🔍 Checking proposal ${p.id}: state=${p.state}, voteEnd=${p.voteEnd}, currentBlock=${currentBlockNumber}, isFinalState=${isFinalState}`);
+        console.log(`🔍 Checking proposal ${p.id}: state=${p.state}, voteEnd=${p.voteEnd}, currentBlock=${currentBlockNumber}, isFinalState=${isFinalAfterVote}`);
       }
       
-      if (isFinalState) {
+      if (isTerminalState) {
         // Remove from tracking if final
         proposalBlockCountersRef.current.delete(p.id);
         return;
@@ -2002,7 +2037,7 @@ function ProposalStateRefresher({
 
       // If voteEnd has been reached or passed, state MUST be final
       if (p.voteEnd && currentBlockNumber >= BigInt(p.voteEnd)) {
-        if (!isFinalState) {
+        if (!isFinalAfterVote) {
           console.log(`🚨 STATE STALE: Proposal ${p.id} shows voteEnd passed (currentBlock ${currentBlockNumber} >= voteEnd ${p.voteEnd}, ${voteEndBlocksAgo} blocks ago) but state is not final (${p.state})`);
           stateIsStale = true;
         }
