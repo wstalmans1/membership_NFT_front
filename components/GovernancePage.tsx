@@ -2560,6 +2560,7 @@ const ProposalCard = memo(function ProposalCard({
               state: 'Queued',
               proposalEta: queuedProposalETA
             }} 
+            queuedProposalETA={queuedProposalETA}
             onExecute={onExecute} 
             isExecuting={isExecuting} 
             isConnected={isConnected} 
@@ -2570,7 +2571,7 @@ const ProposalCard = memo(function ProposalCard({
 
       {proposal.state === 'Queued' && typeof proposal.state !== 'number' && !isLocallyExecuted && (
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-          <QueuedProposalStatus proposal={proposal} onExecute={onExecute} isExecuting={isExecuting} isConnected={isConnected} executeHash={executeHash} />
+          <QueuedProposalStatus proposal={proposal} queuedProposalETA={queuedProposalETA} onExecute={onExecute} isExecuting={isExecuting} isConnected={isConnected} executeHash={executeHash} />
         </div>
       )}
 
@@ -2911,8 +2912,9 @@ function VoteCountsWithDirectRead({
 }
 
 // Component to display queued proposal status with countdown
-function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, executeHash }: { 
+function QueuedProposalStatus({ proposal, queuedProposalETA, onExecute, isExecuting, isConnected, executeHash }: { 
   proposal: any; 
+  queuedProposalETA?: number;
   onExecute: (proposal: any) => void; 
   isExecuting: boolean; 
   isConnected: boolean;
@@ -2928,7 +2930,8 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
 
   useEffect(() => {
     // If no ETA is available, don't show ready state - wait for ETA to be fetched
-    if (!proposal.proposalEta || proposal.proposalEta === 0) {
+    const etaSource = queuedProposalETA || proposal.proposalEta;
+    if (!etaSource || etaSource === 0) {
       setIsReady(false);
       setTimeRemaining('Calculating...');
       return;
@@ -2936,7 +2939,7 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
 
     const updateCountdown = () => {
       const now = Math.floor(Date.now() / 1000);
-      const eta = typeof proposal.proposalEta === 'number' ? proposal.proposalEta : Number(proposal.proposalEta);
+      const eta = typeof etaSource === 'number' ? etaSource : Number(etaSource);
       const remaining = eta - now;
 
       console.log('Countdown check:', { 
@@ -2972,7 +2975,7 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [proposal.proposalEta]);
+  }, [proposal.proposalEta, queuedProposalETA]);
 
   // Don't show "Ready to Execute" box - message will appear next to Execute button in timeline instead
   if (isReady) {
@@ -2980,7 +2983,8 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
   }
 
   // If no valid ETA, don't show anything (shouldn't happen for Queued proposals)
-  if (!proposal.proposalEta || proposal.proposalEta === 0) {
+  const finalEta = queuedProposalETA || proposal.proposalEta;
+  if (!finalEta || finalEta === 0) {
     return null;
   }
 
