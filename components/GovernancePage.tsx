@@ -2680,7 +2680,8 @@ function VoteCountsWithDirectRead({
   const hasVotingPower = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint' && votingPower > 0n;
   const canActuallyVote = canVote && hasVotingPower;
   const isVotingPowerLoading =
-    isVotingPowerQueryLoading || (votingPower === undefined && !!address && proposalSnapshot !== undefined);
+    isVotingPowerQueryLoading ||
+    (votingPower === undefined && !!address && proposalSnapshot !== undefined && !votingPowerError);
 
   // Log vote counts and voting power for debugging
   useEffect(() => {
