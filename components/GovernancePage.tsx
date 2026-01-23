@@ -99,7 +99,7 @@ const PROPOSAL_STATE_LABELS: Record<number, string> = {
   2: '❌ Canceled',
   3: '❌ Defeated',
   4: '✅ Proposal Passed',
-  5: '⏳ Scheduled',
+  5: '⏳ Review & Opposition Window',
   6: '⏰ Expired',
   7: '✅ Executed',
 };
@@ -1254,7 +1254,7 @@ export function GovernancePage() {
         });
         setQueueingProposalId(null);
         
-        setSuccess('Proposal scheduled successfully! It will be ready to execute after the safety delay period.');
+        setSuccess('Proposal scheduled successfully! It is now in the review/opposition window before execution.');
         setTimeout(() => {
           refetchLatestProposals();
           setTimeout(() => {
@@ -1695,7 +1695,7 @@ export function GovernancePage() {
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Timelock Delay</p>
                     <p className="text-gray-300">
-                      The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This safety delay allows the community to review and potentially cancel malicious proposals before they take effect.
+                      The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This review/opposition window allows the community to detect and cancel malicious proposals before they take effect.
                     </p>
                   </div>
                 </div>
@@ -2370,8 +2370,7 @@ const ProposalCard = memo(function ProposalCard({
     proposal.state === 'Defeated' ||
     proposal.state === 'Executed' ||
     proposal.state === 'Canceled' ||
-    proposal.state === 'Expired' ||
-    proposal.state === 'Queued';
+    proposal.state === 'Expired';
 
   return (
     <div
@@ -2407,11 +2406,11 @@ const ProposalCard = memo(function ProposalCard({
                   <p className="text-gray-300 mb-3">
                     {proposal.state === 'Pending' && 'Voting has not started yet. Waiting for the voting delay period to pass.'}
                     {proposal.state === 'Active' && 'Voting is currently open. Members can cast their votes now.'}
-                    {proposal.state === 'Succeeded' && 'The proposal passed! Quorum was reached and "For" votes exceeded "Against" votes. It can now be queued for execution.'}
+                    {proposal.state === 'Succeeded' && 'The proposal passed. It can now be queued to start the review/opposition window before execution.'}
                     {proposal.state === 'Defeated' && 'The proposal failed. Either quorum was not reached or "Against" votes exceeded "For" votes.'}
                     {proposal.state === 'Executed' && 'The proposal has been executed. All actions specified in the proposal have been carried out.'}
                     {proposal.state === 'Canceled' && 'The proposal was canceled before voting ended.'}
-                    {proposal.state === 'Queued' && 'The proposal is queued for execution after the timelock delay period.'}
+                    {proposal.state === 'Queued' && 'The proposal is in the review/opposition window. This delay allows members to detect and oppose malicious changes before execution.'}
                     {proposal.state === 'Expired' && 'The proposal expired before it could be executed.'}
                   </p>
                   <div className="border-t border-gray-700 pt-2 mt-2">
@@ -2500,7 +2499,7 @@ const ProposalCard = memo(function ProposalCard({
                   Proposal Passed!
                 </h4>
                 <p className="text-xs text-blue-800 dark:text-blue-300">
-                  This proposal received enough votes to pass. Use the "Schedule" button in the timeline above to queue it for execution after a safety delay period.
+                  This proposal received enough votes to pass. Use the "Start Review Window" button in the timeline above to begin the review/opposition window before execution.
                 </p>
               </div>
             </div>
@@ -2948,12 +2947,12 @@ function QueuedProposalStatus({ proposal, onExecute, isExecuting, isConnected, e
         </div>
         <div className="flex-1">
           <h4 className="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-1">
-            Scheduled for Execution
+            Review & Opposition Window
           </h4>
           <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-2">
-            This proposal is scheduled to execute after a safety delay period. This gives members time to review
-            changes, detect possible issues and intervene through a cancellation governance proposal before the changes
-            take effect (in case of a proposal with on-chain execution).
+            This proposal is in the review/opposition window before execution. This delay gives members time to
+            detect and oppose malicious changes (for example by organizing a cancellation proposal) before anything
+            takes effect.
           </p>
           <div className="flex items-center gap-2 mt-2">
             <span className="text-sm font-mono font-semibold text-yellow-900 dark:text-yellow-200">
@@ -3095,32 +3094,32 @@ function ProposalTimeline({
       quorumMessage: isDefeated && proposal.voteAnalysis ? proposal.voteAnalysis.reason : undefined
     });
 
-    // Step 5: Schedule Execution - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
+    // Step 5: Start Review Window - Show for Active/Succeeded/Queued/Executed (only if proposal passed or might pass)
     const queued = proposal.state === 'Queued' || Boolean(isQueued);
     const canProceedToExecution = proposal.state === 'Succeeded' || proposal.state === 'Executed' || proposal.state === 'Active' || queued;
     if (canProceedToExecution) {
       if (queued || proposal.state === 'Executed') {
         steps.push({
-          label: 'Scheduled for Execution',
+          label: 'Review & Opposition Window',
           block: null, // ETA is timestamp-based
           status: queued && proposal.state !== 'Executed' ? 'current' : 'completed',
           description: queuedProposalETA || proposal.proposalEta
-            ? `Scheduled to execute at ${new Date((queuedProposalETA || proposal.proposalEta) * 1000).toLocaleString()}`
-            : 'Scheduled for execution after timelock delay'
+            ? `Execution earliest at ${new Date((queuedProposalETA || proposal.proposalEta) * 1000).toLocaleString()}`
+            : 'Execution is delayed to allow review and opposition'
         });
       } else if (proposal.state === 'Succeeded') {
         steps.push({
-          label: 'Schedule Execution',
+          label: 'Start Review Window',
           block: null,
           status: 'upcoming',
-          description: 'Proposal can be queued for execution'
+          description: 'Proposal can be queued to start the review/opposition window'
         });
       } else if (proposal.state === 'Active') {
         steps.push({
-          label: 'Schedule Execution',
+          label: 'Start Review Window',
           block: null,
           status: 'upcoming',
-          description: 'If proposal passes, it can be queued for execution after voting ends'
+          description: 'If proposal passes, it can be queued to open the review/opposition window'
         });
       }
     }
@@ -3143,14 +3142,14 @@ function ProposalTimeline({
           status: 'upcoming',
           description: eta 
             ? `Can be executed after ${new Date(eta * 1000).toLocaleString()}`
-            : 'Can be executed after timelock delay period'
+            : 'Can be executed after the review/opposition window ends'
         });
       } else {
         steps.push({
           label: 'Execute',
           block: null,
           status: 'upcoming',
-          description: 'If proposal passes and is queued, it can be executed after the timelock delay'
+          description: 'If proposal passes and is queued, it can be executed after the review/opposition window'
         });
       }
     }
@@ -3222,8 +3221,8 @@ function ProposalTimeline({
                       Current
                     </span>
                   )}
-                  {/* Schedule Execution button - show next to the "Schedule Execution" step when proposal is Succeeded and not already queued */}
-                  {step.label === 'Schedule Execution' && 
+                  {/* Start Review Window button - show next to the "Start Review Window" step when proposal is Succeeded and not already queued */}
+                  {step.label === 'Start Review Window' && 
                    proposal.state === 'Succeeded' && 
                    onQueue && 
                    !isQueued && 
@@ -3232,7 +3231,7 @@ function ProposalTimeline({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('Schedule button clicked, calling onQueue with proposal:', proposal);
+                        console.log('Start Review Window button clicked, calling onQueue with proposal:', proposal);
                         if (onQueue) {
                           onQueue(proposal);
                         } else {
@@ -3242,20 +3241,20 @@ function ProposalTimeline({
                       disabled={isQueueing || !isConnected || isQueueingForProposal}
                       className="px-3 py-1 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium"
                     >
-                      {isQueueing && isQueueingForProposal ? 'Scheduling...' : 'Schedule'}
+                      {isQueueing && isQueueingForProposal ? 'Starting...' : 'Start Review Window'}
                     </button>
                   )}
-                  {/* Show scheduled status with countdown when proposal is queued - appears beside "Schedule Execution" label */}
-                  {step.label === 'Schedule Execution' && (proposal.state === 'Queued' || isQueued) && timeRemaining && (
+                  {/* Show scheduled status with countdown when proposal is queued - appears beside "Start Review Window" label */}
+                  {step.label === 'Start Review Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                       <div className="flex items-start gap-2">
                         <span className="text-lg">⏳</span>
                         <div className="flex-1">
                           <h5 className="text-xs font-semibold text-yellow-900 dark:text-yellow-200 mb-1">
-                            Scheduled for Execution
+                            Review & Opposition Window
                           </h5>
                           <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-1">
-                            This proposal is scheduled to execute after a safety delay period. This gives members time to review changes, detect possible issues and intervene through a cancellation governance proposal before the changes take effect (in case of a proposal with on-chain execution).
+                            This delay exists so members can detect and oppose malicious proposals before execution.
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <span className="text-sm font-mono font-semibold text-yellow-900 dark:text-yellow-200">
@@ -3292,7 +3291,7 @@ function ProposalTimeline({
                             {isExecuting && isExecutingForProposal ? 'Executing...' : 'Execute'}
                           </button>
                           <span className="text-xs text-green-700 dark:text-green-300 ml-2">
-                            The safety delay period has passed. Use the "Execute" button to finalise/execute this proposal.
+                            The review/opposition window has passed. Use the "Execute" button to finalise/execute this proposal.
                           </span>
                         </>
                       ) : null;
@@ -3308,7 +3307,7 @@ function ProposalTimeline({
                   </p>
                 )}
                 {/* Show queue transaction hash if available */}
-                {step.label === 'Schedule Execution' && queueHash && isQueueingForProposal && (
+                {step.label === 'Start Review Window' && queueHash && isQueueingForProposal && (
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${queueHash}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{queueHash.substring(0, 10)}...</a>
                   </p>
