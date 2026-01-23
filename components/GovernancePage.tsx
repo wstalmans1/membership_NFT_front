@@ -2210,7 +2210,6 @@ const ProposalCard = memo(function ProposalCard({
   }, [setExpandedProposal, isExpanded, proposal.id]);
 
   const isFinalState =
-    proposal.state === 'Succeeded' ||
     proposal.state === 'Defeated' ||
     proposal.state === 'Executed' ||
     proposal.state === 'Canceled' ||
