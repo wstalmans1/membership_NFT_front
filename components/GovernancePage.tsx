@@ -2174,6 +2174,14 @@ const ProposalCard = memo(function ProposalCard({
     setExpandedProposal(isExpanded ? null : proposal.id);
   }, [setExpandedProposal, isExpanded, proposal.id]);
 
+  const isFinalState =
+    proposal.state === 'Succeeded' ||
+    proposal.state === 'Defeated' ||
+    proposal.state === 'Executed' ||
+    proposal.state === 'Canceled' ||
+    proposal.state === 'Expired' ||
+    proposal.state === 'Queued';
+
   return (
     <div
       className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
@@ -2263,7 +2271,7 @@ const ProposalCard = memo(function ProposalCard({
 
       <VoteCountsWithDirectRead proposalId={proposal.id} initialVotes={proposal.votes} canVote={canVote} />
 
-      {isExpanded && (
+      {(isExpanded || !isFinalState) && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
           <ProposalTimeline 
             proposal={proposal}
