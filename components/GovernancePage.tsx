@@ -2611,6 +2611,7 @@ function VoteCountsWithDirectRead({
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [localVotingProposalId, setLocalVotingProposalId] = useState<string | null>(null);
+  const [pendingVoteSupport, setPendingVoteSupport] = useState<number | null>(null);
   
   // Get vote choice from localStorage (set when user votes)
   const getStoredVoteChoice = (proposalId: string): number | null => {
@@ -2816,6 +2817,7 @@ function VoteCountsWithDirectRead({
     if (!address) return;
     if (!votingPowerKnown) {
       setLocalVotingProposalId(proposalId);
+      setPendingVoteSupport(support);
       refetchVotingPower();
       refetchHasVoted();
       return;
@@ -2823,6 +2825,28 @@ function VoteCountsWithDirectRead({
     if (!hasVotingPower) return;
     handleVote(support);
   }, [address, votingPowerKnown, hasVotingPower, proposalId, refetchVotingPower, refetchHasVoted, handleVote]);
+
+  useEffect(() => {
+    if (pendingVoteSupport === null) return;
+    if (!votingPowerKnown) return;
+    if (votingPowerError) {
+      setPendingVoteSupport(null);
+      return;
+    }
+    if (isVoting || isVoteConfirming) return;
+    if (hasVotingPower) {
+      handleVote(pendingVoteSupport);
+    }
+    setPendingVoteSupport(null);
+  }, [
+    pendingVoteSupport,
+    votingPowerKnown,
+    votingPowerError,
+    isVoting,
+    isVoteConfirming,
+    hasVotingPower,
+    handleVote,
+  ]);
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
