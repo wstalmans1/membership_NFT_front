@@ -2638,7 +2638,12 @@ function VoteCountsWithDirectRead({
     args: [BigInt(proposalId)],
   });
 
-  const { data: votingPower, refetch: refetchVotingPower } = useReadContract({
+  const {
+    data: votingPower,
+    refetch: refetchVotingPower,
+    isLoading: isVotingPowerQueryLoading,
+    error: votingPowerError,
+  } = useReadContract({
     address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
     abi: DAOGovernor,
     functionName: 'getVotes',
@@ -2673,7 +2678,8 @@ function VoteCountsWithDirectRead({
   // Determine if user can actually vote (has voting power at snapshot)
   const hasVotingPower = votingPower !== undefined && votingPower !== null && typeof votingPower === 'bigint' && votingPower > 0n;
   const canActuallyVote = canVote && hasVotingPower;
-  const isVotingPowerLoading = votingPower === undefined && !!address && proposalSnapshot !== undefined;
+  const isVotingPowerLoading =
+    isVotingPowerQueryLoading || (votingPower === undefined && !!address && proposalSnapshot !== undefined);
 
   // Log vote counts and voting power for debugging
   useEffect(() => {
@@ -2753,6 +2759,13 @@ function VoteCountsWithDirectRead({
     refetchDirectVotes();
     refetchHasVoted();
   }, [voteEventBatch, proposalId, refetchDirectVotes, refetchHasVoted]);
+
+  useEffect(() => {
+    if (address && proposalSnapshot !== undefined) {
+      refetchVotingPower();
+      refetchHasVoted();
+    }
+  }, [address, proposalSnapshot, refetchVotingPower, refetchHasVoted]);
 
   // Load vote choice from localStorage on mount or when proposalId changes
   useEffect(() => {
@@ -2840,6 +2853,12 @@ function VoteCountsWithDirectRead({
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
                     ⏳ Checking your voting power...
+                  </p>
+                </div>
+              ) : votingPowerError ? (
+                <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-xs text-red-800 dark:text-red-200">
+                    Unable to load voting power right now. Please refresh and try again.
                   </p>
                 </div>
               ) : (
