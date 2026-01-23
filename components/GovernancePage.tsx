@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo, useSyncExternalStore } from 'react';
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useWatchContractEvent } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
@@ -875,6 +875,127 @@ export function GovernancePage() {
 
   // Use proposals directly from the new on-chain query
   const proposals = allProposals;
+
+  const eventRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleGovernanceRefresh = useCallback((reason: string) => {
+    if (!isCorrectNetwork || !publicClient) return;
+    if (eventRefreshTimeoutRef.current) return;
+    eventRefreshTimeoutRef.current = setTimeout(async () => {
+      eventRefreshTimeoutRef.current = null;
+      try {
+        console.log(`🔔 Governance event detected (${reason}) - refreshing proposals`);
+        await refetchProposalCount();
+        await refetchLatestProposals();
+      } catch (error) {
+        console.error('Failed to refresh proposals after event:', error);
+      }
+    }, 500);
+  }, [isCorrectNetwork, publicClient, refetchProposalCount, refetchLatestProposals]);
+
+  useEffect(() => {
+    return () => {
+      if (eventRefreshTimeoutRef.current) {
+        clearTimeout(eventRefreshTimeoutRef.current);
+        eventRefreshTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'ProposalCreated',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: () => scheduleGovernanceRefresh('ProposalCreated'),
+  });
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'ProposalQueued',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: () => scheduleGovernanceRefresh('ProposalQueued'),
+  });
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'ProposalExecuted',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: () => scheduleGovernanceRefresh('ProposalExecuted'),
+  });
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'ProposalCanceled',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: () => scheduleGovernanceRefresh('ProposalCanceled'),
+  });
+
+  useEffect(() => {
+    if (!isCorrectNetwork || !publicClient) return;
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      refetchProposalCount();
+    }, 120_000);
+    return () => clearInterval(interval);
+  }, [isCorrectNetwork, publicClient, refetchProposalCount]);
+
+  const [voteEventBatch, setVoteEventBatch] = useState<{ nonce: number; proposalIds: string[] }>({
+    nonce: 0,
+    proposalIds: [],
+  });
+
+  const scheduleVoteEventRefresh = useCallback((proposalIds: string[]) => {
+    if (!proposalIds.length) return;
+    setVoteEventBatch((prev) => ({
+      nonce: prev.nonce + 1,
+      proposalIds,
+    }));
+  }, []);
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'VoteCast',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: (logs) => {
+      const ids = logs
+        .map((log) => {
+          const args = (log as any).args as { proposalId?: bigint } | undefined;
+          return args?.proposalId !== undefined ? args.proposalId.toString() : null;
+        })
+        .filter((id): id is string => !!id);
+      if (ids.length) {
+        scheduleVoteEventRefresh(Array.from(new Set(ids)));
+      }
+    },
+  });
+
+  useWatchContractEvent({
+    address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+    abi: DAOGovernor,
+    eventName: 'VoteCastWithParams',
+    chainId: sepolia.id,
+    enabled: isCorrectNetwork,
+    onLogs: (logs) => {
+      const ids = logs
+        .map((log) => {
+          const args = (log as any).args as { proposalId?: bigint } | undefined;
+          return args?.proposalId !== undefined ? args.proposalId.toString() : null;
+        })
+        .filter((id): id is string => !!id);
+      if (ids.length) {
+        scheduleVoteEventRefresh(Array.from(new Set(ids)));
+      }
+    },
+  });
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1935,6 +2056,7 @@ export function GovernancePage() {
                   isExecutingForProposal={isExecutingForProposal}
                   executeHash={executeHashForProposal}
                   setExpandedProposal={setExpandedProposal}
+                  voteEventBatch={voteEventBatch}
                 />
               );
             })}
@@ -2186,6 +2308,7 @@ const ProposalCard = memo(function ProposalCard({
   isExecutingForProposal,
   executeHash,
   setExpandedProposal,
+  voteEventBatch,
 }: {
   proposal: any;
   isExpanded: boolean;
@@ -2204,6 +2327,7 @@ const ProposalCard = memo(function ProposalCard({
   isExecutingForProposal: boolean;
   executeHash?: `0x${string}`;
   setExpandedProposal: (value: string | null) => void;
+  voteEventBatch: { nonce: number; proposalIds: string[] };
 }) {
   const handleToggle = useCallback(() => {
     setExpandedProposal(isExpanded ? null : proposal.id);
@@ -2303,7 +2427,13 @@ const ProposalCard = memo(function ProposalCard({
         </div>
       </div>
 
-      <VoteCountsWithDirectRead proposalId={proposal.id} initialVotes={proposal.votes} canVote={canVote} />
+      <VoteCountsWithDirectRead
+        proposalId={proposal.id}
+        initialVotes={proposal.votes}
+        canVote={canVote}
+        isActive={proposal.state === 'Active'}
+        voteEventBatch={voteEventBatch}
+      />
 
       {(isExpanded || !isFinalState) && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
@@ -2384,7 +2514,19 @@ const ProposalCard = memo(function ProposalCard({
 });
 
 // Component to display vote counts with direct contract read for real-time updates
-function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { proposalId: string; initialVotes?: { forVotes: string; againstVotes: string; abstainVotes: string }; canVote: boolean }) {
+function VoteCountsWithDirectRead({
+  proposalId,
+  initialVotes,
+  canVote,
+  isActive,
+  voteEventBatch,
+}: {
+  proposalId: string;
+  initialVotes?: { forVotes: string; againstVotes: string; abstainVotes: string };
+  canVote: boolean;
+  isActive: boolean;
+  voteEventBatch: { nonce: number; proposalIds: string[] };
+}) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [showVoting, setShowVoting] = useState(false);
@@ -2407,7 +2549,8 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
     args: [BigInt(proposalId)],
     query: { 
       enabled: true,
-      refetchInterval: 5000, // Refetch every 5 seconds
+      refetchInterval: isActive ? 20000 : false, // Active proposals update less frequently; WS handles real-time updates
+      refetchIntervalInBackground: false,
     },
   });
 
@@ -2528,6 +2671,12 @@ function VoteCountsWithDirectRead({ proposalId, initialVotes, canVote }: { propo
       }, 8000);
     }
   }, [isVoteConfirmed, localVotingProposalId, proposalId, refetchDirectVotes, refetchHasVoted, voteReceipt, publicClient, address]);
+
+  useEffect(() => {
+    if (!voteEventBatch.proposalIds.includes(proposalId)) return;
+    refetchDirectVotes();
+    refetchHasVoted();
+  }, [voteEventBatch, proposalId, refetchDirectVotes, refetchHasVoted]);
 
   useEffect(() => {
     if (showVoting && address && proposalSnapshot !== undefined) {

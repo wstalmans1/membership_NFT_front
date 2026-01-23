@@ -1,4 +1,4 @@
-import { createConfig, http, fallback } from 'wagmi';
+import { createConfig, http, fallback, webSocket } from 'wagmi';
 import { sepolia, mainnet } from 'wagmi/chains';
 import { metaMask, injected } from 'wagmi/connectors';
 
@@ -20,22 +20,35 @@ const getSepoliaRpcUrl = () => {
   return undefined; // Will use wagmi's default public RPCs
 };
 
+const getSepoliaWsUrl = () => {
+  if (process.env.NEXT_PUBLIC_SEPOLIA_WS_URL) {
+    return process.env.NEXT_PUBLIC_SEPOLIA_WS_URL;
+  }
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL;
+  }
+  return undefined;
+};
+
 // Use fallback transport for redundancy - tries multiple RPC endpoints
 // Note: Alchemy may have limitations on eth_getLogs block ranges
 // The fallback will automatically use public RPCs when Alchemy fails
 const sepoliaRpcUrl = getSepoliaRpcUrl();
-const transports = sepoliaRpcUrl
-  ? {
-      [sepolia.id]: fallback([
-        http(sepoliaRpcUrl), // Custom RPC first (e.g., Alchemy)
-        http(), // Fallback to public RPCs if custom fails (handles large block ranges)
-      ]),
-      [mainnet.id]: http(), // Mainnet uses default public RPCs
-    }
-  : {
-      [sepolia.id]: http(), // Use default public RPCs
-      [mainnet.id]: http(), // Mainnet uses default public RPCs
-    };
+const sepoliaWsUrl = getSepoliaWsUrl();
+
+const sepoliaTransports =
+  sepoliaRpcUrl || sepoliaWsUrl
+    ? fallback([
+        ...(sepoliaWsUrl ? [webSocket(sepoliaWsUrl)] : []),
+        ...(sepoliaRpcUrl ? [http(sepoliaRpcUrl)] : []),
+        http(), // Final fallback to public RPCs
+      ])
+    : http(); // Use default public RPCs
+
+const transports = {
+  [sepolia.id]: sepoliaTransports,
+  [mainnet.id]: http(), // Mainnet uses default public RPCs
+};
 
 export const wagmiConfig = createConfig({
   chains: [sepolia, mainnet], // Include Mainnet so wagmi can detect when MetaMask switches to it
@@ -52,4 +65,3 @@ declare module 'wagmi' {
     config: typeof wagmiConfig;
   }
 }
-
