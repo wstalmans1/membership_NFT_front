@@ -380,62 +380,67 @@ export function TreasuryPage() {
       )}
 
       {/* Treasury Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full min-w-0">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
-            <div className="relative group">
-              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                <p className="mb-2 font-semibold">Treasury Balance</p>
-                <p className="text-gray-300">
-                  The total amount of Sepolia ETH held by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Funds come from membership donations and can be spent through governance proposals.
-                </p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 w-full min-w-0">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Treasury Parameters</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full min-w-0">
+          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-gray-600 dark:text-gray-400">Treasury Balance</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Treasury Balance</p>
+                  <p className="text-gray-300">
+                    The total amount of Sepolia ETH held by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Funds come from membership donations and can be spent through governance proposals.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">
-            {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
-          </p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Per-Transaction Cap</h3>
-            <div className="relative group">
-              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                <p className="mb-2 font-semibold">Per-Transaction Cap</p>
-                <p className="text-gray-300">
-                  The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
-                </p>
-              </div>
-            </div>
-          </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">
-            {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
-          </p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Epoch Cap</h3>
-            <div className="relative group">
-              <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                <p className="mb-2 font-semibold">Epoch Cap</p>
-                <p className="text-gray-300">
-                  The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
-                </p>
-              </div>
-            </div>
-          </div>
-          <p className="text-xl font-bold text-gray-900 dark:text-white">
-            {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
-          </p>
-          {epochDuration ? (
-            <p className="text-xs text-gray-500 mt-1">
-              Duration: {Number(epochDuration)} seconds
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
             </p>
-          ) : null}
+          </div>
+          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-gray-600 dark:text-gray-400">Per-Transaction Cap</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Per-Transaction Cap</p>
+                  <p className="text-gray-300">
+                    The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
+            </p>
+          </div>
+          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] text-gray-600 dark:text-gray-400">Epoch Cap</p>
+              <div className="relative group">
+                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                  <p className="mb-2 font-semibold">Epoch Cap</p>
+                  <p className="text-gray-300">
+                    The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
+              </p>
+              {epochDuration ? (
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Duration: {Number(epochDuration)} seconds
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 
