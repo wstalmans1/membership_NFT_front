@@ -29,6 +29,10 @@ interface DataContextType {
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+const MAX_PAYOUT_CACHE = 200;
+const MAX_PROPOSAL_CACHE = 200;
+
+const capList = <T,>(list: T[], max: number) => (list.length > max ? list.slice(0, max) : list);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [allPayouts, setAllPayoutsState] = useState<any[]>([]);
@@ -45,11 +49,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Wrapper functions to support functional updates - wrapped in useCallback to prevent infinite loops
   const setAllPayouts = useCallback((payouts: any[] | ((prev: any[]) => any[])) => {
-    if (typeof payouts === 'function') {
-      setAllPayoutsState(payouts);
-    } else {
-      setAllPayoutsState(payouts);
-    }
+    setAllPayoutsState((prev) => {
+      const next = typeof payouts === 'function' ? payouts(prev) : payouts;
+      return capList(next, MAX_PAYOUT_CACHE);
+    });
   }, []);
 
   const setLoadedPayoutCount = useCallback((count: number | ((prev: number) => number)) => {
@@ -61,11 +64,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setAllProposals = useCallback((proposals: any[] | ((prev: any[]) => any[])) => {
-    if (typeof proposals === 'function') {
-      setAllProposalsState(proposals);
-    } else {
-      setAllProposalsState(proposals);
-    }
+    setAllProposalsState((prev) => {
+      const next = typeof proposals === 'function' ? proposals(prev) : proposals;
+      return capList(next, MAX_PROPOSAL_CACHE);
+    });
   }, []);
 
   const setLoadedProposalCount = useCallback((count: number | ((prev: number) => number)) => {

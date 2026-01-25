@@ -1736,7 +1736,7 @@ export function GovernancePage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 w-full min-w-0">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Governance Parameters</h2>
+          <h2 className="text-base font-semibold text-gray-500 dark:text-gray-400 mb-2">Parameters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-3 w-full min-w-0">
             <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1830,7 +1830,7 @@ export function GovernancePage() {
             ) : (
               <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             )}
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Rules</h3>
+            <h3 className="text-base font-semibold text-gray-500 dark:text-gray-400">Voting Rules</h3>
           </button>
           {isVotingRulesExpanded && (
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">

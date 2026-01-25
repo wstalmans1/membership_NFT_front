@@ -61,7 +61,6 @@ export function TreasuryPage() {
   // Local state for UI-only concerns
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [searchProgress, setSearchProgress] = useState<string | null>(null);
-  const [currentBlockNumber, setCurrentBlockNumber] = useState<bigint | null>(null);
   const [rateLimitError, setRateLimitError] = useState(false);
   const [isPayoutSectionExpanded, setIsPayoutSectionExpanded] = useState(false);
 
@@ -231,24 +230,7 @@ export function TreasuryPage() {
   const CHUNK_SIZE = 800n;
   const DEPLOYMENT_BLOCK = 9944847n;
 
-  // Get current block number for auto-search
-  useEffect(() => {
-    if (!publicClient) return;
-    
-    const fetchBlockNumber = async () => {
-      try {
-        const block = await publicClient.getBlock({ blockTag: 'latest' });
-        setCurrentBlockNumber(block.number);
-      } catch (error) {
-        console.error('Error fetching current block number:', error);
-      }
-    };
-    
-    fetchBlockNumber();
-    // Refresh block number periodically
-    const interval = setInterval(fetchBlockNumber, 30000);
-    return () => clearInterval(interval);
-  }, [publicClient]);
+  // Removed unused block polling to avoid unnecessary memory/CPU usage
 
   // Track previous payouts to prevent unnecessary updates
   const prevPayoutsRef = useRef<any[]>([]);
@@ -381,7 +363,7 @@ export function TreasuryPage() {
 
       {/* Treasury Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 w-full min-w-0">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Treasury Parameters</h2>
+        <h2 className="text-base font-semibold text-gray-500 dark:text-gray-400 mb-2">Parameters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full min-w-0">
           <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">

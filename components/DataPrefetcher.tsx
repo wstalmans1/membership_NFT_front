@@ -11,6 +11,8 @@ import { Address, decodeEventLog } from 'viem';
 const CHUNK_SIZE = 800n;
 const DEPLOYMENT_BLOCK = 9944847n;
 const FIRST_PROPOSAL_BLOCK = 9983760n; // Block number of the first proposal ever created in the QAWL DAO
+const MAX_PREFETCH_PAYOUTS = 100;
+const MAX_PREFETCH_PROPOSALS = 200;
 
 export function DataPrefetcher() {
   const publicClient = usePublicClient();
@@ -101,7 +103,8 @@ export function DataPrefetcher() {
 
         const result = payouts
           .filter((p): p is NonNullable<typeof payouts[0]> => p !== null)
-          .sort((a, b) => Number(b.blockNumber - a.blockNumber));
+          .sort((a, b) => Number(b.blockNumber - a.blockNumber))
+          .slice(0, MAX_PREFETCH_PAYOUTS);
         console.log(`[DataPrefetcher] Payouts loaded: ${result.length} payouts`);
         return result;
       } catch (error) {
@@ -193,7 +196,8 @@ export function DataPrefetcher() {
 
         const result = proposals
           .filter((p): p is NonNullable<typeof proposals[0]> => p !== null)
-          .sort((a, b) => Number(b.blockNumber - a.blockNumber));
+          .sort((a, b) => Number(b.blockNumber - a.blockNumber))
+          .slice(0, MAX_PREFETCH_PROPOSALS);
         console.log(`[DataPrefetcher] Proposals loaded: ${result.length} proposals`);
         return result;
       } catch (error) {
