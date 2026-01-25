@@ -2539,6 +2539,7 @@ const ProposalCard = memo(function ProposalCard({
     proposal.state === 'Executed' ||
     proposal.state === 'Canceled' ||
     proposal.state === 'Expired';
+  const shouldShowFullTimeline = isExpanded || (!isFinalState && proposal.state === 'Active');
 
   return (
     <div
@@ -2662,7 +2663,7 @@ const ProposalCard = memo(function ProposalCard({
         isExpanded={isExpanded}
       />
 
-      {isExpanded ? (
+      {shouldShowFullTimeline ? (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
           <ProposalTimeline 
             proposal={proposal}
@@ -2695,48 +2696,7 @@ const ProposalCard = memo(function ProposalCard({
         </div>
       )}
 
-      {proposal.state === 'Succeeded' && !isQueued && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                <span className="text-2xl">✅</span>
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
-                  Proposal Passed!
-                </h4>
-                <p className="text-xs text-blue-800 dark:text-blue-300">
-                  This proposal received enough votes to pass. Use the "Start Review Window" button in the timeline above to begin the review/opposition window before execution.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {isQueued && proposal.state !== 'Queued' && !isLocallyExecuted && queuedProposalETA !== undefined && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-          <QueuedProposalStatus 
-            proposal={{
-              ...proposal,
-              state: 'Queued',
-              proposalEta: queuedProposalETA
-            }} 
-            queuedProposalETA={queuedProposalETA}
-            onExecute={onExecute} 
-            isExecuting={isExecuting} 
-            isConnected={isConnected} 
-            executeHash={executeHash} 
-          />
-        </div>
-      )}
-
-      {proposal.state === 'Queued' && typeof proposal.state !== 'number' && !isLocallyExecuted && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-          <QueuedProposalStatus proposal={proposal} queuedProposalETA={queuedProposalETA} onExecute={onExecute} isExecuting={isExecuting} isConnected={isConnected} executeHash={executeHash} />
-        </div>
-      )}
 
       {isExpanded && !canVote && proposal.state === 'Active' && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
@@ -3539,6 +3499,13 @@ function ProposalTimeline({
                       Current
                     </span>
                   )}
+                  {step.label === 'Proposal Passed' && proposal.state === 'Succeeded' && !isQueued && (
+                    <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-blue-800 dark:text-blue-300">
+                        This proposal received enough votes to pass. Use the “Start Review Window” button to begin the review/opposition window before execution.
+                      </span>
+                    </div>
+                  )}
                   {/* Start Review Window button - show next to the "Start Review Window" step when proposal is Succeeded and not already queued */}
                   {step.label === 'Start Review Window' && 
                    proposal.state === 'Succeeded' && 
@@ -3564,19 +3531,26 @@ function ProposalTimeline({
                   )}
                   {/* Show scheduled status with countdown when proposal is queued - appears beside "Start Review Window" label */}
                   {step.label === 'Start Review Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && !isReady && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                      <div className="flex items-start gap-2">
-                        <span className="text-lg">⏳</span>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <span className="text-2xl">⏳</span>
+                        </div>
                         <div className="flex-1">
-                          <h5 className="text-xs font-semibold text-yellow-900 dark:text-yellow-200 mb-1">
+                          <h4 className="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-1">
                             Review & Opposition Window
-                          </h5>
-                          <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-1">
-                            This delay exists so members can detect and oppose malicious proposals before execution.
+                          </h4>
+                          <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-2">
+                            This proposal is in the review/opposition window before execution. This delay gives members time to
+                            detect and oppose malicious changes (for example by organizing a cancellation proposal) before anything
+                            takes effect.
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <span className="text-sm font-mono font-semibold text-yellow-900 dark:text-yellow-200">
-                              {timeRemaining} {isReady ? '' : 'remaining'}
+                              {timeRemaining}
+                            </span>
+                            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                              remaining
                             </span>
                           </div>
                         </div>
