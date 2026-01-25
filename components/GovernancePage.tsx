@@ -271,6 +271,7 @@ export function GovernancePage() {
   const [calldatas, setCalldatas] = useState('');
   const [valuesInput, setValuesInput] = useState('0');
   const [valuesUnit, setValuesUnit] = useState<'wei' | 'eth'>('wei');
+  const [lockValuesToZero, setLockValuesToZero] = useState(false);
   const [withOnChainExecution, setWithOnChainExecution] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -312,13 +313,9 @@ export function GovernancePage() {
           console.log('Loading treasury payout proposal from localStorage:', proposalData);
           setTargets(proposalData.targets || '');
           setCalldatas(proposalData.calldatas || '');
-          if (proposalData.values) {
-            const storedValues = Array.isArray(proposalData.values) ? proposalData.values.join(', ') : String(proposalData.values);
-            setValuesInput(storedValues);
-          } else {
-            setValuesInput('0');
-            setValuesUnit('wei');
-          }
+          setValuesInput('0');
+          setValuesUnit('wei');
+          setLockValuesToZero(true);
           setDescription(proposalData.description || '');
           setWithOnChainExecution(true); // Treasury payouts require on-chain execution
           setShowCreateForm(true);
@@ -327,6 +324,7 @@ export function GovernancePage() {
         } catch (error) {
           console.error('Failed to parse stored treasury proposal data:', error);
           localStorage.removeItem('treasuryPayoutProposal');
+          setLockValuesToZero(false);
         }
         return; // Exit early if treasury proposal found
       }
@@ -346,6 +344,7 @@ export function GovernancePage() {
             setValuesInput('0');
             setValuesUnit('wei');
           }
+          setLockValuesToZero(false);
           setDescription(proposalData.description || '');
           setWithOnChainExecution(true); // Allowlist proposals require on-chain execution
           setShowCreateForm(true);
@@ -354,6 +353,7 @@ export function GovernancePage() {
         } catch (error) {
           console.error('Failed to parse stored allowlist proposal data:', error);
           localStorage.removeItem('allowlistProposal');
+          setLockValuesToZero(false);
         }
       }
     }
@@ -1173,37 +1173,41 @@ export function GovernancePage() {
           return;
         }
 
-        // Parse values (comma-separated). Empty -> all 0. Single -> apply to all.
-        const rawValues = valuesInput
-          .split(',')
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0);
-
-        if (rawValues.length === 0) {
+        if (lockValuesToZero) {
           values = targetAddresses.map(() => 0n);
-        } else if (rawValues.length === 1) {
-          const parsed = parseValueInput(rawValues[0]);
-          if (parsed === null) {
-            setError('Please provide a valid value amount');
-            return;
-          }
-          values = targetAddresses.map(() => parsed);
         } else {
-          if (rawValues.length !== targetAddresses.length) {
-            setError('Number of values must match number of targets (or provide a single value for all)');
-            return;
-          }
-          try {
-            values = rawValues.map((value) => {
-              const parsed = parseValueInput(value);
-              if (parsed === null) {
-                throw new Error('Invalid value');
-              }
-              return parsed;
-            });
-          } catch (error) {
-            setError('Values must be valid numbers, decimals (ETH), or hex amounts');
-            return;
+          // Parse values (comma-separated). Empty -> all 0. Single -> apply to all.
+          const rawValues = valuesInput
+            .split(',')
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+
+          if (rawValues.length === 0) {
+            values = targetAddresses.map(() => 0n);
+          } else if (rawValues.length === 1) {
+            const parsed = parseValueInput(rawValues[0]);
+            if (parsed === null) {
+              setError('Please provide a valid value amount');
+              return;
+            }
+            values = targetAddresses.map(() => parsed);
+          } else {
+            if (rawValues.length !== targetAddresses.length) {
+              setError('Number of values must match number of targets (or provide a single value for all)');
+              return;
+            }
+            try {
+              values = rawValues.map((value) => {
+                const parsed = parseValueInput(value);
+                if (parsed === null) {
+                  throw new Error('Invalid value');
+                }
+                return parsed;
+              });
+            } catch (error) {
+              setError('Values must be valid numbers, decimals (ETH), or hex amounts');
+              return;
+            }
           }
         }
       } else {
@@ -1214,11 +1218,46 @@ export function GovernancePage() {
       }
 
 
+      let gasLimit: bigint | undefined;
+      if (publicClient && address) {
+        try {
+          const estimatedGas = await publicClient.estimateContractGas({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'propose',
+            args: [targetAddresses, values, calldataArray, description],
+            account: address,
+          });
+          const latestBlock = await publicClient.getBlock({ blockTag: 'latest' });
+          const maxAllowed = latestBlock.gasLimit > 100000n ? latestBlock.gasLimit - 100000n : latestBlock.gasLimit;
+          const buffered = estimatedGas + (estimatedGas / 5n);
+          gasLimit = buffered > maxAllowed ? maxAllowed : buffered;
+          console.log('⛽ Gas estimate:', estimatedGas.toString(), 'capped to', gasLimit.toString());
+        } catch (gasErr: any) {
+          const message = typeof gasErr?.shortMessage === 'string'
+            ? gasErr.shortMessage
+            : typeof gasErr?.message === 'string'
+              ? gasErr.message
+              : 'Gas estimation failed';
+          console.warn('Gas estimate failed:', gasErr);
+          if (message.toLowerCase().includes('proposer votes below proposal threshold')) {
+            setError('You need more voting power to create a proposal. Please ensure you are a member and meet the proposal threshold.');
+          } else {
+            setError('Unable to estimate gas for this proposal. It may be invalid or your account may not meet the proposal threshold. Please review inputs and try again.');
+          }
+          return;
+        }
+      } else {
+        setError('Unable to estimate gas. Please refresh and try again.');
+        return;
+      }
+
       console.log('Submitting proposal:', {
         targets: targetAddresses,
         values,
         calldatas: calldataArray,
         description,
+        gasLimit: gasLimit?.toString(),
       });
 
       writeContract({
@@ -1226,6 +1265,7 @@ export function GovernancePage() {
         abi: DAOGovernor,
         functionName: 'propose',
         args: [targetAddresses, values, calldataArray, description],
+        ...(gasLimit && { gas: gasLimit }),
       });
     } catch (err: any) {
       console.error('Error submitting proposal:', err);
@@ -1245,6 +1285,8 @@ export function GovernancePage() {
       setTargets('');
       setCalldatas('');
       setValuesInput('0');
+      setValuesUnit('wei');
+      setLockValuesToZero(false);
       setWithOnChainExecution(false);
       
       // Refetch proposals after a short delay to allow block to be mined
@@ -1741,9 +1783,9 @@ export function GovernancePage() {
             <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Proposal Threshold</p>
-                <div className="relative group" tabIndex={0}>
+                <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Proposal Threshold</p>
                     <p className="text-gray-300">
                       The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
@@ -1763,9 +1805,9 @@ export function GovernancePage() {
             <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Delay</p>
-                <div className="relative group" tabIndex={0}>
+                <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Delay</p>
                     <p className="text-gray-300">
                       The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
@@ -1782,9 +1824,9 @@ export function GovernancePage() {
             <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Period</p>
-                <div className="relative group" tabIndex={0}>
+                <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Period</p>
                     <p className="text-gray-300">
                       The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
@@ -1801,9 +1843,9 @@ export function GovernancePage() {
             <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Timelock Delay</p>
-                <div className="relative group" tabIndex={0}>
+                <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Timelock Delay</p>
                     <p className="text-gray-300">
                       The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This review/opposition window allows the community to detect and cancel malicious proposals before they take effect.
@@ -1840,9 +1882,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Vote Types:</span> Members can vote <span className="font-medium">For</span>, <span className="font-medium">Against</span>, or <span className="font-medium">Abstain</span>
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Vote Types</p>
                     <p className="text-gray-300">
                       <strong>For:</strong> You support the proposal. <strong>Against:</strong> You oppose the proposal. <strong>Abstain:</strong> You choose not to take a position, but your vote still counts toward quorum.
@@ -1857,9 +1899,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Voting Power:</span> Each membership NFT grants 1 vote. Votes must be delegated to activate voting power.
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Power</p>
                     <p className="text-gray-300">
                       Each membership NFT grants 1 vote, but you must delegate your votes (to yourself or another address) before you can vote on proposals. Delegation activates your voting power.
@@ -1874,9 +1916,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Quorum:</span> {quorumNumerator ? `${Number(quorumNumerator)}%` : '...'} of total membership supply (calculated at proposal snapshot). Quorum includes <span className="font-medium">For</span> and <span className="font-medium">Abstain</span> votes.
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Quorum</p>
                     <p className="text-gray-300">
                       The minimum number of votes required for a proposal to be valid. Quorum is calculated as a percentage of total membership supply at the proposal snapshot. Both "For" and "Abstain" votes count toward quorum.
@@ -1891,9 +1933,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Proposal Success:</span> A proposal succeeds when <span className="font-medium">quorum is reached</span> AND <span className="font-medium">For votes exceed Against votes</span>.
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Proposal Success</p>
                     <p className="text-gray-300">
                       A proposal succeeds only if both conditions are met: (1) enough members vote to reach quorum, and (2) "For" votes exceed "Against" votes. If either condition fails, the proposal is defeated.
@@ -1908,9 +1950,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Snapshot:</span> Voting power is determined at the proposal snapshot block (when voting starts), not at the time of voting.
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Snapshot</p>
                     <p className="text-gray-300">
                       The snapshot is the block number when voting starts. Your voting power is calculated based on your membership NFT ownership and delegation status at that specific block, not when you actually cast your vote. This prevents manipulation by buying/selling NFTs during voting.
@@ -1931,9 +1973,9 @@ export function GovernancePage() {
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">Proposal States:</span> Proposals move through different states during their lifecycle.
                 </div>
-                <div className="relative group flex-shrink-0" tabIndex={0}>
+                <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Proposal State Codes</p>
                     <div className="text-gray-300 space-y-0.5 font-mono text-xs">
                       <div>0 = Pending</div>
@@ -2033,9 +2075,9 @@ export function GovernancePage() {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Proposal Description *
                         </label>
-                        <div className="relative group" tabIndex={0}>
+                        <div className="relative group" tabIndex={0} data-tooltip-anchor>
                           <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                          <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                             <p className="mb-2 font-semibold">Proposal Description</p>
                             <p className="text-gray-300">
                               A clear description of what the proposal aims to achieve. This is required and will be visible to all members when voting.
@@ -2065,9 +2107,9 @@ export function GovernancePage() {
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           With on-chain execution
                         </span>
-                        <div className="relative group" tabIndex={0}>
+                        <div className="relative group" tabIndex={0} data-tooltip-anchor>
                           <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                          <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                             <p className="mb-2 font-semibold">On-chain Execution</p>
                             <p className="text-gray-300">
                               Check this box if your proposal requires executing actions on smart contracts (e.g., treasury payouts, parameter changes). Uncheck for description-only proposals (signaling proposals).
@@ -2083,9 +2125,9 @@ export function GovernancePage() {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                               Target Contracts (comma-separated addresses) *
                             </label>
-                            <div className="relative group" tabIndex={0}>
+                            <div className="relative group" tabIndex={0} data-tooltip-anchor>
                               <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                              <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                 <p className="mb-2 font-semibold">Target Contracts</p>
                                 <p className="text-gray-300">
                                   The smart contract addresses that the proposal will interact with. Leave empty for description-only proposals (e.g., signaling proposals). If provided, you must also provide matching calldatas.
@@ -2112,9 +2154,9 @@ export function GovernancePage() {
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Values (comma-separated)
                               </label>
-                              <div className="relative group" tabIndex={0}>
+                              <div className="relative group" tabIndex={0} data-tooltip-anchor>
                                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                   <p className="mb-2 font-semibold">Values</p>
                                   <p className="text-gray-300">
                                     Amount of ETH to send with each call. Pick the unit (wei or ETH) for the values you enter.
@@ -2130,11 +2172,12 @@ export function GovernancePage() {
                                   e.stopPropagation();
                                   setValuesUnit('wei');
                                 }}
+                                disabled={lockValuesToZero}
                                 className={`px-2 py-1 rounded-md transition-colors ${
                                   valuesUnit === 'wei'
                                     ? 'bg-blue-700 text-white'
                                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                                }`}
+                                } ${lockValuesToZero ? 'opacity-50 cursor-not-allowed' : ''}`}
                               >
                                 wei
                               </button>
@@ -2144,11 +2187,12 @@ export function GovernancePage() {
                                   e.stopPropagation();
                                   setValuesUnit('eth');
                                 }}
+                                disabled={lockValuesToZero}
                                 className={`px-2 py-1 rounded-md transition-colors ${
                                   valuesUnit === 'eth'
                                     ? 'bg-blue-700 text-white'
                                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                                }`}
+                                } ${lockValuesToZero ? 'opacity-50 cursor-not-allowed' : ''}`}
                               >
                                 ETH
                               </button>
@@ -2158,12 +2202,14 @@ export function GovernancePage() {
                             type="text"
                             value={valuesInput}
                             onChange={(e) => setValuesInput(e.target.value)}
-                            disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                            disabled={lockValuesToZero || isMember === false || (isMember === undefined && isLoadingMembership)}
                             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
                             placeholder={valuesUnit === 'wei' ? '0 (wei)' : '0.01 (ETH)'}
                           />
                           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Unit: {valuesUnit}. Default is 0. A single value applies to all targets.
+                            {lockValuesToZero
+                              ? 'For treasury payouts, this value is always 0. The payout amount is encoded in calldata.'
+                              : `Unit: ${valuesUnit}. Default is 0. A single value applies to all targets.`}
                           </p>
                         </div>
                         <div>
@@ -2171,9 +2217,9 @@ export function GovernancePage() {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                               Calldata (comma-separated hex-encoded) *
                             </label>
-                            <div className="relative group" tabIndex={0}>
+                            <div className="relative group" tabIndex={0} data-tooltip-anchor>
                               <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                              <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                 <p className="mb-2 font-semibold">Calldata</p>
                                 <p className="text-gray-300">
                                   The encoded function calls (in hex format) that will be executed on each target contract if the proposal passes. Each calldata corresponds to one target address. Must match the number of targets provided.
@@ -2614,9 +2660,9 @@ const ProposalCard = memo(function ProposalCard({
                   {proposal.voteAnalysis.reason}
                 </span>
               )}
-              <div className="relative group" tabIndex={0}>
+              <div className="relative group" tabIndex={0} data-tooltip-anchor>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Proposal State: {proposal.state}</p>
                   <p className="text-gray-300 mb-3">
                     {proposal.state === 'Pending' && 'Voting has not started yet. Waiting for the voting delay period to pass.'}

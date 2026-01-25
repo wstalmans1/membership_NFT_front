@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { NetworkWarningBannerWrapper } from "@/components/NetworkWarningBannerWrapper";
 import { TestEnvironmentBanner } from "@/components/TestEnvironmentBanner";
+import { TooltipClamp } from "@/components/TooltipClamp";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
         <Providers>
           <TestEnvironmentBanner />
           <NetworkWarningBannerWrapper />
+          <TooltipClamp />
           {children}
         </Providers>
       </body>
