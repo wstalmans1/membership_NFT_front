@@ -362,13 +362,11 @@ export function TreasuryPage() {
       )}
 
       {/* Treasury Overview */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 w-full min-w-0">
-        <h2 className="text-base font-semibold text-gray-500 dark:text-gray-400 mb-2">Parameters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full min-w-0">
-          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-gray-600 dark:text-gray-400">Treasury Balance</p>
-              <div className="relative group">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 w-full min-w-0">
+        <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] text-gray-600 dark:text-gray-400">Treasury Balance</p>
+            <div className="relative group">
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Treasury Balance</p>
@@ -381,47 +379,46 @@ export function TreasuryPage() {
             <p className="text-sm font-semibold text-gray-900 dark:text-white">
               {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
             </p>
-          </div>
-          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-gray-600 dark:text-gray-400">Per-Transaction Cap</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Per-Transaction Cap</p>
-                  <p className="text-gray-300">
-                    The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">
-              {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
-            </p>
-          </div>
-          <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] text-gray-600 dark:text-gray-400">Epoch Cap</p>
-              <div className="relative group">
-                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                  <p className="mb-2 font-semibold">Epoch Cap</p>
-                  <p className="text-gray-300">
-                    The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
-              </p>
-              {epochDuration ? (
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  Duration: {Number(epochDuration)} seconds
+        </div>
+        <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] text-gray-600 dark:text-gray-400">Per-Transaction Cap</p>
+            <div className="relative group">
+              <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Per-Transaction Cap</p>
+                <p className="text-gray-300">
+                  The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
                 </p>
-              ) : null}
+              </div>
             </div>
+          </div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+            {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
+          </p>
+        </div>
+        <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] text-gray-600 dark:text-gray-400">Epoch Cap</p>
+            <div className="relative group">
+              <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                <p className="mb-2 font-semibold">Epoch Cap</p>
+                <p className="text-gray-300">
+                  The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
+            </p>
+            {epochDuration ? (
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                Duration: {Number(epochDuration)} seconds
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -476,86 +473,86 @@ export function TreasuryPage() {
                 </p>
                 
                 <div className="space-y-4 mt-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
-                      Recipient Address
-                    </label>
-                    <div className="relative group">
-                      <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                        <p className="mb-2 font-semibold">Recipient Address</p>
-                        <p className="text-gray-300">
-                          The Ethereum address that will receive the payment. This address must be on the allowed recipients list (managed through governance).
-                        </p>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
+                        Recipient Address
+                      </label>
+                      <div className="relative group">
+                        <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Recipient Address</p>
+                          <p className="text-gray-300">
+                            The Ethereum address that will receive the payment. This address must be on the allowed recipients list (managed through governance).
+                          </p>
+                        </div>
                       </div>
                     </div>
+                    <input
+                      type="text"
+                      value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)}
+                      placeholder="0x..."
+                      disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                      className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                    />
+                    {recipient && (
+                      <p className={`mt-1 text-xs ${isRecipientAllowed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x') 
+                          ? 'Checking recipient status...' 
+                          : isRecipientAllowed 
+                          ? '✓ Recipient is allowed' 
+                          : '✗ Recipient is not allowed'}
+                      </p>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                    placeholder="0x..."
-                    disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
-                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                  />
-                  {recipient && (
-                    <p className={`mt-1 text-xs ${isRecipientAllowed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x') 
-                        ? 'Checking recipient status...' 
-                        : isRecipientAllowed 
-                        ? '✓ Recipient is allowed' 
-                        : '✗ Recipient is not allowed'}
-                    </p>
-                  )}
-                </div>
-                
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
-                      Amount (Sepolia ETH)
-                    </label>
-                    <div className="relative group">
-                      <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
-                      <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                        <p className="mb-2 font-semibold">Amount</p>
-                        <p className="text-gray-300">
-                          The amount of Sepolia ETH to send to the recipient. Must not exceed the per-transaction cap.
-                        </p>
+                  
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-medium text-blue-900 dark:text-blue-200">
+                        Amount (Sepolia ETH)
+                      </label>
+                      <div className="relative group">
+                        <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Amount</p>
+                          <p className="text-gray-300">
+                            The amount of Sepolia ETH to send to the recipient. Must not exceed the per-transaction cap.
+                          </p>
+                        </div>
                       </div>
                     </div>
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.0"
+                      disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                      className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                    />
+                    {amount && perTxCap && (() => {
+                      try {
+                        const amountWei = parseEther(amount);
+                        return amountWei > BigInt(perTxCap.toString());
+                      } catch {
+                        return false;
+                      }
+                    })() ? (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                        Amount exceeds per-transaction cap of {formatEther(BigInt(perTxCap.toString()))} Sepolia ETH
+                      </p>
+                    ) : null}
                   </div>
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.0"
-                    disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
-                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                  />
-                  {amount && perTxCap && (() => {
-                    try {
-                      const amountWei = parseEther(amount);
-                      return amountWei > BigInt(perTxCap.toString());
-                    } catch {
-                      return false;
-                    }
-                  })() ? (
-                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                      Amount exceeds per-transaction cap of {formatEther(BigInt(perTxCap.toString()))} Sepolia ETH
-                    </p>
-                  ) : null}
-                </div>
 
-                <button
-                  onClick={handleCreateProposal}
-                  disabled={isMember === false || (isMember === undefined && isLoadingMembership) || !recipient || !amount || isRecipientAllowed === false || (isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x'))}
-                  className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >
-                  {isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Create Governance Proposal'}
-                </button>
-              </div>
+                  <button
+                    onClick={handleCreateProposal}
+                    disabled={isMember === false || (isMember === undefined && isLoadingMembership) || !recipient || !amount || isRecipientAllowed === false || (isRecipientAllowed === undefined && recipient.length === 42 && recipient.startsWith('0x'))}
+                    className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Create Governance Proposal'}
+                  </button>
+                </div>
               </>
             )}
           </div>
