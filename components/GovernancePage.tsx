@@ -105,6 +105,7 @@ const PROPOSAL_STATE_LABELS: Record<number, string> = {
 };
 
 const PROPOSAL_PAGE_SIZE = 10;
+const MAX_PROPOSAL_CACHE = 200;
 
 type BlockListener = () => void;
 
@@ -166,8 +167,12 @@ const subscribeToBlockNumber = (listener: BlockListener) => {
 
 const getBlockNumberSnapshot = () => blockNumberSnapshot;
 
-const useCurrentBlockNumber = () => {
+const useCurrentBlockNumber = () =>
+  useSyncExternalStore(subscribeToBlockNumber, getBlockNumberSnapshot, getBlockNumberSnapshot);
+
+const BlockNumberProvider = memo(function BlockNumberProvider() {
   const publicClient = usePublicClient();
+
   useWatchBlockNumber({
     chainId: sepolia.id,
     enabled: !!publicClient,
@@ -188,8 +193,8 @@ const useCurrentBlockNumber = () => {
     }
   }, [publicClient]);
 
-  return useSyncExternalStore(subscribeToBlockNumber, getBlockNumberSnapshot, getBlockNumberSnapshot);
-};
+  return null;
+});
 
 const sortProposals = (list: any[]) =>
   list
@@ -200,9 +205,12 @@ const sortProposals = (list: any[]) =>
       return Number(BigInt(b.id) - BigInt(a.id));
     });
 
+const capProposals = (list: any[]) =>
+  list.length > MAX_PROPOSAL_CACHE ? list.slice(0, MAX_PROPOSAL_CACHE) : list;
+
 const mergeProposals = (prev: any[], next: any[]) => {
-  if (next.length === 0) return prev;
-  if (prev.length === 0) return sortProposals(next);
+  if (next.length === 0) return capProposals(prev);
+  if (prev.length === 0) return capProposals(sortProposals(next));
 
   const prevById = new Map(prev.map((proposal) => [proposal.id, proposal]));
   const mergedById = new Map(prevById);
@@ -218,7 +226,7 @@ const mergeProposals = (prev: any[], next: any[]) => {
     }
   });
 
-  const merged = sortProposals(Array.from(mergedById.values()));
+  const merged = capProposals(sortProposals(Array.from(mergedById.values())));
 
   if (!hasChanges && merged.length === prev.length) {
     for (let i = 0; i < merged.length; i += 1) {
@@ -227,6 +235,8 @@ const mergeProposals = (prev: any[], next: any[]) => {
         break;
       }
     }
+  } else if (!hasChanges && merged.length !== prev.length) {
+    hasChanges = true;
   }
 
   return hasChanges ? merged : prev;
@@ -510,18 +520,25 @@ export function GovernancePage() {
 
   // Ensure proposalCount is a number
   const proposalCountNum = typeof proposalCount === 'bigint' ? Number(proposalCount) : (typeof proposalCount === 'number' ? proposalCount : 0);
+  const maxVisibleProposalCount = Math.min(proposalCountNum, MAX_PROPOSAL_CACHE);
 
   useEffect(() => {
     if (proposalCountNum > 0 && loadedProposalCount === 0) {
-      setLoadedProposalCount(Math.min(PROPOSAL_PAGE_SIZE, proposalCountNum));
+      setLoadedProposalCount(Math.min(PROPOSAL_PAGE_SIZE, proposalCountNum, MAX_PROPOSAL_CACHE));
     }
   }, [proposalCountNum, loadedProposalCount, setLoadedProposalCount]);
+
+  useEffect(() => {
+    if (loadedProposalCount > MAX_PROPOSAL_CACHE) {
+      setLoadedProposalCount(MAX_PROPOSAL_CACHE);
+    }
+  }, [loadedProposalCount, setLoadedProposalCount]);
 
   const effectiveLoadedCount = useMemo(() => {
     if (proposalCountNum === 0) return 0;
     const baseCount = loadedProposalCount > 0 ? loadedProposalCount : PROPOSAL_PAGE_SIZE;
-    return Math.min(baseCount, proposalCountNum);
-  }, [loadedProposalCount, proposalCountNum]);
+    return Math.min(baseCount, maxVisibleProposalCount);
+  }, [loadedProposalCount, maxVisibleProposalCount, proposalCountNum]);
 
   const startIndex = useMemo(() => {
     if (proposalCountNum === 0) return 0;
@@ -910,8 +927,8 @@ export function GovernancePage() {
   const handleLoadMoreProposals = useCallback(() => {
     if (isLoadingOlder || proposalCountNum === 0) return;
     setIsLoadingOlder(true);
-    setLoadedProposalCount((prev) => Math.min((prev || PROPOSAL_PAGE_SIZE) + PROPOSAL_PAGE_SIZE, proposalCountNum));
-  }, [isLoadingOlder, proposalCountNum, setLoadedProposalCount]);
+    setLoadedProposalCount((prev) => Math.min((prev || PROPOSAL_PAGE_SIZE) + PROPOSAL_PAGE_SIZE, maxVisibleProposalCount));
+  }, [isLoadingOlder, maxVisibleProposalCount, proposalCountNum, setLoadedProposalCount]);
 
   useEffect(() => {
     if (!isLoadingOlder) return;
@@ -928,7 +945,7 @@ export function GovernancePage() {
     return proposals.slice(0, Math.min(effectiveLoadedCount, proposals.length));
   }, [proposals, effectiveLoadedCount]);
 
-  const canLoadMoreProposals = effectiveLoadedCount < proposalCountNum;
+  const canLoadMoreProposals = effectiveLoadedCount < maxVisibleProposalCount;
 
   const eventRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleGovernanceRefresh = useCallback((reason: string) => {
@@ -1689,6 +1706,7 @@ export function GovernancePage() {
         queryClient={queryClient}
         refetchLatestProposals={refetchLatestProposals}
       />
+      <BlockNumberProvider />
       {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}
 
