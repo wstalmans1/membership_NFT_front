@@ -9,7 +9,7 @@ import { DAOGovernor } from '@/abis/DAOGovernor';
 import { MembershipNFT } from '@/abis/MembershipNFT';
 import { formatAddress } from '@/lib/utils';
 import { Address, BaseError, ContractFunctionRevertedError, encodeFunctionData, parseEther, keccak256, toBytes, stringToBytes, pad, toHex, encodePacked, decodeEventLog } from 'viem';
-import { HelpCircle, ChevronDown, ChevronUp, Loader2, Clock } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, ChevronRight, Loader2, Clock } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -259,6 +259,8 @@ export function GovernancePage() {
   const [description, setDescription] = useState('');
   const [targets, setTargets] = useState('');
   const [calldatas, setCalldatas] = useState('');
+  const [valuesInput, setValuesInput] = useState('0');
+  const [valuesUnit, setValuesUnit] = useState<'wei' | 'eth'>('wei');
   const [withOnChainExecution, setWithOnChainExecution] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -300,6 +302,13 @@ export function GovernancePage() {
           console.log('Loading treasury payout proposal from localStorage:', proposalData);
           setTargets(proposalData.targets || '');
           setCalldatas(proposalData.calldatas || '');
+          if (proposalData.values) {
+            const storedValues = Array.isArray(proposalData.values) ? proposalData.values.join(', ') : String(proposalData.values);
+            setValuesInput(storedValues);
+          } else {
+            setValuesInput('0');
+            setValuesUnit('wei');
+          }
           setDescription(proposalData.description || '');
           setWithOnChainExecution(true); // Treasury payouts require on-chain execution
           setShowCreateForm(true);
@@ -320,6 +329,13 @@ export function GovernancePage() {
           console.log('Loading allowlist proposal from localStorage:', proposalData);
           setTargets(proposalData.targets || '');
           setCalldatas(proposalData.calldatas || '');
+          if (proposalData.values) {
+            const storedValues = Array.isArray(proposalData.values) ? proposalData.values.join(', ') : String(proposalData.values);
+            setValuesInput(storedValues);
+          } else {
+            setValuesInput('0');
+            setValuesUnit('wei');
+          }
           setDescription(proposalData.description || '');
           setWithOnChainExecution(true); // Allowlist proposals require on-chain execution
           setShowCreateForm(true);
@@ -1087,6 +1103,21 @@ export function GovernancePage() {
     }
 
     try {
+      const parseValueInput = (rawValue: string) => {
+        const trimmed = rawValue.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('0x')) {
+          return BigInt(trimmed);
+        }
+        if (valuesUnit === 'eth') {
+          return parseEther(trimmed);
+        }
+        if (trimmed.includes('.')) {
+          throw new Error('Wei values must be whole numbers');
+        }
+        return BigInt(trimmed);
+      };
+
       // Parse targets (comma-separated addresses)
       let targetAddresses: Address[] = [];
       let values: bigint[] = [];
@@ -1125,8 +1156,39 @@ export function GovernancePage() {
           return;
         }
 
-        // Values array (0 ETH for each target by default)
-        values = targetAddresses.map(() => 0n);
+        // Parse values (comma-separated). Empty -> all 0. Single -> apply to all.
+        const rawValues = valuesInput
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0);
+
+        if (rawValues.length === 0) {
+          values = targetAddresses.map(() => 0n);
+        } else if (rawValues.length === 1) {
+          const parsed = parseValueInput(rawValues[0]);
+          if (parsed === null) {
+            setError('Please provide a valid value amount');
+            return;
+          }
+          values = targetAddresses.map(() => parsed);
+        } else {
+          if (rawValues.length !== targetAddresses.length) {
+            setError('Number of values must match number of targets (or provide a single value for all)');
+            return;
+          }
+          try {
+            values = rawValues.map((value) => {
+              const parsed = parseValueInput(value);
+              if (parsed === null) {
+                throw new Error('Invalid value');
+              }
+              return parsed;
+            });
+          } catch (error) {
+            setError('Values must be valid numbers, decimals (ETH), or hex amounts');
+            return;
+          }
+        }
       } else {
         // For proposals without on-chain execution (description-only), use dummy target
         targetAddresses = [CONTRACTS.SEPOLIA.GOVERNOR_PROXY as Address];
@@ -1165,6 +1227,7 @@ export function GovernancePage() {
       setDescription('');
       setTargets('');
       setCalldatas('');
+      setValuesInput('0');
       setWithOnChainExecution(false);
       
       // Refetch proposals after a short delay to allow block to be mined
@@ -1943,29 +2006,6 @@ export function GovernancePage() {
           )}
 
           <form onSubmit={handleSubmitProposal} className="space-y-4">
-            <div className="mb-4">
-              <label className={`flex items-center gap-2 ${isMember === false || (isMember === undefined && isLoadingMembership) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                <input
-                  type="checkbox"
-                  checked={withOnChainExecution}
-                  onChange={(e) => setWithOnChainExecution(e.target.checked)}
-                  disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  With on-chain execution
-                </span>
-                <div className="relative group">
-                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
-                    <p className="mb-2 font-semibold">On-chain Execution</p>
-                    <p className="text-gray-300">
-                      Check this box if your proposal requires executing actions on smart contracts (e.g., treasury payouts, parameter changes). Uncheck for description-only proposals (signaling proposals).
-                    </p>
-                  </div>
-                </div>
-              </label>
-            </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1990,6 +2030,29 @@ export function GovernancePage() {
                 placeholder="Describe your proposal..."
                 required
               />
+            </div>
+            <div className="mb-4">
+              <label className={`flex items-center gap-2 ${isMember === false || (isMember === undefined && isLoadingMembership) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={withOnChainExecution}
+                  onChange={(e) => setWithOnChainExecution(e.target.checked)}
+                  disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  With on-chain execution
+                </span>
+                <div className="relative group">
+                  <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                  <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                    <p className="mb-2 font-semibold">On-chain Execution</p>
+                    <p className="text-gray-300">
+                      Check this box if your proposal requires executing actions on smart contracts (e.g., treasury payouts, parameter changes). Uncheck for description-only proposals (signaling proposals).
+                    </p>
+                  </div>
+                </div>
+              </label>
             </div>
             {withOnChainExecution && (
               <>
@@ -2019,6 +2082,66 @@ export function GovernancePage() {
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 You must also provide matching calldatas below.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Values (comma-separated)
+                  </label>
+                  <div className="relative group">
+                    <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
+                      <p className="mb-2 font-semibold">Values</p>
+                      <p className="text-gray-300">
+                        Amount of ETH to send with each call. Pick the unit (wei or ETH) for the values you enter.
+                        Use one value for all targets, or a comma-separated list matching each target.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setValuesUnit('wei');
+                    }}
+                    className={`px-2 py-1 rounded-md transition-colors ${
+                      valuesUnit === 'wei'
+                        ? 'bg-blue-700 text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    wei
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setValuesUnit('eth');
+                    }}
+                    className={`px-2 py-1 rounded-md transition-colors ${
+                      valuesUnit === 'eth'
+                        ? 'bg-blue-700 text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    ETH
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={valuesInput}
+                onChange={(e) => setValuesInput(e.target.value)}
+                disabled={isMember === false || (isMember === undefined && isLoadingMembership)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                placeholder={valuesUnit === 'wei' ? '0 (wei)' : '0.01 (ETH)'}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Unit: {valuesUnit}. Default is 0. A single value applies to all targets.
               </p>
             </div>
             <div>
@@ -2419,14 +2542,33 @@ const ProposalCard = memo(function ProposalCard({
 
   return (
     <div
-      className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors cursor-pointer"
+      className="p-4 border border-gray-300 dark:border-gray-500 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
       onClick={handleToggle}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Proposal from block {proposal.blockNumber.toLocaleString()}</h3>
-            <CopyableProposalId proposalId={proposal.id} />
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Proposal from block {proposal.blockNumber.toLocaleString()}
+              </h3>
+              <CopyableProposalId proposalId={proposal.id} />
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggle();
+              }}
+              className="flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+            >
+              <span>{isExpanded ? 'Collapse details' : 'Expand details'}</span>
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -2475,7 +2617,14 @@ const ProposalCard = memo(function ProposalCard({
               </div>
             </div>
           {isExpanded && <PendingStateNotice proposal={proposal} />}
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">{proposal.description}</p>
+          <div className="mt-1 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
+            <div className="text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-300 font-semibold mb-2">
+              Proposal Description
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {proposal.description}
+            </p>
+          </div>
           <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
             <span>Proposer: <a href={`https://eth-sepolia.blockscout.com/address/${proposal.proposer}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-mono" onClick={(e) => e.stopPropagation()}>{formatAddress(proposal.proposer)}</a></span>
             <span>Vote Start: Block {proposal.voteStart.toLocaleString()}</span>
@@ -2513,7 +2662,7 @@ const ProposalCard = memo(function ProposalCard({
         isExpanded={isExpanded}
       />
 
-      {(isExpanded || !isFinalState) && (
+      {isExpanded ? (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
           <ProposalTimeline 
             proposal={proposal}
@@ -2529,6 +2678,19 @@ const ProposalCard = memo(function ProposalCard({
             isExecutingForProposal={isExecutingForProposal}
             executeHash={executeHash}
             isQueued={isQueued}
+            variant="full"
+            onToggle={handleToggle}
+          />
+        </div>
+      ) : (
+        <div className="mt-3">
+          <ProposalTimeline 
+            proposal={proposal}
+            timelockDelaySeconds={timelockDelaySeconds}
+            queuedProposalETA={queuedProposalETA}
+            isQueued={isQueued}
+            variant="compact"
+            onToggle={handleToggle}
           />
         </div>
       )}
@@ -3073,7 +3235,9 @@ function ProposalTimeline({
   isExecuting,
   isExecutingForProposal,
   executeHash,
-  isQueued
+  isQueued,
+  variant = 'full',
+  onToggle
 }: { 
   proposal: any; 
   timelockDelaySeconds: bigint | null | undefined;
@@ -3088,6 +3252,8 @@ function ProposalTimeline({
   isExecutingForProposal?: boolean;
   executeHash?: `0x${string}`;
   isQueued?: boolean;
+  variant?: 'full' | 'compact';
+  onToggle?: () => void;
 }) {
   const currentBlockNumber = useCurrentBlockNumber();
   // Countdown state for queued proposals
@@ -3251,9 +3417,70 @@ function ProposalTimeline({
   const steps = getTimelineSteps();
   const currentBlock = currentBlockNumber || 0n;
 
+  const getBlockInfo = (step: { block: bigint | null }) => {
+    if (!step.block || currentBlock === 0n) return '';
+    const stepBlock = BigInt(step.block);
+    if (currentBlock >= stepBlock) {
+      const blocksAgo = currentBlock - stepBlock;
+      return `${blocksAgo.toLocaleString()} blocks ago`;
+    }
+    const blocksRemaining = stepBlock - currentBlock;
+    return `${blocksRemaining.toLocaleString()} blocks remaining`;
+  };
+
+  if (variant === 'compact') {
+    const currentStep = steps.find((step) => step.status === 'current')
+      ?? steps.find((step) => step.status === 'upcoming')
+      ?? steps[steps.length - 1];
+    const currentIndex = currentStep ? steps.indexOf(currentStep) : -1;
+    const nextStep = currentIndex >= 0 ? steps[currentIndex + 1] : undefined;
+    const currentBlockInfo = currentStep ? getBlockInfo(currentStep) : '';
+    const nextBlockInfo = nextStep ? getBlockInfo(nextStep) : '';
+
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <ChevronRight className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+            <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide">
+              Voting Timeline
+            </span>
+          </div>
+          {currentStep && (
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+              {currentStep.label}
+            </span>
+          )}
+        </div>
+        {currentStep && (
+          <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+            {currentStep.description}
+            {currentBlockInfo && <span className="ml-2">{currentBlockInfo}</span>}
+          </div>
+        )}
+        {nextStep && (
+          <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+            Next: {nextStep.label}
+            {nextBlockInfo && <span className="ml-2">{nextBlockInfo}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4">
-      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Proposal Timeline</h4>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle?.();
+        }}
+        className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-4"
+      >
+        <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        <span>Proposal Timeline</span>
+      </button>
       <div className="space-y-3">
         {steps.map((step, index) => {
           const isLast = index === steps.length - 1;

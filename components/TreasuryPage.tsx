@@ -445,16 +445,16 @@ export function TreasuryPage() {
           <div>
             <button
               onClick={() => setIsPayoutSectionExpanded(!isPayoutSectionExpanded)}
-              className="w-full flex items-center justify-between text-left"
+              className="w-full flex items-center gap-2 text-left"
             >
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200">
-                Execute Treasury Payouts
-              </h3>
               {isPayoutSectionExpanded ? (
                 <ChevronUp className="w-5 h-5 text-blue-900 dark:text-blue-200" />
               ) : (
                 <ChevronDown className="w-5 h-5 text-blue-900 dark:text-blue-200" />
               )}
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200">
+                Execute Treasury Payouts
+              </h3>
             </button>
             
             {isPayoutSectionExpanded && (

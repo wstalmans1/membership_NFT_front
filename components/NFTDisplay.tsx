@@ -237,7 +237,7 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
           {/* Right Column - Photo and QR Code */}
           <div className="col-span-1 flex flex-col items-center gap-1">
             {metadata.image ? (
-              <div className="w-2/3 aspect-[3/4] bg-white rounded overflow-hidden border border-cyan-300/50 shadow-sm">
+              <div className="w-2/3 aspect-[3/4] bg-gray-900 rounded overflow-hidden border border-cyan-300/50 shadow-sm">
                 <img
                   src={metadata.image}
                   alt={properties.name || 'Member Photo'}
@@ -279,4 +279,3 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
     </div>
   );
 }
-
