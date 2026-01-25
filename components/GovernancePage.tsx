@@ -2623,7 +2623,7 @@ const ProposalCard = memo(function ProposalCard({
         <div className="flex-1">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
+              <h3 className="font-semibold text-gray-500 dark:text-gray-400">
                 Proposal from block {proposal.blockNumber.toLocaleString()}
               </h3>
               <CopyableProposalId proposalId={proposal.id} />
@@ -2691,11 +2691,11 @@ const ProposalCard = memo(function ProposalCard({
               </div>
             </div>
           {isExpanded && <PendingStateNotice proposal={proposal} />}
-          <div className="mt-1 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
+          <div className="mt-1 mb-2 p-3 bg-gray-50 dark:bg-white/16 rounded">
             <div className="text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-300 font-semibold mb-2">
               Proposal Description
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-gray-400 dark:text-gray-200">
               {proposal.description}
             </p>
           </div>
