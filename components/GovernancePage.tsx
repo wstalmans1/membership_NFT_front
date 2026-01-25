@@ -2539,7 +2539,7 @@ const ProposalCard = memo(function ProposalCard({
     proposal.state === 'Executed' ||
     proposal.state === 'Canceled' ||
     proposal.state === 'Expired';
-  const shouldShowFullTimeline = isExpanded || (!isFinalState && proposal.state === 'Active');
+  const shouldShowFullTimeline = isExpanded || !isFinalState;
 
   return (
     <div
@@ -3530,7 +3530,7 @@ function ProposalTimeline({
                     </button>
                   )}
                   {/* Show scheduled status with countdown when proposal is queued - appears beside "Start Review Window" label */}
-                  {step.label === 'Start Review Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && !isReady && (
+                  {step.label === 'Review & Opposition Window' && (proposal.state === 'Queued' || isQueued) && timeRemaining && !isReady && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 mt-0.5">
