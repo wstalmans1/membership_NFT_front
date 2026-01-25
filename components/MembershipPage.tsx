@@ -627,7 +627,7 @@ export function MembershipPage() {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
                   <div className="relative group" tabIndex={0}>
                     <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                    <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                    <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                       <p className="mb-2 font-semibold">Voting Power</p>
                       <p className="text-gray-300">
                         Your voting power determines how much weight your vote has in governance proposals. Each membership NFT grants 1 vote, which is automatically delegated to yourself when you mint. You can change delegation to vote directly or delegate to another address.
@@ -642,7 +642,7 @@ export function MembershipPage() {
                       <span className="text-sm text-gray-600 dark:text-gray-400">Voting Power:</span>
                       <div className="relative group" tabIndex={0}>
                         <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                        <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                           <p className="mb-2 font-semibold">Voting Power</p>
                           <p className="text-gray-300">
                             Each <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> member has 1 vote, which can be delegated to yourself or to another address. When delegated to yourself, you can vote directly. When delegated to another address, that address can vote on your behalf.
@@ -669,7 +669,7 @@ export function MembershipPage() {
                       <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
                       <div className="relative group" tabIndex={0}>
                         <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                        <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                           <p className="mb-2 font-semibold">Delegation</p>
                           <p className="text-gray-300">
                             Delegation determines who can use your voting power. You can delegate to yourself (to vote directly) or to another address (to let them vote on your behalf). New memberships are automatically delegated to yourself.
@@ -728,7 +728,7 @@ export function MembershipPage() {
                                         Delegate to Address
                                         <div className="relative group inline-block ml-2" tabIndex={0}>
                                           <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                          <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                          <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                             <p className="mb-2 font-semibold">Delegate to Another Address</p>
                                             <p className="text-gray-300">
                                               Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
@@ -772,7 +772,7 @@ export function MembershipPage() {
                                           <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
                                           <div className="relative group" tabIndex={0}>
                                             <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                            <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                               <p className="mb-2 font-semibold">Delegate to Myself</p>
                                               <p className="text-gray-300">
                                                 This allows you to vote directly on proposals using your voting power.
@@ -796,7 +796,7 @@ export function MembershipPage() {
                                           <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
                                           <div className="relative group" tabIndex={0}>
                                             <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                            <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                               <p className="mb-2 font-semibold">Delegate to Another Address</p>
                                               <p className="text-gray-300">
                                                 Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.

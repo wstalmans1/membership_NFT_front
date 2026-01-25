@@ -169,7 +169,7 @@ export function ConstitutionPage() {
   };
 
   return (
-    <div className="space-y-8 min-w-0 w-full max-w-full overflow-hidden">
+    <div className="space-y-8 min-w-0 w-full max-w-full overflow-visible">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Constitution</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">View <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> governance parameters and rules</p>
@@ -184,15 +184,15 @@ export function ConstitutionPage() {
       )}
 
       {/* Membership Parameters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-visible">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Membership Parameters</h2>
-        <div className="space-y-4 min-w-0 overflow-hidden">
+        <div className="space-y-4 min-w-0 overflow-visible">
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <span className="text-gray-600 dark:text-gray-400">Minimum Donation</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Minimum Donation</p>
                   <p className="text-gray-300">
                     The minimum amount of Sepolia ETH required to mint a membership NFT. This donation goes directly to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury.
@@ -211,7 +211,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Revocation Authority</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Revocation Authority</p>
                   <p className="text-gray-300">
                     The address authorized to revoke membership NFTs outside of normal governance processes. 
@@ -237,15 +237,15 @@ export function ConstitutionPage() {
       </div>
 
       {/* Treasury Parameters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 min-w-0 overflow-visible">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Treasury Parameters</h2>
-        <div className="space-y-4 min-w-0 overflow-hidden">
+        <div className="space-y-4 min-w-0 overflow-visible">
           <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
               <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Per-Transaction Spend Cap</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Per-Transaction Spend Cap</p>
                   <p className="text-gray-300">
                     The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
@@ -264,7 +264,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Epoch Spend Cap</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Epoch Spend Cap</p>
                   <p className="text-gray-300">
                     The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
@@ -283,7 +283,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Epoch Duration</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Epoch Duration</p>
                   <p className="text-gray-300">
                     The length of time (in seconds) that defines one epoch. The epoch spend cap resets after each epoch duration period.
@@ -297,12 +297,12 @@ export function ConstitutionPage() {
                 : 'Loading...'}
             </span>
           </div>
-          <div className="py-3 min-w-0 overflow-hidden">
-            <div className="flex items-center gap-2 mb-3 min-w-0 overflow-hidden">
+          <div className="py-3 min-w-0 overflow-visible">
+            <div className="flex items-center gap-2 mb-3 min-w-0 overflow-visible">
               <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Allowed Recipients</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Allowed Recipients</p>
                   <p className="text-gray-300">
                     The list of addresses that are authorized to receive payments from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Only addresses on this allowlist can receive funds through governance proposals.
@@ -361,7 +361,7 @@ export function ConstitutionPage() {
                           </label>
                           <div className="relative group flex-shrink-0" tabIndex={0}>
                             <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                            <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                            <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-56 p-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                               <p className="mb-1 font-semibold">Recipient Address</p>
                               <p className="text-gray-300">
                                 The Ethereum address to add to the allowed recipients list. This address will be able to receive funds from the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury after the proposal is executed.
@@ -466,7 +466,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Voting Delay</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Voting Delay</p>
                   <p className="text-gray-300">
                     The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
@@ -485,7 +485,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Voting Period</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Voting Period</p>
                   <p className="text-gray-300">
                     The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
@@ -504,7 +504,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Proposal Threshold</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Proposal Threshold</p>
                   <p className="text-gray-300">
                     The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
@@ -526,7 +526,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Quorum Numerator</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Quorum Numerator</p>
                   <p className="text-gray-300">
                     The numerator used to calculate the quorum percentage. Quorum = (numerator / 100) × total membership supply. For example, a numerator of 10 means minimum 10% of members must vote for a proposal to be considered.
@@ -549,7 +549,7 @@ export function ConstitutionPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Contract Addresses</h2>
           <div className="relative group" tabIndex={0}>
             <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-            <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+            <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
               <p className="mb-2 font-semibold">Contract Addresses</p>
               <p className="text-gray-300">
                 These are the on-chain addresses of the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>'s smart contracts. All contracts are verified on Blockscout, allowing anyone to inspect the code and verify their functionality. Click any address to view it on the block explorer.
@@ -563,7 +563,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Constitution:</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Constitution Contract</p>
                   <p className="text-gray-300">
                     Defines the core <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> parameters including minimum donation, spend caps, allowed recipients, and base URI. This contract acts as the source of truth for governance rules and treasury constraints.
@@ -585,7 +585,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Governor:</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Governor Contract</p>
                   <p className="text-gray-300">
                     Manages the governance process: proposal creation, voting, and execution. Members create proposals here, vote on them, and successful proposals are queued for execution through the Timelock.
@@ -607,7 +607,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Membership NFT:</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Membership NFT Contract</p>
                   <p className="text-gray-300">
                     Issues soulbound (non-transferable) membership NFTs to <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> members. Each NFT grants 1 vote in governance. Members mint NFTs by making a minimum donation to the treasury.
@@ -629,7 +629,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Treasury:</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Treasury Executor Contract</p>
                   <p className="text-gray-300">
                     Manages <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury funds and executes payouts. Enforces spend caps and recipient allowlists. All treasury operations must go through governance proposals and the Timelock.
@@ -651,7 +651,7 @@ export function ConstitutionPage() {
               <span className="text-gray-600 dark:text-gray-400">Timelock:</span>
               <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Timelock Controller</p>
                   <p className="text-gray-300">
                     Adds a delay between proposal execution and actual execution. This gives members time to review and react to proposals before they take effect, providing an additional security layer.

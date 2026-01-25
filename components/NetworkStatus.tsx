@@ -148,7 +148,7 @@ export function NetworkStatus() {
           >
             ?
           </span>
-          <div className="absolute right-0 top-full mt-2 w-max max-w-xs p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700 whitespace-normal">
+          <div className="absolute right-0 top-full mt-2 w-max max-w-[80vw] sm:max-w-xs p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700 whitespace-normal">
             MetaMask now locks networks per site. If you switched via this DApp, changing MetaMask's global network won't affect this site.
             <span className="block mt-2 text-gray-300">
               Use the DApp switch button or MetaMask → Connected sites → this site → Network.

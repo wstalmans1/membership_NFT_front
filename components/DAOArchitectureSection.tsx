@@ -26,7 +26,7 @@ export function DAOArchitectureSection() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white"><span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> Architecture</h2>
           <div className="relative group" tabIndex={0}>
             <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-            <div className="absolute left-0 bottom-full mb-2 w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+            <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-72 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
               <p className="mb-2 font-semibold"><span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> Architecture Overview</p>
               <p className="text-gray-300">
                 Understanding how the <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span> works: contracts, roles, and governance flows. Click sections to expand for detailed information.

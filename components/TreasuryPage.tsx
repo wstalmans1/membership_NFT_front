@@ -368,7 +368,7 @@ export function TreasuryPage() {
             <p className="text-[11px] text-gray-600 dark:text-gray-400">Treasury Balance</p>
             <div className="relative group" tabIndex={0}>
                 <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Treasury Balance</p>
                   <p className="text-gray-300">
                     The total amount of Sepolia ETH held by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Funds come from membership donations and can be spent through governance proposals.
@@ -385,7 +385,7 @@ export function TreasuryPage() {
             <p className="text-[11px] text-gray-600 dark:text-gray-400">Per-Transaction Cap</p>
             <div className="relative group" tabIndex={0}>
               <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+              <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Per-Transaction Cap</p>
                 <p className="text-gray-300">
                   The maximum amount of Sepolia ETH that can be spent in a single treasury transaction. This prevents large unauthorized withdrawals.
@@ -402,7 +402,7 @@ export function TreasuryPage() {
             <p className="text-[11px] text-gray-600 dark:text-gray-400">Epoch Cap</p>
             <div className="relative group" tabIndex={0}>
               <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+              <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                 <p className="mb-2 font-semibold">Epoch Cap</p>
                 <p className="text-gray-300">
                   The maximum total amount of Sepolia ETH that can be spent from the treasury within a single epoch (time period). This provides additional protection against rapid depletion of funds.
@@ -480,7 +480,7 @@ export function TreasuryPage() {
                       </label>
                       <div className="relative group" tabIndex={0}>
                         <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                        <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                           <p className="mb-2 font-semibold">Recipient Address</p>
                           <p className="text-gray-300">
                             The Ethereum address that will receive the payment. This address must be on the allowed recipients list (managed through governance).
@@ -514,7 +514,7 @@ export function TreasuryPage() {
                       </label>
                       <div className="relative group" tabIndex={0}>
                         <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 cursor-help" />
-                        <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                        <div className="absolute bottom-full mb-2 right-0 md:left-0 md:right-auto w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                           <p className="mb-2 font-semibold">Amount</p>
                           <p className="text-gray-300">
                             The amount of Sepolia ETH to send to the recipient. Must not exceed the per-transaction cap.
