@@ -362,9 +362,9 @@ export function TreasuryPage() {
   };
 
   return (
-    <div className="space-y-8 w-full min-w-0 overflow-hidden">
+    <div className="space-y-6 w-full min-w-0 overflow-hidden">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Treasury</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Treasury</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">View <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury balance and spending parameters. Payouts are executed through governance proposals.</p>
       </div>
 
@@ -372,7 +372,7 @@ export function TreasuryPage() {
       {isConnected && <BalanceCheck />}
 
       {!isConnected && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <p className="text-teal-600 dark:text-teal-400">
             Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
           </p>
@@ -380,8 +380,8 @@ export function TreasuryPage() {
       )}
 
       {/* Treasury Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full min-w-0">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full min-w-0">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
             <div className="relative group">
@@ -394,11 +394,11 @@ export function TreasuryPage() {
               </div>
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl font-bold text-gray-900 dark:text-white">
             {treasuryBalance ? formatEther(BigInt(treasuryBalance.value.toString())) : '...'} Sepolia ETH
           </p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Per-Transaction Cap</h3>
             <div className="relative group">
@@ -411,11 +411,11 @@ export function TreasuryPage() {
               </div>
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl font-bold text-gray-900 dark:text-white">
             {perTxCap ? formatEther(BigInt(perTxCap.toString())) : '...'} Sepolia ETH
           </p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Epoch Cap</h3>
             <div className="relative group">
@@ -428,7 +428,7 @@ export function TreasuryPage() {
               </div>
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl font-bold text-gray-900 dark:text-white">
             {epochCap ? formatEther(BigInt(epochCap.toString())) : '...'} Sepolia ETH
           </p>
           {epochDuration ? (
@@ -441,7 +441,7 @@ export function TreasuryPage() {
 
       {/* Execute Treasury Payouts - Collapsible */}
       {isConnected && isCorrectNetwork && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div>
             <button
               onClick={() => setIsPayoutSectionExpanded(!isPayoutSectionExpanded)}
@@ -452,7 +452,7 @@ export function TreasuryPage() {
               ) : (
                 <ChevronDown className="w-5 h-5 text-blue-900 dark:text-blue-200" />
               )}
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200">
+              <h3 className="text-base font-semibold text-blue-900 dark:text-blue-200">
                 Execute Treasury Payouts
               </h3>
             </button>
@@ -461,7 +461,7 @@ export function TreasuryPage() {
               <>
                 {/* Show membership requirement message if not a member */}
                 {isMember === false && (
-                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <div className="space-y-3">
                       <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium">
                         You need to be a member to create treasury payout proposals. Please become a member first.

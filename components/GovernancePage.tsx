@@ -1717,12 +1717,12 @@ export function GovernancePage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full min-w-0">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Governance Parameters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 w-full min-w-0">
-            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Proposal Threshold</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 w-full min-w-0">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Governance Parameters</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-3 w-full min-w-0">
+            <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">Proposal Threshold</p>
                 <div className="relative group">
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -1736,15 +1736,15 @@ export function GovernancePage() {
                   </div>
                 </div>
               </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {proposalThreshold !== undefined && proposalThreshold !== null
                   ? proposalThreshold.toString()
                   : '0'}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Voting Delay</p>
+            <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Delay</p>
                 <div className="relative group">
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -1755,15 +1755,15 @@ export function GovernancePage() {
                   </div>
                 </div>
               </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {votingDelay !== undefined && votingDelay !== null
                   ? `${Number(votingDelay)} blocks`
                   : '0 blocks'}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Voting Period</p>
+            <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Period</p>
                 <div className="relative group">
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -1774,15 +1774,15 @@ export function GovernancePage() {
                   </div>
                 </div>
               </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {votingPeriod !== undefined && votingPeriod !== null
                   ? `${Number(votingPeriod)} blocks`
                   : '0 blocks'}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Timelock Delay</p>
+            <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-gray-600 dark:text-gray-400">Timelock Delay</p>
                 <div className="relative group">
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
                   <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 border border-gray-700">
@@ -1793,7 +1793,7 @@ export function GovernancePage() {
                   </div>
                 </div>
               </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 {timelockDelaySeconds !== undefined && timelockDelaySeconds !== null
                   ? `${Number(timelockDelaySeconds)} seconds${Number(timelockDelaySeconds) >= 12 ? ` (~${Math.round(Number(timelockDelaySeconds) / 12)} blocks)` : ''}`
                   : '0 seconds'}
@@ -1805,14 +1805,14 @@ export function GovernancePage() {
         <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
           <button
             onClick={() => setIsVotingRulesExpanded(!isVotingRulesExpanded)}
-            className="flex items-center gap-2 w-full text-left mb-3 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 w-full text-left mb-3 hover:opacity-80 transition-opacity"
           >
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Rules</h3>
             {isVotingRulesExpanded ? (
               <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             ) : (
               <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             )}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Rules</h3>
           </button>
           {isVotingRulesExpanded && (
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">

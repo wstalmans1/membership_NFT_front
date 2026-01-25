@@ -469,16 +469,16 @@ export function MembershipPage() {
               setIsAllMembersExpanded(false);
             }
           }}
-          className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
+          className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity mb-4"
         >
+          {isMembershipStatusExpanded ? (
+            <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+          )}
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Your Membership Status
           </h2>
-          {isMembershipStatusExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-          )}
         </button>
         
         {isMembershipStatusExpanded && (
@@ -1105,8 +1105,13 @@ export function MembershipPage() {
                 setIsMembershipStatusExpanded(false);
               }
             }}
-            className="w-full flex items-center justify-between text-left hover:opacity-80 transition-opacity mb-4"
+            className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity mb-4"
           >
+            {isAllMembersExpanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+            )}
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               {isLoadingMembers ? (
                 'All Members'
@@ -1114,11 +1119,6 @@ export function MembershipPage() {
                 `All Members (${allMembers.length})`
               )}
             </h2>
-            {isAllMembersExpanded ? (
-              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0 ml-2" />
-            )}
           </button>
           {isAllMembersExpanded && (
             <>
@@ -1148,4 +1148,3 @@ export function MembershipPage() {
     </div>
   );
 }
-
