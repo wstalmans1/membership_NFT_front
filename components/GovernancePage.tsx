@@ -2691,11 +2691,11 @@ const ProposalCard = memo(function ProposalCard({
               </div>
             </div>
           {isExpanded && <PendingStateNotice proposal={proposal} />}
-          <div className="mt-1 mb-2 p-3 bg-gray-50 dark:bg-white/16 rounded">
+          <div className="mt-1 mb-2 p-3 bg-slate-200 dark:bg-slate-700/70 rounded">
             <div className="text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-300 font-semibold mb-2">
               Proposal Description
             </div>
-            <p className="text-sm text-gray-400 dark:text-gray-200">
+            <p className="text-sm text-gray-500 dark:text-gray-200">
               {proposal.description}
             </p>
           </div>
