@@ -405,6 +405,13 @@ export function Dashboard() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Learn about our design principles</p>
           </Link>
           <Link
+            href="/trilemma"
+            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+          >
+            <h3 className="font-semibold text-gray-900 dark:text-white">Blockchain Nation Trilemma</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand the tradeoffs between sovereignty, scale, and onboarding</p>
+          </Link>
+          <Link
             href="/getting-started"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
           >
@@ -416,4 +423,3 @@ export function Dashboard() {
     </div>
   );
 }
-

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900">
+  <rect width="100%" height="100%" fill="#0f172a"/>
+  <style>
+    .title{font:700 26px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; fill:#e2e8f0;}
+    .label{font:600 18px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; fill:#e2e8f0;}
+    .small{font:500 15px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; fill:#cbd5f5;}
+    .node{fill:#1e293b; stroke:#3b82f6; stroke-width:2;}
+    .nodeText{font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; fill:#e2e8f0;}
+    .hint{font:500 13px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; fill:#94a3b8;}
+  </style>
+
+  <text x="450" y="48" text-anchor="middle" class="title">Blockchain Nation Trilemma</text>
+
+  <!-- Triangle -->
+  <polygon points="450,110 130,650 770,650" fill="none" stroke="#475569" stroke-width="2" />
+
+  <!-- Axis labels -->
+  <text x="450" y="95" text-anchor="middle" class="label">Scalability + UX</text>
+  <text x="90" y="675" text-anchor="start" class="label">On-chain Sovereignty</text>
+  <text x="810" y="675" text-anchor="end" class="label">User-friendly Onboarding</text>
+
+  <!-- Nodes -->
+  <rect x="415" y="170" rx="8" ry="8" width="70" height="46" class="node"/>
+  <text x="450" y="200" text-anchor="middle" class="nodeText">4</text>
+
+  <rect x="415" y="360" rx="8" ry="8" width="70" height="46" class="node"/>
+  <text x="450" y="390" text-anchor="middle" class="nodeText">5</text>
+
+  <rect x="280" y="540" rx="8" ry="8" width="70" height="46" class="node"/>
+  <text x="315" y="570" text-anchor="middle" class="nodeText">2</text>
+
+  <rect x="645" y="505" rx="8" ry="8" width="70" height="46" class="node"/>
+  <text x="680" y="535" text-anchor="middle" class="nodeText">3</text>
+
+  <rect x="415" y="600" rx="8" ry="8" width="70" height="52" class="node"/>
+  <text x="450" y="632" text-anchor="middle" class="nodeText">1</text>
+
+  <!-- Guidance -->
+  <text x="450" y="700" text-anchor="middle" class="hint">Closer to a vertex = stronger on that axis, weaker on others</text>
+
+  <!-- Legend / Index -->
+  <text x="120" y="740" text-anchor="start" class="label">Index</text>
+  <text x="120" y="764" text-anchor="start" class="small">(1) Fully on-chain nation: Blockchain nation: 95% • Members: 100k–2M • Wallet reliance: High</text>
+  <text x="120" y="786" text-anchor="start" class="small">(2) On-chain + Snapshot voting: Blockchain nation: 60% • Members: 1M–50M • Wallet reliance: Medium</text>
+  <text x="120" y="808" text-anchor="start" class="small">(3) On-chain + smart accounts: Blockchain nation: 85% • Members: 1M–20M • Wallet reliance: Low</text>
+  <text x="120" y="830" text-anchor="start" class="small">(4) Off-chain membership + proofs: Blockchain nation: 35% • Members: 100M–1B+ • Wallet reliance: Low</text>
+  <text x="120" y="852" text-anchor="start" class="small">(5) Hybrid two-tier: Blockchain nation: 70% • Members: 10M–500M • Wallet reliance: Medium</text>
+</svg>

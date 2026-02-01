@@ -19,6 +19,7 @@ const navItems = [
 const moreMenuItems = [
   { href: '/dao-architecture', label: 'DAO Architecture' },
   { href: '/philosophy', label: 'Design Philosophy' },
+  { href: '/trilemma', label: 'Blockchain Nation Trilemma' },
   { href: '/getting-started', label: 'Getting Started Guide' },
 ];
 
