@@ -43,6 +43,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">1) Fully On‑Chain Nation (current model)</p>
                 <p><span className="font-semibold">Membership:</span> ERC‑721 on L1/L2 · <span className="font-semibold">Voting:</span> On‑chain Governor · <span className="font-semibold">Execution:</span> On‑chain Timelock</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 95% · <span className="font-semibold">Members:</span> 100k–2M · <span className="font-semibold">Wallet reliance:</span> High
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ Maximum sovereignty</li>
@@ -59,6 +63,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">2) On‑Chain Membership + Off‑Chain Voting (Snapshot)</p>
                 <p><span className="font-semibold">Membership:</span> ERC‑721 on‑chain · <span className="font-semibold">Voting:</span> Snapshot signatures · <span className="font-semibold">Execution:</span> On‑chain via executor (multisig/bot)</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 60% · <span className="font-semibold">Members:</span> 1M–50M · <span className="font-semibold">Wallet reliance:</span> Medium
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ Keeps on‑chain identity</li>
@@ -74,6 +82,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">3) On‑Chain Membership + Smart‑Account UX</p>
                 <p><span className="font-semibold">Membership:</span> ERC‑721 on‑chain · <span className="font-semibold">Voting:</span> On‑chain or off‑chain · <span className="font-semibold">Execution:</span> On‑chain · <span className="font-semibold">Onboarding:</span> Email/social → smart account</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 85% · <span className="font-semibold">Members:</span> 1M–20M · <span className="font-semibold">Wallet reliance:</span> Low
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ UX dramatically improved</li>
@@ -88,6 +100,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">4) Off‑Chain Membership + On‑Chain Proofs</p>
                 <p><span className="font-semibold">Membership:</span> Off‑chain list (Merkle/ZK) · <span className="font-semibold">Voting:</span> Off‑chain signatures · <span className="font-semibold">Execution:</span> On‑chain via executor · <span className="font-semibold">Onboarding:</span> Email/social</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 35% · <span className="font-semibold">Members:</span> 100M–1B+ · <span className="font-semibold">Wallet reliance:</span> Low
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ Massive scalability</li>
@@ -103,6 +119,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">5) Hybrid: Two‑Tier Nation</p>
                 <p><span className="font-semibold">Tier 1:</span> On‑chain NFT “citizens” · <span className="font-semibold">Tier 2:</span> Off‑chain members (proof‑based) · <span className="font-semibold">Voting:</span> Weighted or separate chambers · <span className="font-semibold">Execution:</span> On‑chain</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 70% · <span className="font-semibold">Members:</span> 10M–500M · <span className="font-semibold">Wallet reliance:</span> Medium
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ Core sovereignty stays on‑chain</li>
@@ -118,6 +138,10 @@ export function TrilemmaPage() {
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
                 <p className="font-semibold text-gray-900 dark:text-white">6) Fully Off‑Chain Nation</p>
                 <p><span className="font-semibold">Membership:</span> Off‑chain · <span className="font-semibold">Voting:</span> Off‑chain · <span className="font-semibold">Execution:</span> Off‑chain or multisig</p>
+                <p className="mt-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Trilemma evaluation</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Blockchain nation:</span> 20% · <span className="font-semibold">Members:</span> 1B+ · <span className="font-semibold">Wallet reliance:</span> Low
+                </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 text-gray-600 dark:text-gray-400">
                   <ul className="space-y-1">
                     <li>✅ Scales to billions</li>

@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+// Ensure lightningcss uses WASM fallback to avoid native binary mismatches on macOS.
+process.env.CSS_TRANSFORMER_WASM = '1';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Static export for IPFS deployment
