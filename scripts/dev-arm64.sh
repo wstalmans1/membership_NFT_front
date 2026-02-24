@@ -15,12 +15,17 @@ if command -v nvm >/dev/null 2>&1; then
   nvm use --lts >/dev/null
 fi
 
+# Forward optional build variant so NEXT_PUBLIC_BUILD_VARIANT=membership pnpm dev:membership works
+# even when the env var would otherwise be lost across the arch exec boundary.
+VARIANT="${NEXT_PUBLIC_BUILD_VARIANT:-full}"
+
 # Force arm64 execution even if the terminal is running under Rosetta.
 # Always prefer arm64 when available (even if this shell is under Rosetta).
 if /usr/bin/arch -arm64 /bin/true >/dev/null 2>&1; then
-  exec /usr/bin/arch -arm64 bash -lc "cd \"$PROJECT_ROOT\"; source \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 || true; nvm use --lts >/dev/null 2>&1 || true; export CSS_TRANSFORMER_WASM=1; \"$PROJECT_ROOT/node_modules/.bin/next\" dev"
+  exec /usr/bin/arch -arm64 bash -lc "cd \"$PROJECT_ROOT\"; source \"$NVM_DIR/nvm.sh\" >/dev/null 2>&1 || true; nvm use --lts >/dev/null 2>&1 || true; export CSS_TRANSFORMER_WASM=1; export NEXT_PUBLIC_BUILD_VARIANT='$VARIANT'; \"$PROJECT_ROOT/node_modules/.bin/next\" dev"
 fi
 
 cd "$PROJECT_ROOT"
 export CSS_TRANSFORMER_WASM=1
+export NEXT_PUBLIC_BUILD_VARIANT="$VARIANT"
 "$PROJECT_ROOT/node_modules/.bin/next" dev

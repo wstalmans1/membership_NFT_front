@@ -1,5 +1,8 @@
 'use client';
 
+import { notFound } from 'next/navigation';
+import { features } from '@/config/features';
+
 import dynamic from 'next/dynamic';
 
 const Navbar = dynamic(() => import('@/components/Navbar').then(mod => ({ default: mod.Navbar })), {
@@ -17,6 +20,7 @@ const Footer = dynamic(() => import('@/components/Footer').then(mod => ({ defaul
 });
 
 export default function Treasury() {
+  if (!features.showTreasury) notFound();
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />

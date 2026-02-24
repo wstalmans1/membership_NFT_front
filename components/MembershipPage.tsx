@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWatchContractEvent, useChainId } from 'wagmi';
+import { useState, useEffect } from 'react';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useChainId } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatEther } from '@/lib/utils';
@@ -10,23 +10,20 @@ import { MembershipNFT } from '@/abis/MembershipNFT';
 import { Constitution } from '@/abis/Constitution';
 import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
-import { NFTMetadata, deleteMetadata, getMetadata, getAllMembers } from '@/lib/metadata';
+import { NFTMetadata, deleteMetadata, getMetadata } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
-import { useSearchParams, usePathname } from 'next/navigation';
+import { features } from '@/config/features';
 
 export function MembershipPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient();
   const queryClient = useQueryClient();
-  
-  // Check if on correct network
+
   const isCorrectNetwork = chainId === sepolia.id;
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
+
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
@@ -34,69 +31,10 @@ export function MembershipPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [delegationReturnedNotification, setDelegationReturnedNotification] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
-  const [allMembers, setAllMembers] = useState<Array<{ tokenId: number; metadata: NFTMetadata; ownerAddress: string }>>([]);
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  // Check if we should expand from query parameter - use both searchParams and window.location for static builds
-  const getExpandParam = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlParam = params.get('expand');
-      if (urlParam) return urlParam;
-    }
-    return searchParams?.get('expand') || null;
-  };
-  const [expandParam, setExpandParam] = useState<string | null>(() => {
-    // Initialize from URL on mount
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('expand');
-    }
-    return searchParams?.get('expand') || null;
-  });
-  
-  // Initialize expanded states from query parameter
-  // Use a function to read from URL directly for static builds
-  const getInitialExpandParam = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('expand');
-    }
-    return searchParams?.get('expand') || null;
-  };
-  
-  const initialExpandParam = getInitialExpandParam();
-  // Initialize expanded state from URL - check both initial param and window.location for static builds
-  const getInitialMembershipExpanded = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('expand') === 'membership';
-    }
-    return initialExpandParam === 'membership';
-  };
-  
-  const getInitialAllMembersExpanded = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('expand') === 'all-members';
-    }
-    return initialExpandParam === 'all-members';
-  };
-  
-  const [isMembershipStatusExpanded, setIsMembershipStatusExpanded] = useState(getInitialMembershipExpanded);
-  const [isAllMembersExpanded, setIsAllMembersExpanded] = useState(getInitialAllMembersExpanded);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
-  
-  // Privacy expanded state - initialized from isMember when balance loads
-  // Use lazy initialization to prevent flash
-  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(() => {
-    // This function runs once on mount, but isMember might be undefined
-    // So we default to false and update via useEffect when balance loads
-    return false;
-  });
-  
-  // Track if user has manually toggled privacy section
+  const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [hasUserToggledPrivacy, setHasUserToggledPrivacy] = useState(false);
-  
+
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
   const [delegateToAddress, setDelegateToAddress] = useState('');
@@ -113,260 +51,65 @@ export function MembershipPage() {
     query: { enabled: !!address },
   });
 
-  // Get token ID if member - use tokenOfOwner (simpler, more reliable)
-  // Only load when section is expanded
+  // Get token ID
   const { data: tokenId, isLoading: isLoadingTokenId, error: tokenIdError, refetch: refetchTokenId } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'tokenOfOwner',
     args: address && balance && Number(balance) > 0 ? [address] : undefined,
-    query: { enabled: !!address && !!balance && Number(balance) > 0 && isMembershipStatusExpanded },
+    query: { enabled: !!address && !!balance && Number(balance) > 0 },
   });
 
-  // Determine if user is a member - only calculate when balance has loaded
-  // This prevents any rendering until we have definitive membership status
   const isMember = address && balance !== undefined
     ? Boolean(Number(balance) > 0)
-    : undefined; // undefined means "still loading"
+    : undefined;
 
-  // Sync expand parameter from URL (for static builds and client-side navigation)
-  useEffect(() => {
-    const updateExpandParam = () => {
-      // Read directly from window.location for most reliable result in static builds
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const newParam = params.get('expand');
-        if (newParam !== expandParam) {
-          setExpandParam(newParam);
-        }
-      } else {
-        const newParam = searchParams?.get('expand') || null;
-        if (newParam !== expandParam) {
-          setExpandParam(newParam);
-        }
-      }
-    };
-    
-    // Check immediately
-    updateExpandParam();
-    
-    // Listen for navigation events
-    const handleLocationChange = () => {
-      // Use multiple timeouts to catch URL updates at different stages
-      setTimeout(updateExpandParam, 0);
-      setTimeout(updateExpandParam, 50);
-      setTimeout(updateExpandParam, 150);
-    };
-    
-    window.addEventListener('popstate', handleLocationChange);
-    
-    // Intercept Next.js Link navigation
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
-    
-    history.pushState = function(...args) {
-      originalPushState.apply(history, args);
-      handleLocationChange();
-    };
-    
-    history.replaceState = function(...args) {
-      originalReplaceState.apply(history, args);
-      handleLocationChange();
-    };
-    
-    // Also listen for pathname changes (Next.js router)
-    // This will fire when Next.js completes navigation
-    const checkInterval = setInterval(() => {
-      updateExpandParam();
-    }, 100);
-    
-    return () => {
-      window.removeEventListener('popstate', handleLocationChange);
-      history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
-      clearInterval(checkInterval);
-    };
-  }, [searchParams, expandParam, pathname]);
-
-  // Expand sections based on query parameter
-  // This effect runs when expandParam, searchParams, or pathname changes
-  // pathname is key - it changes when Next.js navigation completes
-  useEffect(() => {
-    // Read directly from URL to ensure we get the latest value
-    const checkAndExpand = () => {
-      if (typeof window === 'undefined') return;
-      
-      const params = new URLSearchParams(window.location.search);
-      const currentParam = params.get('expand');
-      
-      if (currentParam === 'membership') {
-        setIsMembershipStatusExpanded(true);
-        setIsAllMembersExpanded(false);
-      } else if (currentParam === 'all-members') {
-        setIsAllMembersExpanded(true);
-        setIsMembershipStatusExpanded(false);
-      }
-    };
-    
-    // Check immediately
-    checkAndExpand();
-    
-    // Check multiple times with delays to catch URL updates at different stages
-    // This is necessary because Next.js Link navigation updates URL asynchronously
-    // Also important for static builds/IPFS where navigation might be handled differently
-    const timeouts = [
-      setTimeout(checkAndExpand, 0),
-      setTimeout(checkAndExpand, 50),
-      setTimeout(checkAndExpand, 150),
-      setTimeout(checkAndExpand, 300),
-      setTimeout(checkAndExpand, 500),
-      setTimeout(checkAndExpand, 1000),
-    ];
-    
-    // Also listen for popstate events (back/forward navigation)
-    const handlePopState = () => {
-      setTimeout(checkAndExpand, 0);
-      setTimeout(checkAndExpand, 100);
-    };
-    window.addEventListener('popstate', handlePopState);
-    
-    // Listen for hashchange (some routers use this)
-    const handleHashChange = () => {
-      setTimeout(checkAndExpand, 0);
-      setTimeout(checkAndExpand, 100);
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    
-    return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, [expandParam, searchParams, pathname]);
-  
-  // Additional effect to check on mount and when window.location changes
-  // This is especially important for static builds/IPFS
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const checkOnMount = () => {
-      const params = new URLSearchParams(window.location.search);
-      const currentParam = params.get('expand');
-      
-      if (currentParam === 'membership') {
-        setIsMembershipStatusExpanded(true);
-        setIsAllMembersExpanded(false);
-      } else if (currentParam === 'all-members') {
-        setIsAllMembersExpanded(true);
-        setIsMembershipStatusExpanded(false);
-      }
-    };
-    
-    // Check immediately on mount
-    checkOnMount();
-    
-    // Also check after a short delay to catch any async URL updates
-    const timeout = setTimeout(checkOnMount, 100);
-    
-    return () => clearTimeout(timeout);
-  }, []); // Empty dependency array - only run on mount
-
-  // Set privacy expanded state when balance loads (only if user hasn't manually toggled)
-  // This must be after isMember is declared
-  useEffect(() => {
-    if (!hasUserToggledPrivacy && isMember !== undefined) {
-      setIsPrivacyExpanded(!isMember); // Expanded if not a member, collapsed if member
-    }
-  }, [isMember, hasUserToggledPrivacy]);
-
-  // Log tokenId fetch status for debugging
-  useEffect(() => {
-    if (address && balance && Number(balance) > 0) {
-      console.log('🔍 TokenId fetch status:', {
-        address,
-        balance: balance.toString(),
-        tokenId: tokenId?.toString(),
-        isLoadingTokenId,
-        tokenIdError: tokenIdError?.message,
-      });
-    }
-  }, [address, balance, tokenId, isLoadingTokenId, tokenIdError]);
-
-  // Get min donation - only load when section is expanded
+  // Get min donation
   const { data: minDonation } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
     functionName: 'minDonationWei',
-    query: { enabled: isMembershipStatusExpanded },
+    query: { enabled: true },
   });
-
 
   // Delegation contract calls
   const { writeContract: writeDelegate, data: delegateHash, isPending: isDelegatePending } = useWriteContract();
-  const { isLoading: isDelegateConfirming, isSuccess: isDelegateSuccess } = useWaitForTransactionReceipt({
-    hash: delegateHash,
-  });
+  const { isLoading: isDelegateConfirming, isSuccess: isDelegateSuccess } = useWaitForTransactionReceipt({ hash: delegateHash });
 
   // Burn contract calls
   const { writeContract: writeBurn, data: burnHash, isPending: isBurnPending } = useWriteContract();
-  const { isLoading: isBurnConfirming, isSuccess: isBurnSuccess } = useWaitForTransactionReceipt({
-    hash: burnHash,
-  });
+  const { isLoading: isBurnConfirming, isSuccess: isBurnSuccess } = useWaitForTransactionReceipt({ hash: burnHash });
 
-  // Get current delegation status - only load when section is expanded
+  // Current delegation + voting power
   const { data: currentDelegate, refetch: refetchDelegate } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'delegates',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && isMember === true && isMembershipStatusExpanded },
+    query: { enabled: !!address && isMember === true },
   });
 
-  // Get current voting power - only load when section is expanded
   const { data: votingPower, refetch: refetchVotingPower } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'getVotes',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && isMember === true && isMembershipStatusExpanded },
+    query: { enabled: !!address && isMember === true },
   });
 
-  // Function to load all members
-  const loadAllMembers = async () => {
-    setIsLoadingMembers(true);
-    try {
-      const members = await getAllMembers();
-      setAllMembers(members);
-    } catch (err: any) {
-      console.error('Failed to load all members:', err);
-    } finally {
-      setIsLoadingMembers(false);
+  // Auto-expand/collapse privacy notice based on member status
+  useEffect(() => {
+    if (!hasUserToggledPrivacy && isMember !== undefined) {
+      setIsPrivacyExpanded(!isMember);
     }
-  };
+  }, [isMember, hasUserToggledPrivacy]);
 
-  // Handle successful mint
-  const handleMintSuccess = () => {
-    setShowForm(false);
-    setError(null);
-    // Invalidate queries to refresh UI
-    queryClient.invalidateQueries();
-    
-    // Immediate refetch of members list (in case metadata update was fast)
-    loadAllMembers();
-    
-    // Refetch balance, tokenId, and members list after delays to ensure everything is synced
-    setTimeout(async () => {
-      await refetchBalance();
-      await refetchTokenId();
-      await loadAllMembers(); // Refetch members list again
-    }, 2000);
-    
-    // Final refetch after longer delay to ensure database propagation
-    setTimeout(async () => {
-      await loadAllMembers();
-    }, 5000);
-  };
-
+  // Log tokenId fetch for debugging
+  useEffect(() => {
+    if (address && balance && Number(balance) > 0) {
+      console.log('🔍 TokenId fetch status:', { address, balance: balance.toString(), tokenId: tokenId?.toString(), isLoadingTokenId, error: tokenIdError?.message });
+    }
+  }, [address, balance, tokenId, isLoadingTokenId, tokenIdError]);
 
   // Handle delegation success
   useEffect(() => {
@@ -377,11 +120,7 @@ export function MembershipPage() {
       setDelegationSuccess(true);
       refetchDelegate();
       refetchVotingPower();
-      // Clear success message after 5 seconds
-      setTimeout(() => {
-        setDelegationSuccess(false);
-        setError(null);
-      }, 5000);
+      setTimeout(() => { setDelegationSuccess(false); setError(null); }, 5000);
     }
   }, [isDelegateSuccess, refetchDelegate, refetchVotingPower]);
 
@@ -396,9 +135,7 @@ export function MembershipPage() {
           setDelegationReturnedNotification(
             `Your voting power has been returned because ${log.args.previousDelegate?.substring(0, 6)}...${log.args.previousDelegate?.substring(38)} burned their NFT. Your votes are now delegated to yourself.`
           );
-          // Auto-hide after 10 seconds
           setTimeout(() => setDelegationReturnedNotification(null), 10000);
-          // Refetch delegation and voting power
           refetchDelegate();
           refetchVotingPower();
         }
@@ -409,742 +146,472 @@ export function MembershipPage() {
   // Handle burn success
   useEffect(() => {
     if (isBurnSuccess && burnHash) {
-      // Delete metadata from Supabase after successful burn
       if (tokenId && address) {
-        deleteMetadata(Number(tokenId), address).catch((err) => {
-          console.error('Failed to delete metadata after burn:', err);
-          // Don't show error to user as NFT is already burned
-        });
+        deleteMetadata(Number(tokenId), address).catch(err => console.error('Failed to delete metadata after burn:', err));
       }
       setIsDeleting(false);
       setShowDeleteConfirm(false);
-      // Refresh the page to show updated state
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      setTimeout(() => window.location.reload(), 2000);
     }
   }, [isBurnSuccess, burnHash, tokenId, address]);
 
-  // Load all members:
-  // - If not connected: load immediately
-  // - If connected: load only after membership status has been determined
-  // This ensures "Your Membership Status" renders first for connected users, then "All Members" section
-  useEffect(() => {
-    if (!isConnected) {
-      // Not connected: load members immediately
-      loadAllMembers();
-    } else if (isConnected && address && balance !== undefined && isMember !== undefined) {
-      // Connected: only start loading members after we've determined membership status
-      // This ensures the "Your Membership Status" section renders first
-      loadAllMembers();
-    }
-  }, [isConnected, address, balance, isMember]);
+  // Handle mint success
+  const handleMintSuccess = () => {
+    setShowForm(false);
+    setError(null);
+    queryClient.invalidateQueries();
+    setTimeout(async () => {
+      await refetchBalance();
+      await refetchTokenId();
+    }, 2000);
+  };
 
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Membership</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Mint and manage your membership NFT, view all members</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Membership</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">Mint and manage your membership NFT</p>
       </div>
 
-      {/* Balance Check - Show if connected but low balance */}
       {isConnected && <BalanceCheck />}
 
       {!isConnected && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <p className="text-teal-600 dark:text-teal-400">
-            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>.
+            {features.showMorePages && (
+              <> If you haven&apos;t set up a wallet yet, visit the{' '}
+                <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+              </>
+            )}
           </p>
         </div>
       )}
 
-      {/* Show section header for all users (connected and non-connected) */}
-      {/* Content inside only loads when expanded and connected */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => {
-            setIsMembershipStatusExpanded(!isMembershipStatusExpanded);
-            // Collapse "All Members" when expanding "Your Membership Status"
-            if (!isMembershipStatusExpanded) {
-              setIsAllMembersExpanded(false);
-            }
-          }}
-          className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity mb-4"
-        >
-          {isMembershipStatusExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-          )}
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Your Membership Status
-          </h2>
-        </button>
-        
-        {isMembershipStatusExpanded && (
-          <>
-            {(!isConnected || !address) ? null : balance === undefined || isMember === undefined ? (
-              // Still loading balance/membership status
+        {(!isConnected || !address) ? null : balance === undefined || isMember === undefined ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <p>Loading membership status...</p>
               </div>
             ) : isMember === true ? (
-                // Member view - wait for tokenId to load when expanded
-                tokenId ? (
+              tokenId ? (
                 <div className="space-y-4">
-              {/* Data Privacy and Storage Notice */}
-              {/* Only render when we're certain user is a member (balance loaded) to prevent flash */}
-              {/* Use calculated value directly if user hasn't toggled, otherwise use state */}
-              {(() => {
-                const privacyExpanded = hasUserToggledPrivacy 
-                  ? isPrivacyExpanded 
-                  : (isMember !== undefined ? !isMember : false);
-                
-                return (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <button
-                      onClick={() => {
-                        setHasUserToggledPrivacy(true);
-                        setIsPrivacyExpanded(!privacyExpanded);
-                      }}
-                      className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                    >
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                          <span className="text-lg">🔒</span>
+                  {/* Data Privacy */}
+                  {(() => {
+                    const privacyExpanded = hasUserToggledPrivacy ? isPrivacyExpanded : (isMember !== undefined ? !isMember : false);
+                    return (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <button
+                          onClick={() => { setHasUserToggledPrivacy(true); setIsPrivacyExpanded(!privacyExpanded); }}
+                          className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                        >
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                              <span className="text-lg">🔒</span>
+                            </div>
+                          </div>
+                          <div className="flex-1 flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">Your Data Privacy</h3>
+                            {privacyExpanded
+                              ? <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />
+                              : <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />}
+                          </div>
+                        </button>
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${privacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+                          <div className="ml-11 space-y-2">
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records are stored permanently on-chain.
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              <strong>What You Can Edit/Delete:</strong> Your name, photo and date of birth at any time through this page.
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records are permanent.
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              <strong>Important:</strong> Someone viewing only the blockchain cannot link your wallet address to your personal information—this link exists only in the off-chain database.
+                            </p>
+                            {features.showMorePages && (
+                              <a href="/philosophy#data-privacy" onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block">
+                                Learn more about data privacy and storage →
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex-1 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                          Your Data Privacy
-                        </h3>
-                        {privacyExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2 transition-transform" />
+                    );
+                  })()}
+
+                  {/* NFT Display with Update/Delete */}
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="flex-1">
+                      <NFTDisplay tokenId={Number(tokenId)} ownerAddress={address!} />
+                    </div>
+                    {!showUpdateForm && !showDeleteConfirm && (
+                      <div className="flex flex-row md:flex-col gap-2 md:pt-0 pt-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const metadata = await getMetadata(Number(tokenId));
+                              if (metadata) { setCurrentMetadata(metadata); setShowUpdateForm(true); }
+                              else setError('Could not load current metadata');
+                            } catch (err: any) { setError(err.message || 'Failed to load metadata'); }
+                          }}
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        >
+                          Update
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Update Form */}
+                  {showUpdateForm && currentMetadata && (
+                    <div className="mt-4 p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Update Membership Information</h3>
+                      <UpdateMembershipForm
+                        tokenId={Number(tokenId)}
+                        ownerAddress={address!}
+                        currentMetadata={currentMetadata}
+                        onSuccess={() => { setShowUpdateForm(false); setCurrentMetadata(null); window.location.reload(); }}
+                        onError={(err) => setError(err)}
+                        onCancel={() => { setShowUpdateForm(false); setCurrentMetadata(null); }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Voting Power & Delegation */}
+                  {features.showVotingPower && <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
+                      <div className="relative group" tabIndex={0} data-tooltip-anchor>
+                        <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
+                        <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                          <p className="mb-2 font-semibold">Voting Power</p>
+                          <p className="text-gray-300">Each membership NFT grants 1 vote, automatically delegated to yourself when you mint. You can change delegation to vote directly or delegate to another address.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Voting Power:</span>
+                          <div className="relative group" tabIndex={0} data-tooltip-anchor>
+                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                            <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <p className="mb-2 font-semibold">Voting Power</p>
+                              <p className="text-gray-300">Each <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> member has 1 vote, which can be delegated to yourself or to another address.</p>
+                            </div>
+                          </div>
+                        </div>
+                        {(() => {
+                          const vp = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
+                          return (
+                            <span className={`text-sm font-semibold ${vp > 0n ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                              1 vote
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
+                          <div className="relative group" tabIndex={0} data-tooltip-anchor>
+                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                            <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <p className="mb-2 font-semibold">Delegation</p>
+                              <p className="text-gray-300">Determines who can use your voting power. Delegate to yourself to vote directly, or to another address to let them vote on your behalf.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
+                          {currentDelegate && typeof currentDelegate === 'string' && currentDelegate !== '0x0000000000000000000000000000000000000000'
+                            ? (currentDelegate.toLowerCase() === address?.toLowerCase()
+                              ? 'Yourself'
+                              : `${currentDelegate.substring(0, 6)}...${currentDelegate.substring(38)}`)
+                            : 'Not delegated'}
+                        </span>
+                      </div>
+
+                      {(() => {
+                        return (
+                          <>
+                            {delegationSuccess && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-green-800 dark:text-green-200">✅ Delegation updated successfully!</p>
+                              </div>
+                            )}
+
+                            {!showDelegationForm ? (
+                              <button
+                                onClick={() => {
+                                  setShowDelegationForm(true);
+                                  const selfDelegated = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                  setDelegationMode(selfDelegated ? 'other' : 'self');
+                                  setDelegateToAddress('');
+                                }}
+                                className="w-full mt-3 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
+                              >
+                                Change Delegation
+                              </button>
+                            ) : (
+                              <div className="mt-3 p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Delegation</h4>
+                                <div className="space-y-3">
+                                  {(() => {
+                                    const selfDelegated = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                    if (selfDelegated) {
+                                      return (
+                                        <div>
+                                          <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Delegate to Address
+                                            <div className="relative group inline-block ml-2" tabIndex={0} data-tooltip-anchor>
+                                              <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                                <p className="mb-2 font-semibold">Delegate to Another Address</p>
+                                                <p className="text-gray-300">Allow another address to vote on your behalf.</p>
+                                              </div>
+                                            </div>
+                                          </label>
+                                          <input
+                                            id="delegateToAddress"
+                                            type="text"
+                                            value={delegateToAddress}
+                                            onChange={(e) => setDelegateToAddress(e.target.value)}
+                                            placeholder="0x..."
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                                          />
+                                          {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
+                                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">Please enter a valid Ethereum address (0x followed by 40 characters)</p>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <>
+                                        <div>
+                                          <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input type="radio" name="delegation" checked={delegationMode === 'self'} onChange={() => { setDelegationMode('self'); setDelegateToAddress(''); }} className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
+                                              <div className="relative group" tabIndex={0} data-tooltip-anchor>
+                                                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                                  <p className="mb-2 font-semibold">Delegate to Myself</p>
+                                                  <p className="text-gray-300">This allows you to vote directly on proposals.</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </label>
+                                        </div>
+                                        <div>
+                                          <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input type="radio" name="delegation" checked={delegationMode === 'other'} onChange={() => setDelegationMode('other')} className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
+                                              <div className="relative group" tabIndex={0} data-tooltip-anchor>
+                                                <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
+                                                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                                  <p className="mb-2 font-semibold">Delegate to Another Address</p>
+                                                  <p className="text-gray-300">Allow another address to vote on your behalf.</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </label>
+                                        </div>
+                                        {delegationMode === 'other' && (
+                                          <div>
+                                            <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Delegate Address</label>
+                                            <input
+                                              id="delegateToAddress"
+                                              type="text"
+                                              value={delegateToAddress}
+                                              onChange={(e) => setDelegateToAddress(e.target.value)}
+                                              placeholder="0x..."
+                                              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                                            />
+                                            {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
+                                              <p className="mt-1 text-xs text-red-600 dark:text-red-400">Please enter a valid Ethereum address</p>
+                                            )}
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+
+                                  <div className="flex gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDelegationForm(false); setDelegationMode('self'); setDelegateToAddress(''); }}
+                                      className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!address) return;
+                                        const selfDelegated = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                        const target = selfDelegated ? delegateToAddress : (delegationMode === 'self' ? address : delegateToAddress);
+                                        if (!target || (!selfDelegated && delegationMode === 'other' && !/^0x[a-fA-F0-9]{40}$/.test(target)) || (selfDelegated && !/^0x[a-fA-F0-9]{40}$/.test(target))) {
+                                          setError('Please enter a valid Ethereum address');
+                                          return;
+                                        }
+                                        setIsDelegating(true);
+                                        setError(null);
+                                        try {
+                                          writeDelegate({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'delegate', args: [target as `0x${string}`] });
+                                        } catch (err: any) {
+                                          setError(err.message || 'Failed to delegate');
+                                          setIsDelegating(false);
+                                        }
+                                      }}
+                                      disabled={(() => {
+                                        const selfDelegated = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
+                                        if (selfDelegated) return isDelegatePending || isDelegateConfirming || isDelegating || !delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x');
+                                        return isDelegatePending || isDelegateConfirming || isDelegating || (delegationMode === 'other' && (!delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x')));
+                                      })()}
+                                      className="flex-1 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                    >
+                                      {isDelegatePending || isDelegateConfirming || isDelegating ? 'Processing...' : 'Update Delegation'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>}
+
+                  {features.showVotingPower && delegationReturnedNotification && (
+                    <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-green-900 dark:text-green-200 mb-1">Voting Power Returned</h3>
+                          <p className="text-sm text-green-800 dark:text-green-300">{delegationReturnedNotification}</p>
+                        </div>
+                        <button onClick={() => setDelegationReturnedNotification(null)} className="ml-4 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200">✕</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delete Confirmation */}
+                  {showDeleteConfirm && (
+                    <div className="mt-4 p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">Burn Membership NFT?</h3>
+                      <p className="text-red-800 dark:text-red-300 mb-4"><strong>Warning:</strong> This will permanently burn your membership NFT and remove your voting power. This action cannot be undone.</p>
+                      <ul className="text-red-800 dark:text-red-300 mb-4 space-y-2 text-sm list-disc list-inside">
+                        <li>Your NFT will be permanently destroyed</li>
+                        <li>Your voting power will be removed</li>
+                        <li>If others delegated to you, their voting power will be automatically returned to them</li>
+                        <li>Your membership metadata will be deleted</li>
+                        <li>You will be able to mint again after burning</li>
+                      </ul>
+                      <div className="flex gap-3">
+                        <button onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting || isBurnPending || isBurnConfirming} className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium">Cancel</button>
+                        <button
+                          onClick={async () => {
+                            if (!address || !tokenId) { setError('Missing address or token ID'); return; }
+                            setIsDeleting(true);
+                            setError(null);
+                            try {
+                              writeBurn({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'burn' });
+                            } catch (err: any) {
+                              setError(err.message || 'Failed to initiate burn transaction');
+                              setIsDeleting(false);
+                            }
+                          }}
+                          disabled={isDeleting || isBurnPending || isBurnConfirming}
+                          className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        >
+                          {isBurnPending ? 'Waiting for MetaMask...' : isBurnConfirming ? 'Burning NFT...' : isDeleting ? 'Processing...' : 'Burn NFT Permanently'}
+                        </button>
+                      </div>
+                      {(isBurnPending || isBurnConfirming) && <p className="mt-3 text-xs text-red-700 dark:text-red-400">Transaction in progress. Please wait...</p>}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <p>Loading membership details...</p>
+                </div>
+              )
+            ) : isMember === false && isCorrectNetwork ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    Join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH</strong>
+                  </p>
+                </div>
+
+                {/* Data Privacy Notice */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                        <span className="text-lg">🔒</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">Data Privacy Notice</h3>
+                      <div className="space-y-2 text-xs text-blue-800 dark:text-blue-300 mb-3">
+                        <p>Before minting your membership NFT, please understand:</p>
+                        <ul className="list-disc list-inside space-y-1 ml-2">
+                          <li><strong>Personal Information (Off-Chain):</strong> Your name, photo, date of birth, and citizenship information will be stored in an off-chain database (not on the blockchain)</li>
+                          <li><strong>On-Chain Data (Permanent):</strong> Only your wallet address, token ID, and governance records are stored permanently on the blockchain and cannot be changed</li>
+                          <li><strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo and date of birth at any time through this page</li>
+                          <li><strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records are permanent and cannot be modified</li>
+                          <li><strong>Privacy:</strong> Someone viewing only the blockchain cannot link your wallet address to your personal information</li>
+                        </ul>
+                        {features.showMorePages && (
+                          <a href="/philosophy#data-privacy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block">
+                            Learn more about data privacy and storage →
+                          </a>
                         )}
                       </div>
-                    </button>
-                    <div
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        privacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                    <div className="ml-11 space-y-2">
-                      <p className="text-xs text-blue-800 dark:text-blue-300">
-                        The personal information shown on your membership card is stored off-chain in a database. Only your wallet address, token ID, and governance records (proposal creation and voting records) are stored permanently on-chain.
-                      </p>
-                      <p className="text-xs text-blue-800 dark:text-blue-300">
-                        <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo and date of birth at any time through the membership page
-                      </p>
-                      <p className="text-xs text-blue-800 dark:text-blue-300">
-                        <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records (proposal creation and voting records) are permanent and cannot be modified.
-                      </p>
-                      <p className="text-xs text-blue-800 dark:text-blue-300">
-                        <strong>Important:</strong> The connection between your on-chain wallet address/NFT and your off-chain personal data exists only in the off-chain database. Someone viewing the blockchain alone cannot link your wallet address to your personal information—this link only exists in the off-chain database.
-                      </p>
-                      <a
-                        href="/philosophy#data-privacy"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
-                      >
-                        Learn more about data privacy and storage →
-                      </a>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" checked={privacyNoticeAccepted} onChange={(e) => setPrivacyNoticeAccepted(e.target.checked)} className="mt-0.5 w-4 h-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                        <span className="text-sm text-blue-900 dark:text-blue-200">I understand how my data will be stored and used</span>
+                      </label>
                     </div>
                   </div>
                 </div>
-                  );
-                })()}
 
-              {/* NFT Display Component with Update/Delete buttons */}
-              <div className="flex flex-col md:flex-row gap-4 items-start">
-                {/* NFT Card */}
-                <div className="flex-1">
-                  <NFTDisplay tokenId={Number(tokenId)} ownerAddress={address!} />
-                </div>
-                
-                {/* Update and Delete Buttons - Right side */}
-                {!showUpdateForm && !showDeleteConfirm && (
-                  <div className="flex flex-row md:flex-col gap-2 md:pt-0 pt-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          const metadata = await getMetadata(Number(tokenId));
-                          if (metadata) {
-                            setCurrentMetadata(metadata);
-                            setShowUpdateForm(true);
-                          } else {
-                            setError('Could not load current metadata');
-                          }
-                        } catch (err: any) {
-                          setError(err.message || 'Failed to load metadata');
-                        }
-                      }}
-                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                    >
-                      Update
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                    >
-                      Delete
-                    </button>
+                {!showForm && (
+                  <button onClick={() => setShowForm(true)} disabled={!privacyNoticeAccepted} className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-800 dark:disabled:hover:bg-blue-700">
+                    Mint Membership
+                  </button>
+                )}
+
+                {showForm && (
+                  <div className="p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Mint Membership NFT</h3>
+                    <MintMembershipForm
+                      onSuccess={handleMintSuccess}
+                      onError={setError}
+                      onCancel={() => { setShowForm(false); setError(null); setPrivacyNoticeAccepted(false); }}
+                    />
+                  </div>
+                )}
+
+                {error && (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
                   </div>
                 )}
               </div>
-
-              {/* Update Form */}
-              {showUpdateForm && currentMetadata && (
-                <div className="mt-4 p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Update Membership Information
-                  </h3>
-                  <UpdateMembershipForm
-                    tokenId={Number(tokenId)}
-                    ownerAddress={address!}
-                    currentMetadata={currentMetadata}
-                    onSuccess={async () => {
-                      setShowUpdateForm(false);
-                      setCurrentMetadata(null);
-                      // Refresh the page to show updated data
-                      window.location.reload();
-                    }}
-                    onError={(err) => {
-                      setError(err);
-                    }}
-                    onCancel={() => {
-                      setShowUpdateForm(false);
-                      setCurrentMetadata(null);
-                    }}
-                  />
-                </div>
-              )}
-              
-              {/* Voting Power & Delegation Status */}
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Voting Power Status</h3>
-                  <div className="relative group" tabIndex={0} data-tooltip-anchor>
-                    <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                    <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                      <p className="mb-2 font-semibold">Voting Power</p>
-                      <p className="text-gray-300">
-                        Your voting power determines how much weight your vote has in governance proposals. Each membership NFT grants 1 vote, which is automatically delegated to yourself when you mint. You can change delegation to vote directly or delegate to another address.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Voting Power:</span>
-                      <div className="relative group" tabIndex={0} data-tooltip-anchor>
-                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                          <p className="mb-2 font-semibold">Voting Power</p>
-                          <p className="text-gray-300">
-                            Each <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> member has 1 vote, which can be delegated to yourself or to another address. When delegated to yourself, you can vote directly. When delegated to another address, that address can vote on your behalf.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {(() => {
-                      // Always show 1 vote if user is a member, regardless of delegation status
-                      const displayVotingPower = isMember === true ? 1n : 0n;
-                      const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
-                      // Use green if voting power is activated (delegated to self), otherwise use default color
-                      const isActivated = votingPowerBigInt > 0n;
-                      return (
-                        <span className={`text-sm font-semibold ${isActivated ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                          {displayVotingPower.toString()} vote
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Delegated to:</span>
-                      <div className="relative group" tabIndex={0} data-tooltip-anchor>
-                        <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                        <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                          <p className="mb-2 font-semibold">Delegation</p>
-                          <p className="text-gray-300">
-                            Delegation determines who can use your voting power. You can delegate to yourself (to vote directly) or to another address (to let them vote on your behalf). New memberships are automatically delegated to yourself.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
-                      {currentDelegate && typeof currentDelegate === 'string' && currentDelegate !== '0x0000000000000000000000000000000000000000' 
-                        ? (currentDelegate.toLowerCase() === address?.toLowerCase() 
-                            ? 'Yourself' 
-                            : `${currentDelegate.substring(0, 6)}...${currentDelegate.substring(38)}`)
-                        : 'Not delegated'}
-                    </span>
-                  </div>
-
-                  {(() => {
-                    const votingPowerBigInt = votingPower ? (typeof votingPower === 'bigint' ? votingPower : BigInt(votingPower.toString())) : 0n;
-                    return (
-                      <>
-                        {delegationSuccess && (
-                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                            <p className="text-xs text-green-800 dark:text-green-200">
-                              ✅ Delegation updated successfully!
-                            </p>
-                          </div>
-                        )}
-
-                        {!showDelegationForm ? (
-                          <button
-                            onClick={() => {
-                              setShowDelegationForm(true);
-                              // If already delegated to self, default to 'other' mode
-                              const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
-                              setDelegationMode(isAlreadyDelegatedToSelf ? 'other' : 'self');
-                              setDelegateToAddress('');
-                            }}
-                            className="w-full mt-3 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
-                          >
-                            Change Delegation
-                          </button>
-                        ) : (
-                          <div className="mt-3 p-4 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Delegation</h4>
-                            
-                            <div className="space-y-3">
-                              {/* Check if already delegated to self */}
-                              {(() => {
-                                const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
-                                
-                                // If already delegated to self, show only address input (no radio buttons)
-                                if (isAlreadyDelegatedToSelf) {
-                                  return (
-                                    <div>
-                                      <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Delegate to Address
-                                        <div className="relative group inline-block ml-2" tabIndex={0} data-tooltip-anchor>
-                                          <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                                            <p className="mb-2 font-semibold">Delegate to Another Address</p>
-                                            <p className="text-gray-300">
-                                              Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </label>
-                                      <input
-                                        id="delegateToAddress"
-                                        type="text"
-                                        value={delegateToAddress}
-                                        onChange={(e) => setDelegateToAddress(e.target.value)}
-                                        placeholder="0x..."
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                                      />
-                                      {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
-                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                                          Please enter a valid Ethereum address (0x followed by 40 characters)
-                                        </p>
-                                      )}
-                                    </div>
-                                  );
-                                }
-                                
-                                // If not delegated to self, show radio buttons with both options
-                                return (
-                                  <>
-                                    <div>
-                                      <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                          type="radio"
-                                          name="delegation"
-                                          checked={delegationMode === 'self'}
-                                          onChange={() => {
-                                            setDelegationMode('self');
-                                            setDelegateToAddress('');
-                                          }}
-                                          className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                                        />
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to myself</span>
-                                          <div className="relative group" tabIndex={0} data-tooltip-anchor>
-                                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                                              <p className="mb-2 font-semibold">Delegate to Myself</p>
-                                              <p className="text-gray-300">
-                                                This allows you to vote directly on proposals using your voting power.
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </label>
-                                    </div>
-                                    
-                                    <div>
-                                      <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                          type="radio"
-                                          name="delegation"
-                                          checked={delegationMode === 'other'}
-                                          onChange={() => setDelegationMode('other')}
-                                          className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                                        />
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-gray-700 dark:text-gray-300">Delegate to another address</span>
-                                          <div className="relative group" tabIndex={0} data-tooltip-anchor>
-                                            <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
-                                              <p className="mb-2 font-semibold">Delegate to Another Address</p>
-                                              <p className="text-gray-300">
-                                                Allow another address to vote on your behalf. This is useful if you trust someone else to make governance decisions for you.
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </label>
-                                    </div>
-                                    
-                                    {delegationMode === 'other' && (
-                                      <div>
-                                        <label htmlFor="delegateToAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                          Delegate Address
-                                        </label>
-                                        <input
-                                          id="delegateToAddress"
-                                          type="text"
-                                          value={delegateToAddress}
-                                          onChange={(e) => setDelegateToAddress(e.target.value)}
-                                          placeholder="0x..."
-                                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                                        />
-                                        {delegateToAddress && delegateToAddress.length !== 42 && !delegateToAddress.startsWith('0x') && (
-                                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                                            Please enter a valid Ethereum address (0x followed by 40 characters)
-                                          </p>
-                                        )}
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                              
-                              <div className="flex gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowDelegationForm(false);
-                                    setDelegationMode('self');
-                                    setDelegateToAddress('');
-                                  }}
-                                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!address) return;
-                                    
-                                    // Determine target address based on current delegation status
-                                    const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
-                                    const targetAddress = isAlreadyDelegatedToSelf 
-                                      ? delegateToAddress 
-                                      : (delegationMode === 'self' ? address : delegateToAddress);
-                                    
-                                    if (!targetAddress || (!isAlreadyDelegatedToSelf && delegationMode === 'other' && !/^0x[a-fA-F0-9]{40}$/.test(targetAddress)) || (isAlreadyDelegatedToSelf && !/^0x[a-fA-F0-9]{40}$/.test(targetAddress))) {
-                                      setError('Please enter a valid Ethereum address');
-                                      return;
-                                    }
-
-                                    setIsDelegating(true);
-                                    setError(null);
-
-                                    try {
-                                      writeDelegate({
-                                        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-                                        abi: MembershipNFT,
-                                        functionName: 'delegate',
-                                        args: [targetAddress as `0x${string}`],
-                                      });
-                                    } catch (err: any) {
-                                      console.error('Delegation error:', err);
-                                      setError(err.message || 'Failed to delegate');
-                                      setIsDelegating(false);
-                                    }
-                                  }}
-                                  disabled={(() => {
-                                    const isAlreadyDelegatedToSelf = currentDelegate && typeof currentDelegate === 'string' && currentDelegate.toLowerCase() === address?.toLowerCase();
-                                    if (isAlreadyDelegatedToSelf) {
-                                      return isDelegatePending || isDelegateConfirming || isDelegating || !delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x');
-                                    }
-                                    return isDelegatePending || isDelegateConfirming || isDelegating || (delegationMode === 'other' && (!delegateToAddress || delegateToAddress.length !== 42 || !delegateToAddress.startsWith('0x')));
-                                  })()}
-                                  className="flex-1 px-4 py-2 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                                >
-                                  {isDelegatePending || isDelegateConfirming || isDelegating ? 'Processing...' : 'Update Delegation'}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Delegation Returned Notification */}
-              {delegationReturnedNotification && (
-                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-200 mb-1">
-                        Voting Power Returned
-                      </h3>
-                      <p className="text-sm text-green-800 dark:text-green-300">
-                        {delegationReturnedNotification}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setDelegationReturnedNotification(null)}
-                      className="ml-4 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Delete Confirmation */}
-              {showDeleteConfirm && (
-                <div className="mt-4 p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">
-                    Burn Membership NFT?
-                  </h3>
-                  <p className="text-red-800 dark:text-red-300 mb-4">
-                    <strong>Warning:</strong> This will permanently burn your membership NFT and remove your voting power. This action cannot be undone.
-                  </p>
-                  <ul className="text-red-800 dark:text-red-300 mb-4 space-y-2 text-sm list-disc list-inside">
-                    <li>Your NFT will be permanently destroyed</li>
-                    <li>Your voting power will be removed</li>
-                    <li>If others delegated to you, their voting power will be automatically returned to them</li>
-                    <li>Your membership metadata will be deleted</li>
-                    <li>You will be able to mint again after burning</li>
-                  </ul>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isDeleting || isBurnPending || isBurnConfirming}
-                      className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!address || !tokenId) {
-                          setError('Missing address or token ID');
-                          return;
-                        }
-
-                        setIsDeleting(true);
-                        setError(null);
-
-                        try {
-                          // Call burn() on the contract
-                          writeBurn({
-                            address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-                            abi: MembershipNFT,
-                            functionName: 'burn',
-                          });
-                        } catch (err: any) {
-                          console.error('Burn error:', err);
-                          setError(err.message || 'Failed to initiate burn transaction');
-                          setIsDeleting(false);
-                        }
-                      }}
-                      disabled={isDeleting || isBurnPending || isBurnConfirming}
-                      className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      {isBurnPending ? 'Waiting for MetaMask...' : isBurnConfirming ? 'Burning NFT...' : isDeleting ? 'Processing...' : 'Burn NFT Permanently'}
-                    </button>
-                  </div>
-                  {(isBurnPending || isBurnConfirming) && (
-                    <p className="mt-3 text-xs text-red-700 dark:text-red-400">
-                      Transaction in progress. Please wait...
-                    </p>
-                  )}
-                </div>
-              )}
-                </div>
-                ) : (
-                  // TokenId still loading for member
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <p>Loading membership details...</p>
-                  </div>
-                )
-              ) : isMember === false && isCorrectNetwork ? (
-                // Non-member view - show mint form immediately (only on correct network)
-                <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-gray-700 dark:text-gray-300">
-                  Join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> by minting a membership NFT. Minimum donation: <strong className="text-gray-900 dark:text-white">{minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH</strong>
-                </p>
-              </div>
-
-              {/* Data Privacy Notice */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                      <span className="text-lg">🔒</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                      Data Privacy Notice
-                    </h3>
-                    <div className="space-y-2 text-xs text-blue-800 dark:text-blue-300 mb-3">
-                      <p>
-                        Before minting your membership NFT, please understand:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>
-                          <strong>Personal Information (Off-Chain):</strong> Your name, photo, date of birth, and citizenship 
-                          information will be stored in an off-chain database (not on the blockchain)
-                        </li>
-                        <li>
-                          <strong>On-Chain Data (Permanent):</strong> Only your wallet address, token ID, and governance records 
-                          (proposal creation and voting records) are stored permanently on the blockchain and cannot be changed
-                        </li>
-                        <li>
-                          <strong>What You Can Edit/Delete:</strong> You can edit or delete your name, photo and date of birth at any time through the membership page
-                        </li>
-                        <li>
-                          <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance 
-                          records (proposal creation and voting records) are permanent and cannot be modified
-                        </li>
-                        <li>
-                          <strong>Privacy:</strong> Someone viewing only the blockchain cannot link your wallet 
-                          address to your personal information—this link exists only in the off-chain database
-                        </li>
-                      </ul>
-                      <a
-                        href="/philosophy#data-privacy"
-                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block"
-                      >
-                        Learn more about data privacy and storage →
-                      </a>
-                    </div>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={privacyNoticeAccepted}
-                        onChange={(e) => setPrivacyNoticeAccepted(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                      />
-                      <span className="text-sm text-blue-900 dark:text-blue-200">
-                        I understand how my data will be stored and used
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {!showForm && (
-                <button
-                  onClick={() => setShowForm(true)}
-                  disabled={!privacyNoticeAccepted}
-                  className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-800 dark:disabled:hover:bg-blue-700"
-                >
-                  Mint Membership
-                </button>
-              )}
-
-              {showForm && (
-                <div className="p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Mint Membership NFT
-                  </h3>
-                  <MintMembershipForm
-                    onSuccess={handleMintSuccess}
-                    onError={setError}
-                    onCancel={() => {
-                      setShowForm(false);
-                      setError(null);
-                      setPrivacyNoticeAccepted(false);
-                    }}
-                  />
-                </div>
-              )}
-
-              {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
-                </div>
-              )}
-            </div>
-              ) : null}
-            </>
-          )}
-        </div>
-
-      {/* All Members Section */}
-      {/* For non-connected users: show immediately */}
-      {/* For connected users: only render after membership status has been determined */}
-      {/* This ensures "Your Membership Status" section renders first for connected users, then "All Members" */}
-      {!isConnected || (isConnected && address && balance !== undefined && isMember !== undefined) ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
-          <button
-            onClick={() => {
-              setIsAllMembersExpanded(!isAllMembersExpanded);
-              // Collapse "Your Membership Status" when expanding "All Members"
-              if (!isAllMembersExpanded) {
-                setIsMembershipStatusExpanded(false);
-              }
-            }}
-            className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity mb-4"
-          >
-            {isAllMembersExpanded ? (
-              <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
-            )}
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {isLoadingMembers ? (
-                'All Members'
-              ) : (
-                `All Members (${allMembers.length})`
-              )}
-            </h2>
-          </button>
-          {isAllMembersExpanded && (
-            <>
-              {isLoadingMembers ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 dark:text-gray-400">Loading members...</p>
-            </div>
-          ) : allMembers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-              {allMembers.map((member) => (
-                <NFTDisplay
-                  key={member.tokenId}
-                  tokenId={member.tokenId}
-                  ownerAddress={member.ownerAddress}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-600 dark:text-gray-400">No members found.</p>
-            </div>
-          )}
-            </>
-          )}
-        </div>
-      ) : null}
+            ) : null}
+      </div>
     </div>
   );
 }

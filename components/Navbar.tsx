@@ -7,21 +7,26 @@ import { WalletButton } from './WalletButton';
 import { NetworkStatus } from './NetworkStatus';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { features } from '@/config/features';
 
-const navItems = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/membership', label: 'Membership' },
-  { href: '/governance', label: 'Governance' },
-  { href: '/treasury', label: 'Treasury' },
-  { href: '/constitution', label: 'Constitution' },
+const allNavItems = [
+  { href: '/', label: 'Dashboard', show: features.showDashboard },
+  { href: '/membership', label: 'Membership', show: true },
+  { href: '/community', label: 'Community', show: features.showCommunity },
+  { href: '/governance', label: 'Governance', show: features.showGovernance },
+  { href: '/treasury', label: 'Treasury', show: features.showTreasury },
+  { href: '/constitution', label: 'Constitution', show: features.showConstitution },
 ];
 
-const moreMenuItems = [
+const allMoreMenuItems = [
   { href: '/dao-architecture', label: 'DAO Architecture' },
   { href: '/philosophy', label: 'Design Philosophy' },
   { href: '/trilemma', label: 'Blockchain Nation Trilemma' },
   { href: '/getting-started', label: 'Getting Started Guide' },
 ];
+
+const navItems = allNavItems.filter(item => item.show);
+const moreMenuItems = features.showMorePages ? allMoreMenuItems : [];
 
 export function Navbar() {
   const pathnameFromHook = usePathname();
@@ -73,6 +78,45 @@ export function Navbar() {
   useEffect(() => {
     setMoreMenuOpen(false);
   }, [pathname]);
+
+  if (!features.showNavbar) {
+    return (
+      <header className="border-b border-gray-800 bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-xl text-white">
+              <span className="font-bold">QAWL</span> <span className="text-base font-normal">DAO</span>
+            </Link>
+            <div className="flex gap-2">
+              {navItems.map((item) => {
+                const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
+                const normalizedHref = item.href.replace(/\/$/, '') || '/';
+                const isActive = normalizedPathname === normalizedHref;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'text-blue-400 border-b-2 border-blue-400'
+                        : 'text-gray-400 hover:text-white'
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center h-16 gap-1">
+            <WalletButton />
+            <NetworkStatus />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">

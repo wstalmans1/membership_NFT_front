@@ -15,6 +15,7 @@ import { HelpCircle } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import { useEffect, useState } from 'react';
 import { decodeEventLog, type Address } from 'viem';
+import { features } from '@/config/features';
 
 export function Dashboard() {
   const { address, isConnected } = useAccount();
@@ -32,21 +33,6 @@ export function Dashboard() {
   const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
   
-  // Handler for navigating to membership page with expand parameter
-  // This ensures query parameters are preserved in static builds
-  // In static export mode, Next.js Link may not preserve query params, so we handle it manually
-  const handleViewAllMembers = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const url = '/membership?expand=all-members';
-    // Update URL directly first to ensure it's set (MembershipPage listens for this)
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', url);
-      // Trigger popstate event so MembershipPage detects the change immediately
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }
-    // Use router.push for Next.js navigation (works in both dev and static builds)
-    router.push(url);
-  };
   
   const handleMintMembership = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -229,7 +215,7 @@ export function Dashboard() {
       {hasInitialized && !isConnectedStable && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <p className="text-teal-600 dark:text-teal-400">
-            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>. If you haven't set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.
+            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>.{features.showMorePages && <> If you haven&apos;t set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.</>}
           </p>
         </div>
       )}
@@ -256,14 +242,14 @@ export function Dashboard() {
       {/* Show content if: all loading is done OR if there are errors (to prevent infinite loading) */}
       {/* Don't wait forever - if queries error out or timeout, show the dashboard anyway */}
       {/* Also wait for initialization to prevent flickering during wallet connection */}
-      {hasInitialized && !loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (isLoadingTreasury && !isErrorTreasury) || isLoadingProposals || (isConnectedStable && address && isMember === undefined && !isErrorMembership)) ? (
+      {hasInitialized && !loadingTimeout && ((isLoadingMembers && !isErrorMembers) || (features.showTreasury && isLoadingTreasury && !isErrorTreasury) || (features.showGovernance && isLoadingProposals) || (isConnectedStable && address && isMember === undefined && !isErrorMembership)) ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 w-full min-w-0">
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <p>Loading dashboard data...</p>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${features.showTreasury ? 'lg:grid-cols-4' : ''} gap-6 w-full`}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Members</h3>
@@ -280,13 +266,9 @@ export function Dashboard() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {totalMembers}
             </p>
-            <a 
-              href="/membership?expand=all-members" 
-              onClick={handleViewAllMembers}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block cursor-pointer"
-            >
+            <Link href="/community" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
               View all →
-            </a>
+            </Link>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
@@ -316,7 +298,7 @@ export function Dashboard() {
             )}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+          {features.showTreasury && <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
@@ -335,9 +317,9 @@ export function Dashboard() {
             <Link href="/treasury" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
               To treasury →
             </Link>
-          </div>
+          </div>}
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+          {features.showGovernance && <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Proposals</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
@@ -354,7 +336,7 @@ export function Dashboard() {
             <Link href="/governance" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">
               View all →
             </Link>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -369,55 +351,65 @@ export function Dashboard() {
             <h3 className="font-semibold text-gray-900 dark:text-white">Membership</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Mint or view your membership NFT</p>
           </a>
-          <Link
-            href="/governance"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Governance</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create proposals and vote</p>
-          </Link>
-          <Link
-            href="/treasury"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Treasury</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View treasury and execute payouts</p>
-          </Link>
-          <Link
-            href="/constitution"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Constitution</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View governance parameters</p>
-          </Link>
-          <Link
-            href="/dao-architecture"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white"><span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> Architecture</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand how the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> works</p>
-          </Link>
-          <Link
-            href="/philosophy"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Design Philosophy</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Learn about our design principles</p>
-          </Link>
-          <Link
-            href="/trilemma"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Blockchain Nation Trilemma</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand the tradeoffs between sovereignty, scale, and onboarding</p>
-          </Link>
-          <Link
-            href="/getting-started"
-            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-          >
-            <h3 className="font-semibold text-gray-900 dark:text-white">Getting Started</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">New to <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span>? Start here</p>
-          </Link>
+          {features.showGovernance && (
+            <Link
+              href="/governance"
+              className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white">Governance</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create proposals and vote</p>
+            </Link>
+          )}
+          {features.showTreasury && (
+            <Link
+              href="/treasury"
+              className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white">Treasury</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View treasury and execute payouts</p>
+            </Link>
+          )}
+          {features.showConstitution && (
+            <Link
+              href="/constitution"
+              className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white">Constitution</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View governance parameters</p>
+            </Link>
+          )}
+          {features.showMorePages && (
+            <>
+              <Link
+                href="/dao-architecture"
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-white"><span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> Architecture</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand how the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> works</p>
+              </Link>
+              <Link
+                href="/philosophy"
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-white">Design Philosophy</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Learn about our design principles</p>
+              </Link>
+              <Link
+                href="/trilemma"
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-white">Blockchain Nation Trilemma</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Understand the tradeoffs between sovereignty, scale, and onboarding</p>
+              </Link>
+              <Link
+                href="/getting-started"
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+              >
+                <h3 className="font-semibold text-gray-900 dark:text-white">Getting Started</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">New to <span className="font-bold">QAWL</span> <span className="text-xs font-normal">DAO</span>? Start here</p>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </div>

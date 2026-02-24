@@ -3,12 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { features } from '@/config/features';
 
-const footerLinks = [
+const allFooterLinks = [
   { href: '/dao-architecture', label: 'DAO Architecture' },
   { href: '/philosophy', label: 'Design Philosophy' },
   { href: '/getting-started', label: 'Getting Started' },
 ];
+
+const footerLinks = features.showMorePages ? allFooterLinks : [];
 
 export function Footer() {
   const pathname = usePathname();
