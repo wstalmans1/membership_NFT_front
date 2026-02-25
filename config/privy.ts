@@ -5,14 +5,12 @@ export const privyConfig: PrivyClientConfig = {
   // Login methods: email first (low barrier), then social, then external wallets
   loginMethods: ['email', 'google', 'wallet'],
 
-  // Always create an embedded Ethereum wallet on login.
-  // 'all-users' (not 'users-without-wallets') is required because Privy treats
-  // a previously-linked MetaMask as "already has a wallet" and skips creation
-  // otherwise — leaving email/social users pointing at the MetaMask address.
+  // Create an embedded wallet only for users who have no wallet yet (email/social logins).
+  // MetaMask/external wallet logins are skipped — they already have a wallet.
   // The nested ethereum.createOnLogin format is required by the current SDK.
   embeddedWallets: {
     ethereum: {
-      createOnLogin: 'all-users',
+      createOnLogin: 'users-without-wallets',
     },
   },
 

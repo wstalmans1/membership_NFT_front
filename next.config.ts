@@ -5,6 +5,9 @@ process.env.CSS_TRANSFORMER_WASM = '1';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Explicitly declare Turbopack (Next.js 16 default) with no extra config needed.
+  // Privy's Solana peer-dependency warnings do not require externals under Turbopack.
+  turbopack: {},
   // Static export for IPFS deployment
   output: 'export',
   // Suppress hydration warnings - they're harmless and caused by Next.js Link components
