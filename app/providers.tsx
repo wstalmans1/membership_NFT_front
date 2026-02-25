@@ -1,33 +1,42 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider } from 'wagmi';
+import { PrivyProvider } from '@privy-io/react-auth';
+import { WagmiProvider } from '@privy-io/wagmi';
 import { wagmiConfig } from '@/config/wagmi';
+import { privyConfig } from '@/config/privy';
 import { useState } from 'react';
 import { DataProvider } from '@/contexts/DataContext';
 import { DataPrefetcher } from '@/components/DataPrefetcher';
+import { PrivyWalletSync } from '@/components/PrivyWalletSync';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
-        gcTime: 10 * 60 * 1000, // 10 minutes - cache time (formerly cacheTime)
-        refetchOnWindowFocus: false, // Don't refetch on window focus
-        refetchOnMount: false, // Don't refetch on mount if data exists
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
       },
     },
   }));
 
   return (
-    <WagmiProvider config={wagmiConfig}>
+    <PrivyProvider
+      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
+      config={privyConfig}
+    >
       <QueryClientProvider client={queryClient}>
-        <DataProvider>
-          <DataPrefetcher />
-          {children}
-        </DataProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <DataProvider>
+            <PrivyWalletSync />
+            <DataPrefetcher />
+            {children}
+          </DataProvider>
+        </WagmiProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </PrivyProvider>
   );
 }
 

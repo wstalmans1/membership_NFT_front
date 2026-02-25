@@ -14,6 +14,8 @@
     "clean:all": "rm -rf .next out node_modules pnpm-lock.yaml"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.14.1",
+    "@privy-io/wagmi": "^4.0.2",
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.90.16",
     "@wagmi/connectors": "^7.0.6",

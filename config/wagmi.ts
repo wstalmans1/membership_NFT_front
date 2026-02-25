@@ -1,6 +1,6 @@
-import { createConfig, http, fallback, webSocket } from 'wagmi';
+import { createConfig } from '@privy-io/wagmi';
+import { http, fallback, webSocket } from 'wagmi';
 import { sepolia, mainnet } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
 
 // Support custom RPC URLs for decentralization
 // Users can provide their own RPC endpoint via environment variable
@@ -51,11 +51,7 @@ const transports = {
 };
 
 export const wagmiConfig = createConfig({
-  chains: [sepolia, mainnet], // Include Mainnet so wagmi can detect when MetaMask switches to it
-  connectors: [
-    // Use injected wallet connector for MetaMask, Brave, and other EIP-1193 wallets
-    injected(),
-  ],
+  chains: [sepolia, mainnet],
   transports,
 });
 

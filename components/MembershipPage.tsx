@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useChainId } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useChainId } from 'wagmi';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { sepolia } from 'wagmi/chains';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatEther } from '@/lib/utils';
@@ -18,7 +20,8 @@ import Link from 'next/link';
 import { features } from '@/config/features';
 
 export function MembershipPage() {
-  const { address, isConnected } = useAccount();
+  const { authenticated } = usePrivy();
+  const { address, isConnected: isLoggedIn } = useWalletAddress();
   const chainId = useChainId();
   const queryClient = useQueryClient();
 
@@ -173,9 +176,9 @@ export function MembershipPage() {
         <p className="mt-2 text-gray-600 dark:text-gray-400">Mint and manage your membership NFT</p>
       </div>
 
-      {isConnected && <BalanceCheck />}
+      {isLoggedIn && <BalanceCheck />}
 
-      {!isConnected && (
+      {!isLoggedIn && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <p className="text-teal-600 dark:text-teal-400">
             Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>.
@@ -189,7 +192,7 @@ export function MembershipPage() {
       )}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-        {(!isConnected || !address) ? null : balance === undefined || isMember === undefined ? (
+        {(!isLoggedIn || !address) ? null : balance === undefined || isMember === undefined ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <p>Loading membership status...</p>
               </div>
