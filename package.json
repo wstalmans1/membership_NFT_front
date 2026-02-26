@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "bash scripts/dev-arm64.sh",
-    "dev:membership": "NEXT_PUBLIC_BUILD_VARIANT=membership bash scripts/dev-arm64.sh",
+    "dev:community": "NEXT_PUBLIC_BUILD_VARIANT=community bash scripts/dev-arm64.sh",
     "build": "next build && node scripts/fix-ipfs-routes.js",
     "build:full": "NEXT_PUBLIC_BUILD_VARIANT=full next build && node scripts/fix-ipfs-routes.js",
-    "build:membership": "NEXT_PUBLIC_BUILD_VARIANT=membership next build && node scripts/fix-ipfs-routes.js",
+    "build:community": "NEXT_PUBLIC_BUILD_VARIANT=community next build && node scripts/fix-ipfs-routes.js",
     "start": "next start",
     "lint": "eslint",
     "clean": "rm -rf .next out",

@@ -15,7 +15,7 @@ if command -v nvm >/dev/null 2>&1; then
   nvm use --lts >/dev/null
 fi
 
-# Forward optional build variant so NEXT_PUBLIC_BUILD_VARIANT=membership pnpm dev:membership works
+# Forward optional build variant so NEXT_PUBLIC_BUILD_VARIANT=community pnpm dev:community works
 # even when the env var would otherwise be lost across the arch exec boundary.
 VARIANT="${NEXT_PUBLIC_BUILD_VARIANT:-full}"
 
