@@ -216,7 +216,7 @@ export function Dashboard() {
       {hasInitialized && !isConnectedStable && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
           <p className="text-teal-600 dark:text-teal-400">
-            Connect your Wallet to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>.{features.showMorePages && <> If you haven&apos;t set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.</>}
+            Login to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>.{features.showMorePages && <> If you haven&apos;t set up a wallet yet, visit the <Link href="/getting-started" className="underline text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200">getting started guide</Link>.</>}
           </p>
         </div>
       )}
