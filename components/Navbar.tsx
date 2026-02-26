@@ -7,7 +7,7 @@ import { WalletButton } from './WalletButton';
 import { NetworkStatus } from './NetworkStatus';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { features } from '@/config/features';
+import { features, versionSwitch } from '@/config/features';
 
 const allNavItems = [
   { href: '/', label: 'Dashboard', show: features.showDashboard },
@@ -108,6 +108,14 @@ export function Navbar() {
                 );
               })}
             </div>
+            <a
+              href={versionSwitch.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-full transition-colors"
+            >
+              {versionSwitch.label} ↗
+            </a>
           </div>
           <div className="flex flex-col items-center justify-center h-16 gap-1">
             <WalletButton />
@@ -207,6 +215,14 @@ export function Navbar() {
           
           {/* Right side: Wallet Button, Network Status, and Mobile Menu Button */}
           <div className="flex items-center gap-2 md:gap-4">
+            <a
+              href={versionSwitch.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden lg:inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 rounded-full transition-colors"
+            >
+              {versionSwitch.label} ↗
+            </a>
             <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:h-16 sm:gap-1">
               <WalletButton />
               <NetworkStatus />
@@ -310,6 +326,15 @@ export function Navbar() {
                 })()}
               </div>
             </div>
+            {/* Version switch in mobile menu */}
+            <a
+              href={versionSwitch.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              {versionSwitch.label} ↗
+            </a>
             {/* Mobile Wallet and Network Status */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
               <div className="sm:hidden">

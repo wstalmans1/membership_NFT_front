@@ -22,3 +22,8 @@ export const features = {
   // Membership page sections
   showVotingPower: !isMembershipOnly,
 } as const;
+
+// Version switch — links to the other deployed build
+export const versionSwitch = isMembershipOnly
+  ? { label: 'Extended DAO', href: 'https://qawldao.eth.limo/' }
+  : { label: 'Community Portal', href: 'https://community.qawldao.eth.limo/community/' };
