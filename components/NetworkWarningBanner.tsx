@@ -4,6 +4,7 @@ import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { AlertCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useWallets } from '@privy-io/react-auth';
 
 // Common chain names mapping
 const CHAIN_NAMES: Record<number, string> = {
@@ -22,6 +23,7 @@ export function NetworkWarningBanner() {
   const { isConnected, chainId: accountChainId } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending } = useSwitchChain();
+  const { wallets } = useWallets();
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   
@@ -37,6 +39,15 @@ export function NetworkWarningBanner() {
 
   // Don't show if wallet not connected
   if (!isConnected) {
+    return null;
+  }
+
+  // Email/Google users have a Privy embedded wallet — their smart wallet is
+  // always routed to Sepolia regardless of what wagmi's chain reports.
+  // The wagmi chain showing "Mainnet" is a false positive for these users,
+  // and useSwitchChain does not work for embedded wallets anyway.
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
+  if (hasEmbeddedWallet) {
     return null;
   }
 
