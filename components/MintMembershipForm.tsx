@@ -167,19 +167,27 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
     e.preventDefault();
 
     if (!address || !isConnected) { onError('Please connect your wallet'); return; }
-    if (chainId !== sepolia.id) { onError(`Please switch to Sepolia network. Current network: ${chainId}`); return; }
+    // Embedded wallet users are always on Sepolia via their smart wallet — skip chain check.
+    if (!hasEmbeddedWallet && chainId !== sepolia.id) {
+      onError(`Please switch to Sepolia network. Current network: ${chainId}`);
+      return;
+    }
     if (!formData.name.trim()) { onError('Please enter your name'); return; }
     if (!formData.photo) { onError('Please upload a photo'); return; }
-    if (!formData.donationAmount) { onError('Please enter a donation amount'); return; }
 
-    const minDonationEth = minDonation ? formatEther(BigInt(minDonation.toString())) : '0';
-    if (parseFloat(formData.donationAmount) < parseFloat(minDonationEth)) {
-      onError(`Donation must be at least ${minDonationEth} Sepolia ETH`);
-      return;
+    // Donation validation only applies to external wallet users.
+    const effectiveDonation = hasEmbeddedWallet ? '0' : formData.donationAmount;
+    if (!hasEmbeddedWallet) {
+      if (!effectiveDonation) { onError('Please enter a donation amount'); return; }
+      const minDonationEth = minDonation ? formatEther(BigInt(minDonation.toString())) : '0';
+      if (parseFloat(effectiveDonation) < parseFloat(minDonationEth)) {
+        onError(`Donation must be at least ${minDonationEth} Sepolia ETH`);
+        return;
+      }
     }
 
     setIsMinting(true);
-    const amountWei = parseEther(formData.donationAmount);
+    const amountWei = parseEther(effectiveDonation);
     console.log('🚀 Starting mint…', { contract: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, value: amountWei.toString(), from: address });
 
     try {
@@ -288,25 +296,27 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
         </p>
       </div>
 
-      <div>
-        <label htmlFor="donationAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Donation Amount (Sepolia ETH) <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="donationAmount"
-          type="number"
-          step="0.001"
-          min={minDonation ? formatEther(BigInt(minDonation.toString())) : '0'}
-          value={formData.donationAmount}
-          onChange={(e) => setFormData({ ...formData, donationAmount: e.target.value })}
-          placeholder={minDonation ? formatEther(BigInt(minDonation.toString())) : '0.0'}
-          required
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '…'} Sepolia ETH
-        </p>
-      </div>
+      {!hasEmbeddedWallet && (
+        <div>
+          <label htmlFor="donationAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Donation Amount (Sepolia ETH) <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="donationAmount"
+            type="number"
+            step="0.001"
+            min={minDonation ? formatEther(BigInt(minDonation.toString())) : '0'}
+            value={formData.donationAmount}
+            onChange={(e) => setFormData({ ...formData, donationAmount: e.target.value })}
+            placeholder={minDonation ? formatEther(BigInt(minDonation.toString())) : '0.0'}
+            required
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '…'} Sepolia ETH
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-3">
         <button
