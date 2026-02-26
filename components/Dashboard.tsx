@@ -15,9 +15,10 @@ import { HelpCircle } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import { useEffect, useState } from 'react';
 import { decodeEventLog, type Address } from 'viem';
-import { features } from '@/config/features';
+import { useFeatures } from '@/hooks/useFeatures';
 
 export function Dashboard() {
+  const features = useFeatures();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();

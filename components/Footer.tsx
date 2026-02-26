@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { features } from '@/config/features';
+import { useFeatures } from '@/hooks/useFeatures';
 
 const allFooterLinks = [
   { href: '/dao-architecture', label: 'DAO Architecture' },
@@ -11,10 +11,10 @@ const allFooterLinks = [
   { href: '/getting-started', label: 'Getting Started' },
 ];
 
-const footerLinks = features.showMorePages ? allFooterLinks : [];
-
 export function Footer() {
   const pathname = usePathname();
+  const features = useFeatures();
+  const footerLinks = features.showMorePages ? allFooterLinks : [];
 
   return (
     <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto">

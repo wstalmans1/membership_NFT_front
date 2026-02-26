@@ -3,6 +3,7 @@
 import { notFound } from 'next/navigation';
 import { features } from '@/config/features';
 import dynamic from 'next/dynamic';
+import { ExtendedOnly } from '@/components/ExtendedOnly';
 import { Download, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 
 const Navbar = dynamic(() => import('@/components/Navbar').then(mod => ({ default: mod.Navbar })), {
@@ -24,6 +25,7 @@ const Footer = dynamic(() => import('@/components/Footer').then(mod => ({ defaul
 export default function GettingStarted() {
   if (!features.showMorePages) notFound();
   return (
+    <ExtendedOnly>
     <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
       <Navbar />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
@@ -316,6 +318,7 @@ export default function GettingStarted() {
       </main>
       <Footer />
     </div>
+    </ExtendedOnly>
   );
 }
 

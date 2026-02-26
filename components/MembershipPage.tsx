@@ -19,9 +19,10 @@ import { NFTDisplay } from './NFTDisplay';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
-import { features } from '@/config/features';
+import { useFeatures } from '@/hooks/useFeatures';
 
 export function MembershipPage() {
+  const features = useFeatures();
   const { authenticated } = usePrivy();
   const { address, isConnected: isLoggedIn } = useWalletAddress();
   const { client: smartWalletClient } = useSmartWallets();

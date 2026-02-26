@@ -8,6 +8,7 @@ import { wagmiConfig } from '@/config/wagmi';
 import { privyConfig } from '@/config/privy';
 import { useState } from 'react';
 import { DataProvider } from '@/contexts/DataContext';
+import { ViewModeProvider } from '@/contexts/ViewModeContext';
 import { DataPrefetcher } from '@/components/DataPrefetcher';
 import { PrivyWalletSync } from '@/components/PrivyWalletSync';
 
@@ -31,11 +32,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <SmartWalletsProvider>
         <QueryClientProvider client={queryClient}>
           <WagmiProvider config={wagmiConfig}>
-            <DataProvider>
-              <PrivyWalletSync />
-              <DataPrefetcher />
-              {children}
-            </DataProvider>
+            <ViewModeProvider>
+              <DataProvider>
+                <PrivyWalletSync />
+                <DataPrefetcher />
+                {children}
+              </DataProvider>
+            </ViewModeProvider>
           </WagmiProvider>
         </QueryClientProvider>
       </SmartWalletsProvider>

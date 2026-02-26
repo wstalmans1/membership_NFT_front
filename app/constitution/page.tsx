@@ -2,6 +2,7 @@
 
 import { notFound } from 'next/navigation';
 import { features } from '@/config/features';
+import { ExtendedOnly } from '@/components/ExtendedOnly';
 
 import dynamic from 'next/dynamic';
 
@@ -22,13 +23,15 @@ const Footer = dynamic(() => import('@/components/Footer').then(mod => ({ defaul
 export default function Constitution() {
   if (!features.showConstitution) notFound();
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
-      <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
-        <ConstitutionPage />
-      </main>
-      <Footer />
-    </div>
+    <ExtendedOnly>
+      <div className="min-h-screen bg-gray-900 flex flex-col" suppressHydrationWarning>
+        <Navbar />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-hidden" suppressHydrationWarning>
+          <ConstitutionPage />
+        </main>
+        <Footer />
+      </div>
+    </ExtendedOnly>
   );
 }
 
