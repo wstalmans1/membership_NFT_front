@@ -2,7 +2,7 @@
 
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useWallets } from '@privy-io/react-auth';
 
@@ -139,28 +139,7 @@ export function NetworkStatus() {
     setDirectChainId(null);
   };
 
-  if (isCorrectNetwork) {
-    return (
-      <div className="flex items-center justify-center gap-2 px-2 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded-lg text-xs font-medium whitespace-nowrap h-6">
-        <CheckCircle className="w-3 h-3 flex-shrink-0" />
-        <span>Sepolia Network</span>
-        <span className="relative group flex items-center" tabIndex={0} data-tooltip-anchor>
-          <span
-            className="flex h-4 w-4 items-center justify-center rounded-full border border-green-300/60 text-[10px] leading-none text-green-700 dark:border-green-700/60 dark:text-green-300"
-            aria-label="Network status help"
-          >
-            ?
-          </span>
-          <div data-tooltip className="absolute right-0 top-full mt-2 w-max max-w-[80vw] sm:max-w-xs p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700 whitespace-normal">
-            MetaMask now locks networks per site. If you switched via this DApp, changing MetaMask's global network won't affect this site.
-            <span className="block mt-2 text-gray-300">
-              Use the DApp switch button or MetaMask → Connected sites → this site → Network.
-            </span>
-          </div>
-        </span>
-      </div>
-    );
-  }
+  if (isCorrectNetwork) return null;
 
   return (
     <div className="flex items-center justify-center gap-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 rounded-lg text-xs font-medium whitespace-nowrap h-6">
