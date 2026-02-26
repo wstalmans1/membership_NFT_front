@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PrivyProvider } from '@privy-io/react-auth';
+import { SmartWalletsProvider } from '@privy-io/react-auth/smart-wallets';
 import { WagmiProvider } from '@privy-io/wagmi';
 import { wagmiConfig } from '@/config/wagmi';
 import { privyConfig } from '@/config/privy';
@@ -27,15 +28,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       config={privyConfig}
     >
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={wagmiConfig}>
-          <DataProvider>
-            <PrivyWalletSync />
-            <DataPrefetcher />
-            {children}
-          </DataProvider>
-        </WagmiProvider>
-      </QueryClientProvider>
+      <SmartWalletsProvider>
+        <QueryClientProvider client={queryClient}>
+          <WagmiProvider config={wagmiConfig}>
+            <DataProvider>
+              <PrivyWalletSync />
+              <DataPrefetcher />
+              {children}
+            </DataProvider>
+          </WagmiProvider>
+        </QueryClientProvider>
+      </SmartWalletsProvider>
     </PrivyProvider>
   );
 }

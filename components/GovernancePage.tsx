@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo, useSyncExternalStore } from 'react';
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useWatchContractEvent, useWatchBlockNumber } from 'wagmi';
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useWatchContractEvent, useWatchBlockNumber } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
+import { useWallets } from '@privy-io/react-auth';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
 import { DAOGovernor } from '@/abis/DAOGovernor';
@@ -243,8 +246,11 @@ const mergeProposals = (prev: any[], next: any[]) => {
 };
 
 export function GovernancePage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
   const chainId = useChainId();
+  const { client: smartWalletClient } = useSmartWallets();
+  const { wallets } = useWallets();
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
   const router = useRouter();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const proposalsDataVersionRef = useRef(0);
@@ -363,6 +369,17 @@ export function GovernancePage() {
   const { writeContract: writeVote, data: voteHash, isPending: isVoting, isError: isVoteError } = useWriteContract();
   const { writeContract: writeQueue, data: queueHash, isPending: isQueueing, error: queueError } = useWriteContract();
   const { writeContract: writeExecute, data: executeHash, isPending: isExecuting, error: executeError } = useWriteContract();
+
+  // Smart-wallet hashes and pending flags (for email/Google login users)
+  const [swProposalHash, setSwProposalHash] = useState<`0x${string}` | undefined>();
+  const [swVoteHash, setSwVoteHash] = useState<`0x${string}` | undefined>();
+  const [swQueueHash, setSwQueueHash] = useState<`0x${string}` | undefined>();
+  const [swExecuteHash, setSwExecuteHash] = useState<`0x${string}` | undefined>();
+  const [isSwProposalPending, setIsSwProposalPending] = useState(false);
+  const [isSwVotePending, setIsSwVotePending] = useState(false);
+  const [isSwQueuePending, setIsSwQueuePending] = useState(false);
+  const [isSwExecutePending, setIsSwExecutePending] = useState(false);
+
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
   const proposalsQueryKey = useMemo(() => ['proposals', CONTRACTS.SEPOLIA.GOVERNOR_PROXY] as const, []);
@@ -397,6 +414,12 @@ export function GovernancePage() {
   const { isLoading: isExecuteConfirming, isSuccess: isExecuteConfirmed } = useWaitForTransactionReceipt({
     hash: executeHash,
   });
+
+  // Smart-wallet receipt watchers (same success effects trigger for both paths)
+  const { isLoading: isSwProposalConfirming, isSuccess: isSwProposalConfirmed } = useWaitForTransactionReceipt({ hash: swProposalHash });
+  const { isLoading: isSwVoteConfirming, isSuccess: isSwVoteConfirmed, data: swVoteReceipt } = useWaitForTransactionReceipt({ hash: swVoteHash });
+  const { isLoading: isSwQueueConfirming, isSuccess: isSwQueueConfirmed } = useWaitForTransactionReceipt({ hash: swQueueHash });
+  const { isLoading: isSwExecuteConfirming, isSuccess: isSwExecuteConfirmed } = useWaitForTransactionReceipt({ hash: swExecuteHash });
 
   // Handle proposal transaction errors
   useEffect(() => {
@@ -1218,6 +1241,35 @@ export function GovernancePage() {
       }
 
 
+      console.log('Submitting proposal:', { targets: targetAddresses, values, calldatas: calldataArray, description });
+
+      // ── Smart wallet path (email / Google login) ──────────────────────────
+      if (hasEmbeddedWallet && smartWalletClient) {
+        setIsSwProposalPending(true);
+        try {
+          const txHash = await smartWalletClient.writeContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'propose',
+            args: [targetAddresses, values, calldataArray, description],
+            chain: sepolia,
+            account: smartWalletClient.account as any,
+          });
+          setSwProposalHash(txHash as `0x${string}`);
+        } catch (swErr: any) {
+          const msg = swErr?.shortMessage || swErr?.message || 'Failed to submit proposal';
+          if (msg.toLowerCase().includes('proposal threshold') || msg.toLowerCase().includes('votes below')) {
+            setError('You need more voting power to create a proposal. Please ensure you are a member and meet the proposal threshold.');
+          } else {
+            setError(msg);
+          }
+        } finally {
+          setIsSwProposalPending(false);
+        }
+        return;
+      }
+
+      // ── External wallet path (MetaMask) ──────────────────────────────────
       let gasLimit: bigint | undefined;
       if (publicClient && address) {
         try {
@@ -1252,14 +1304,6 @@ export function GovernancePage() {
         return;
       }
 
-      console.log('Submitting proposal:', {
-        targets: targetAddresses,
-        values,
-        calldatas: calldataArray,
-        description,
-        gasLimit: gasLimit?.toString(),
-      });
-
       writeContract({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
@@ -1278,7 +1322,7 @@ export function GovernancePage() {
   
   // Reset form and show success message, then refresh proposals
   useEffect(() => {
-    if (isConfirmed) {
+    if (isConfirmed || isSwProposalConfirmed) {
       setJustSubmitted(true); // Keep button disabled
       setSuccess('Proposal submitted successfully! Refreshing proposals...');
       setDescription('');
@@ -1313,7 +1357,7 @@ export function GovernancePage() {
         }, 4000);
       }, 2000);
     }
-  }, [isConfirmed, refetchLatestProposals, refetchProposalCount, queryClient]);
+  }, [isConfirmed, isSwProposalConfirmed, refetchLatestProposals, refetchProposalCount, queryClient]);
 
   // Handle queue errors
   useEffect(() => {
@@ -1326,7 +1370,7 @@ export function GovernancePage() {
 
   // Handle queue confirmation - fetch actual ETA from contract when queue is confirmed
   useEffect(() => {
-    if (isQueueConfirmed && queueHash && publicClient && queueingProposalId) {
+    if ((isQueueConfirmed && (queueHash || swQueueHash)) && publicClient && queueingProposalId) {
       const fetchActualETA = async () => {
         try {
           // Wait a moment for the transaction to be mined and state to update
@@ -1417,14 +1461,15 @@ export function GovernancePage() {
 
       fetchActualETA();
     }
-  }, [isQueueConfirmed, queueHash, publicClient, queueingProposalId, refetchLatestProposals]);
+  }, [isQueueConfirmed, isSwQueueConfirmed, queueHash, swQueueHash, publicClient, queueingProposalId, refetchLatestProposals]);
 
   // Handle execute confirmation
   useEffect(() => {
-    if (isExecuteConfirmed && executeHash && executingProposalId) {
-      if (executeHash !== lastExecuteHashRef.current) {
+    const activeHash = executeHash || swExecuteHash;
+    if ((isExecuteConfirmed || isSwExecuteConfirmed) && activeHash && executingProposalId) {
+      if (activeHash !== lastExecuteHashRef.current) {
         setExecutedProposalIds(prev => new Set(prev).add(executingProposalId));
-        lastExecuteHashRef.current = executeHash;
+        lastExecuteHashRef.current = activeHash;
       }
       setExecutingProposalId(null);
       setSuccess('Proposal executed successfully! All changes have been applied.');
@@ -1444,7 +1489,7 @@ export function GovernancePage() {
         }, 3000);
       }, 5000);
     }
-  }, [isExecuteConfirmed, executeHash, executingProposalId, refetchLatestProposals, queryClient, proposalsQueryKey]);
+  }, [isExecuteConfirmed, isSwExecuteConfirmed, executeHash, swExecuteHash, executingProposalId, refetchLatestProposals, queryClient, proposalsQueryKey]);
 
   // Clean up tracking when proposal state updates to Queued - use actual ETA from contract
   useEffect(() => {
@@ -1467,9 +1512,9 @@ export function GovernancePage() {
     setError('Transaction failed. Please check your wallet and try again.');
   }
 
-  // Handle vote confirmation
+  // Handle vote confirmation (both wagmi and smart wallet paths)
   useEffect(() => {
-    if (isVoteConfirmed && votingProposalId) {
+    if ((isVoteConfirmed || isSwVoteConfirmed) && votingProposalId) {
       const confirmedProposalId = votingProposalId; // Store before clearing state
       console.log('Vote confirmed for proposal:', confirmedProposalId);
       console.log('Vote receipt:', voteReceipt);
@@ -1533,7 +1578,7 @@ export function GovernancePage() {
         setSuccess(null);
       }, 8000);
     }
-  }, [isVoteConfirmed, votingProposalId, refetchLatestProposals, refetchHasVoted, queryClient, voteReceipt]);
+  }, [isVoteConfirmed, isSwVoteConfirmed, votingProposalId, refetchLatestProposals, refetchHasVoted, queryClient, voteReceipt, swVoteReceipt]);
 
   const handleVote = async (proposalId: string, support: number) => {
     if (!address || !isConnected) {
@@ -1546,6 +1591,28 @@ export function GovernancePage() {
 
     try {
       console.log('Casting vote:', { proposalId, support, address });
+
+      if (hasEmbeddedWallet && smartWalletClient) {
+        setIsSwVotePending(true);
+        try {
+          const txHash = await smartWalletClient.writeContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'castVote',
+            args: [BigInt(proposalId), support],
+            chain: sepolia,
+            account: smartWalletClient.account as any,
+          });
+          setSwVoteHash(txHash as `0x${string}`);
+        } catch (swErr: any) {
+          setError(swErr?.shortMessage || swErr?.message || 'Failed to cast vote. Please try again.');
+          setVotingProposalId(null);
+        } finally {
+          setIsSwVotePending(false);
+        }
+        return;
+      }
+
       writeVote({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
@@ -1607,7 +1674,28 @@ export function GovernancePage() {
       });
       
       setQueueingProposalId(proposal.id);
-      
+
+      if (hasEmbeddedWallet && smartWalletClient) {
+        setIsSwQueuePending(true);
+        try {
+          const txHash = await smartWalletClient.writeContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'queue',
+            args: [proposal.targets as Address[], values as bigint[], proposal.calldatas as `0x${string}`[], descriptionHash],
+            chain: sepolia,
+            account: smartWalletClient.account as any,
+          });
+          setSwQueueHash(txHash as `0x${string}`);
+        } catch (swErr: any) {
+          setError(swErr?.shortMessage || swErr?.message || 'Failed to queue proposal. Please try again.');
+          setQueueingProposalId(null);
+        } finally {
+          setIsSwQueuePending(false);
+        }
+        return;
+      }
+
       // queue function requires: targets, values, calldatas, descriptionHash
       writeQueue({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
@@ -1620,14 +1708,12 @@ export function GovernancePage() {
           descriptionHash
         ],
       });
-      
-      console.log('writeQueue called - MetaMask should pop up now');
     } catch (err: any) {
       console.error('Error queueing proposal:', err);
       setError(err.message || 'Failed to queue proposal. Please try again.');
       setQueueingProposalId(null);
     }
-  }, [address, isConnected, writeQueue, setError, setSuccess, setQueueingProposalId]);
+  }, [address, isConnected, writeQueue, smartWalletClient, hasEmbeddedWallet, setError, setSuccess, setQueueingProposalId]);
 
   const handleExecute = useCallback(async (proposal: any) => {
     if (!address || !isConnected) {
@@ -1718,7 +1804,28 @@ export function GovernancePage() {
       });
       
       setExecutingProposalId(proposal.id);
-      
+
+      if (hasEmbeddedWallet && smartWalletClient) {
+        setIsSwExecutePending(true);
+        try {
+          const txHash = await smartWalletClient.writeContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'execute',
+            args: [proposal.targets as Address[], values as bigint[], proposal.calldatas as `0x${string}`[], descriptionHash],
+            chain: sepolia,
+            account: smartWalletClient.account as any,
+          });
+          setSwExecuteHash(txHash as `0x${string}`);
+        } catch (swErr: any) {
+          setError(swErr?.shortMessage || swErr?.message || 'Failed to execute proposal. Please try again.');
+          setExecutingProposalId(null);
+        } finally {
+          setIsSwExecutePending(false);
+        }
+        return;
+      }
+
       // execute function requires: targets, values, calldatas, descriptionHash
       writeExecute({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
@@ -1731,14 +1838,12 @@ export function GovernancePage() {
           descriptionHash
         ],
       });
-      
-      console.log('writeExecute called - MetaMask should pop up now');
     } catch (err: any) {
       console.error('Error executing proposal:', err);
       setError(formatViemError(err));
       setExecutingProposalId(null);
     }
-  }, [address, isConnected, writeExecute, publicClient, setError, setSuccess, setExecutingProposalId]);
+  }, [address, isConnected, writeExecute, smartWalletClient, hasEmbeddedWallet, publicClient, setError, setSuccess, setExecutingProposalId]);
 
   return (
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
@@ -2244,10 +2349,10 @@ export function GovernancePage() {
                     )}
                     <button
                       type="submit"
-                      disabled={isPending || isConfirming || justSubmitted || isMember === false || (isMember === undefined && isLoadingMembership)}
+                      disabled={isPending || isConfirming || isSwProposalPending || isSwProposalConfirming || justSubmitted || isMember === false || (isMember === undefined && isLoadingMembership)}
                       className="w-full px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isPending || isConfirming || justSubmitted ? 'Submitting...' : isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Submit Proposal'}
+                      {isPending || isConfirming || isSwProposalPending || isSwProposalConfirming || justSubmitted ? 'Submitting...' : isMember === false ? 'Membership Required' : (isMember === undefined && isLoadingMembership) ? 'Checking membership...' : 'Submit Proposal'}
                     </button>
                     {hash && (
                       <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
@@ -2308,10 +2413,10 @@ export function GovernancePage() {
                   isConnected={isConnected}
                   onQueue={handleQueue}
                   onExecute={handleExecute}
-                  isQueueing={isQueueing || isQueueConfirming}
+                  isQueueing={isQueueing || isQueueConfirming || isSwQueuePending || isSwQueueConfirming}
                   isQueueingForProposal={isQueueingForProposal}
                   queueHash={queueHashForProposal}
-                  isExecuting={isExecuting || isExecuteConfirming}
+                  isExecuting={isExecuting || isExecuteConfirming || isSwExecutePending || isSwExecuteConfirming}
                   isExecutingForProposal={isExecutingForProposal}
                   executeHash={executeHashForProposal}
                   setExpandedProposal={setExpandedProposal}
@@ -2803,7 +2908,10 @@ function VoteCountsWithDirectRead({
   voteEventBatch: { nonce: number; proposalIds: string[] };
   isExpanded: boolean;
 }) {
-  const { address } = useAccount();
+  const { address } = useWalletAddress();
+  const { client: smartWalletClient } = useSmartWallets();
+  const { wallets } = useWallets();
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
   const publicClient = usePublicClient();
   const [localVotingProposalId, setLocalVotingProposalId] = useState<string | null>(null);
   const [pendingVoteSupport, setPendingVoteSupport] = useState<number | null>(null);
@@ -2865,6 +2973,9 @@ function VoteCountsWithDirectRead({
   const { isLoading: isVoteConfirming, isSuccess: isVoteConfirmed, data: voteReceipt } = useWaitForTransactionReceipt({
     hash: voteHash,
   });
+  const [swVoteHashPanel, setSwVoteHashPanel] = useState<`0x${string}` | undefined>();
+  const [isSwVotePanelPending, setIsSwVotePanelPending] = useState(false);
+  const { isLoading: isSwVotePanelConfirming, isSuccess: isSwVoteConfirmedPanel, data: swVoteReceiptPanel } = useWaitForTransactionReceipt({ hash: swVoteHashPanel });
 
   // Use direct contract read if available, otherwise fall back to initial votes
   const voteCounts = directVoteCounts && Array.isArray(directVoteCounts)
@@ -2905,14 +3016,16 @@ function VoteCountsWithDirectRead({
     }
   }, [directVoteCounts, proposalId, voteCountsError, votingPower, address]);
 
-  // Handle vote confirmation and extract vote choice from VoteCast event
+  // Handle vote confirmation and extract vote choice from VoteCast event (both wagmi and smart wallet)
   useEffect(() => {
-    if (isVoteConfirmed && localVotingProposalId === proposalId && voteReceipt && publicClient) {
+    const receipt = voteReceipt || swVoteReceiptPanel;
+    const confirmed = isVoteConfirmed || isSwVoteConfirmedPanel;
+    if (confirmed && localVotingProposalId === proposalId && receipt && publicClient) {
       console.log('Vote confirmed, extracting vote choice from events...');
       
       // Try to extract vote choice from VoteCast event
       try {
-        const voteCastEvent = voteReceipt.logs.find((log: any) => {
+        const voteCastEvent = receipt.logs.find((log: any) => {
           try {
             const decoded = decodeEventLog({
               abi: DAOGovernor,
@@ -2956,7 +3069,7 @@ function VoteCountsWithDirectRead({
         refetchHasVoted();
       }, 8000);
     }
-  }, [isVoteConfirmed, localVotingProposalId, proposalId, refetchDirectVotes, refetchHasVoted, voteReceipt, publicClient, address]);
+  }, [isVoteConfirmed, isSwVoteConfirmedPanel, localVotingProposalId, proposalId, refetchDirectVotes, refetchHasVoted, voteReceipt, swVoteReceiptPanel, publicClient, address]);
 
   useEffect(() => {
     if (!voteEventBatch.proposalIds.includes(proposalId)) return;
@@ -2992,6 +3105,32 @@ function VoteCountsWithDirectRead({
     }
     try {
       console.log('Casting vote directly:', { proposalId, support, address });
+
+      if (hasEmbeddedWallet && smartWalletClient) {
+        setIsSwVotePanelPending(true);
+        try {
+          const txHash = await smartWalletClient.writeContract({
+            address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
+            abi: DAOGovernor,
+            functionName: 'castVote',
+            args: [BigInt(proposalId), support],
+            chain: sepolia,
+            account: smartWalletClient.account as any,
+          });
+          setSwVoteHashPanel(txHash as `0x${string}`);
+        } catch (swErr: any) {
+          console.error('Smart wallet vote error:', swErr);
+          setLocalVotingProposalId(null);
+          setUserVoteChoice(null);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(`vote_${proposalId}`);
+          }
+        } finally {
+          setIsSwVotePanelPending(false);
+        }
+        return;
+      }
+
       writeVote({
         address: CONTRACTS.SEPOLIA.GOVERNOR_PROXY,
         abi: DAOGovernor,
@@ -3006,7 +3145,7 @@ function VoteCountsWithDirectRead({
         localStorage.removeItem(`vote_${proposalId}`);
       }
     }
-  }, [address, proposalId, writeVote]);
+  }, [address, proposalId, writeVote, hasEmbeddedWallet, smartWalletClient]);
 
   const handleVoteWithCheck = useCallback(async (support: number) => {
     if (!address) return;
@@ -3028,7 +3167,7 @@ function VoteCountsWithDirectRead({
       setPendingVoteSupport(null);
       return;
     }
-    if (isVoting || isVoteConfirming) return;
+    if (isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming) return;
     if (hasVotingPower) {
       handleVote(pendingVoteSupport);
     }
@@ -3039,6 +3178,8 @@ function VoteCountsWithDirectRead({
     votingPowerError,
     isVoting,
     isVoteConfirming,
+    isSwVotePanelPending,
+    isSwVotePanelConfirming,
     hasVotingPower,
     handleVote,
   ]);
@@ -3103,10 +3244,10 @@ function VoteCountsWithDirectRead({
               ) : (
                 <>
                   {/* Show processing indicator */}
-                  {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId && (
+                  {(isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming) && localVotingProposalId === proposalId && (
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                       <p className="text-xs text-blue-800 dark:text-blue-200">
-                        {isVoting ? '⏳ Submitting vote transaction...' : '⏳ Waiting for transaction confirmation...'}
+                        {(isVoting || isSwVotePanelPending) ? '⏳ Submitting vote transaction...' : '⏳ Waiting for transaction confirmation...'}
                       </p>
                     </div>
                   )}
@@ -3114,29 +3255,29 @@ function VoteCountsWithDirectRead({
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleVoteWithCheck(1)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
+                      disabled={isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
-                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
+                      {(isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote For'}
                     </button>
                     <button
                       onClick={() => handleVoteWithCheck(0)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
+                      disabled={isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
-                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
+                      {(isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Vote Against'}
                     </button>
                     <button
                       onClick={() => handleVoteWithCheck(2)}
-                      disabled={isVoting || isVoteConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
+                      disabled={isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming || !!hasVoted || (votingPowerKnown && !hasVotingPower)}
                       className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
-                      {(isVoting || isVoteConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}
+                      {(isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming) && localVotingProposalId === proposalId ? 'Voting...' : 'Abstain'}
                     </button>
                   </div>
-                  {voteHash && localVotingProposalId === proposalId && (
+                  {(voteHash || swVoteHashPanel) && localVotingProposalId === proposalId && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${voteHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{voteHash.substring(0, 10)}...</a>
+                      Transaction: <a href={`https://eth-sepolia.blockscout.com/tx/${voteHash || swVoteHashPanel}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{(voteHash || swVoteHashPanel)?.substring(0, 10)}...</a>
                     </p>
                   )}
                 </>

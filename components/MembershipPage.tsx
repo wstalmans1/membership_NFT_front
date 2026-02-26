@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
+import { useWallets } from '@privy-io/react-auth';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent, useChainId } from 'wagmi';
 import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { sepolia } from 'wagmi/chains';
@@ -22,6 +24,9 @@ import { features } from '@/config/features';
 export function MembershipPage() {
   const { authenticated } = usePrivy();
   const { address, isConnected: isLoggedIn } = useWalletAddress();
+  const { client: smartWalletClient } = useSmartWallets();
+  const { wallets } = useWallets();
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
   const chainId = useChainId();
   const queryClient = useQueryClient();
 
@@ -478,7 +483,18 @@ export function MembershipPage() {
                                         setIsDelegating(true);
                                         setError(null);
                                         try {
-                                          writeDelegate({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'delegate', args: [target as `0x${string}`] });
+                                          if (hasEmbeddedWallet && smartWalletClient) {
+                                            await smartWalletClient.writeContract({
+                                              address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+                                              abi: MembershipNFT,
+                                              functionName: 'delegate',
+                                              args: [target as `0x${string}`],
+                                              chain: sepolia,
+                                              account: smartWalletClient.account as any,
+                                            });
+                                          } else {
+                                            writeDelegate({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'delegate', args: [target as `0x${string}`] });
+                                          }
                                         } catch (err: any) {
                                           setError(err.message || 'Failed to delegate');
                                           setIsDelegating(false);
@@ -535,7 +551,17 @@ export function MembershipPage() {
                             setIsDeleting(true);
                             setError(null);
                             try {
-                              writeBurn({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'burn' });
+                              if (hasEmbeddedWallet && smartWalletClient) {
+                                await smartWalletClient.writeContract({
+                                  address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+                                  abi: MembershipNFT,
+                                  functionName: 'burn',
+                                  chain: sepolia,
+                                  account: smartWalletClient.account as any,
+                                });
+                              } else {
+                                writeBurn({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'burn' });
+                              }
                             } catch (err: any) {
                               setError(err.message || 'Failed to initiate burn transaction');
                               setIsDeleting(false);

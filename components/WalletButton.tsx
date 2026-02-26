@@ -165,7 +165,15 @@ export function WalletButton() {
                   </span>
                 </button>
                 <button
-                  onClick={() => { logout(); setShowModal(false); }}
+                  onClick={async () => {
+                    setShowModal(false);
+                    try {
+                      await logout();
+                    } catch (err) {
+                      console.error('Logout error:', err);
+                    }
+                    window.location.reload();
+                  }}
                   className="flex-1 flex flex-col items-center gap-2 px-4 py-3 bg-white dark:bg-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
                 >
                   <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-400" />

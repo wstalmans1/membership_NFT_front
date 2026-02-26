@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
+import { useWriteContract, useWaitForTransactionReceipt, usePublicClient, useChainId, useReadContract } from 'wagmi';
+import { sepolia } from 'viem/chains';
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
+import { useWallets } from '@privy-io/react-auth';
 import { uploadPhoto } from '@/lib/storage';
 import { createMetadata, updateMetadataWithTokenId, NFTMetadata } from '@/lib/metadata';
 import { CONTRACTS } from '@/config/contracts';
 import { MembershipNFT } from '@/abis/MembershipNFT';
 import { Constitution } from '@/abis/Constitution';
 import { formatEther, parseEther } from '@/lib/utils';
-import { encodeFunctionData, decodeEventLog } from 'viem';
+import { decodeEventLog } from 'viem';
 import { useQueryClient } from '@tanstack/react-query';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 
 interface MintMembershipFormProps {
   onSuccess: () => void;
@@ -19,10 +22,16 @@ interface MintMembershipFormProps {
 }
 
 export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembershipFormProps) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const queryClient = useQueryClient();
+
+  // Smart wallet client for email/Google users (Privy-managed ZeroDev account)
+  const { client: smartWalletClient } = useSmartWallets();
+  const { wallets } = useWallets();
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
+
   const [isUploading, setIsUploading] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,276 +42,183 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
     donationAmount: '',
   });
 
-  // Get min donation
+  // Get min donation from the Constitution contract
   const { data: minDonation } = useReadContract({
     address: CONTRACTS.SEPOLIA.CONSTITUTION_PROXY,
     abi: Constitution,
     functionName: 'minDonationWei',
   });
 
-  // Mint contract calls
+  // wagmi hooks — used only for the external wallet (MetaMask) path
   const { writeContract, data: hash, error: writeError, isPending: isWritePending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
 
-  // Handle write errors from hook
+  // Handle errors from the wagmi writeContract hook (MetaMask path only)
   useEffect(() => {
     if (writeError) {
       console.error('❌ WriteContract error from hook:', writeError);
       const errorMessage = writeError.message || (writeError as any).shortMessage || 'Unknown error';
       setIsMinting(false);
-      
-      // Check error code and message
       const errorCode = (writeError as any)?.code;
       const errorName = (writeError as any)?.name;
-      
       if (errorCode === 4001 || errorMessage.toLowerCase().includes('rejected') || errorMessage.toLowerCase().includes('denied') || errorName === 'UserRejectedRequestError') {
         onError('Transaction was rejected. Please try again and approve the transaction in your wallet.');
-      } else if (errorMessage.toLowerCase().includes('insufficient funds') || errorMessage.toLowerCase().includes('insufficient balance')) {
-        onError('Insufficient balance. Please ensure you have enough Sepolia ETH to cover the donation and gas fees.');
       } else if (errorMessage.toLowerCase().includes('user rejected') || errorMessage.toLowerCase().includes('cancelled')) {
         onError('Transaction was cancelled. Please try again when ready.');
-      } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('chain')) {
-        onError('Network error. Please ensure you are connected to Sepolia network and try again.');
+      } else if (errorMessage.toLowerCase().includes('insufficient funds') || errorMessage.toLowerCase().includes('insufficient balance')) {
+        onError('Insufficient balance. Please ensure you have enough Sepolia ETH to cover gas fees.');
       } else {
-        onError(`Transaction failed: ${errorMessage}. Please check your wallet and try again.`);
+        onError(`Transaction failed: ${errorMessage}`);
       }
     }
   }, [writeError, onError]);
 
+  /**
+   * Shared receipt processing — called by both the smart wallet path (inline)
+   * and the wagmi/MetaMask path (via useEffect below).
+   */
+  async function processReceipt(
+    txHash: `0x${string}`,
+    fromAddress: `0x${string}`
+  ) {
+    console.log('⏳ Waiting for transaction receipt…', txHash);
+    const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash });
+    console.log('✅ Receipt received:', receipt);
+
+    const decodedLogs = receipt.logs
+      .map((log) => {
+        try {
+          return decodeEventLog({ abi: MembershipNFT, data: log.data, topics: log.topics });
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const memberMintedEvent = decodedLogs.find((log: any) => log?.eventName === 'MemberMinted');
+    if (!memberMintedEvent || !memberMintedEvent.args) {
+      console.warn('MemberMinted event not found in receipt logs');
+      onError('Mint successful, but could not extract token ID. Please refresh the page.');
+      setIsMinting(false);
+      return;
+    }
+
+    const tokenId = Number((memberMintedEvent.args as any).tokenId);
+    console.log('✅ Token ID:', tokenId);
+
+    setIsUploading(true);
+    const photoFileName = `token-${Date.now()}-${fromAddress.slice(2, 10)}.${formData.photo!.name.split('.').pop()}`;
+    const photoUrl = await uploadPhoto(formData.photo!, photoFileName);
+    setIsUploading(false);
+
+    const issuedDate = new Date().toISOString().split('T')[0];
+    const metadata: NFTMetadata = {
+      name: `Honorary Citizenship #${formData.name}`,
+      description: `Honorary citizenship certificate for ${formData.name}`,
+      image: photoUrl,
+      attributes: [
+        { trait_type: 'Name', value: formData.name },
+        { trait_type: 'Date of Birth', value: formData.dateOfBirth || 'Not provided' },
+        { trait_type: 'Citizenship', value: formData.citizenship },
+        { trait_type: 'Issued Date', value: issuedDate },
+      ],
+      properties: {
+        ownerAddress: fromAddress,
+        name: formData.name,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        citizenship: formData.citizenship,
+        issuedDate,
+        photoUrl,
+        photoFileName,
+      },
+    };
+
+    await createMetadata(fromAddress, metadata);
+    await updateMetadataWithTokenId(tokenId, fromAddress, metadata);
+    console.log('✅ Metadata saved, token ID:', tokenId);
+
+    queryClient.invalidateQueries();
+    setIsMinting(false);
+    onSuccess();
+  }
+
+  // Handle transaction hash from the wagmi writeContract hook (MetaMask path)
+  useEffect(() => {
+    if (!hash || !publicClient || !address || !formData.name || !formData.photo) return;
+    console.log('✅ Transaction hash from wagmi hook:', hash);
+
+    processReceipt(hash, address as `0x${string}`).catch((error: any) => {
+      console.error('Error processing MetaMask receipt:', error);
+      onError(`Transaction sent but failed: ${error.message}`);
+      setIsMinting(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        onError('Please select an image file');
-        return;
-      }
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        onError('Image size must be less than 5MB');
-        return;
-      }
-      setFormData({ ...formData, photo: file });
-    }
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { onError('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { onError('Image size must be less than 5MB'); return; }
+    setFormData({ ...formData, photo: file });
   };
-
-  // Handle transaction hash when it becomes available
-  useEffect(() => {
-    async function handleTransactionHash() {
-      if (!hash || !publicClient || !address || !formData.name || !formData.photo) {
-        return;
-      }
-
-      console.log('✅ Transaction hash available from hook:', hash);
-      console.log('⏳ Waiting for transaction receipt...', hash);
-      
-      try {
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        console.log('✅ Transaction receipt received:', receipt);
-        
-        // Extract tokenId from event logs
-        try {
-          const decodedLogs = receipt.logs
-            .map((log) => {
-              try {
-                return decodeEventLog({
-                  abi: MembershipNFT,
-                  data: log.data,
-                  topics: log.topics,
-                });
-              } catch {
-                return null;
-              }
-            })
-            .filter(Boolean);
-
-          const memberMintedEvent = decodedLogs.find(
-            (log: any) => log?.eventName === 'MemberMinted'
-          );
-
-          if (memberMintedEvent && memberMintedEvent.args) {
-            const tokenId = Number((memberMintedEvent.args as any).tokenId);
-            console.log('✅ Extracted tokenId:', tokenId);
-
-            // Upload photo and create metadata
-            const photoFileName = `token-${Date.now()}-${address.slice(2, 10)}.${formData.photo.name.split('.').pop()}`;
-            const photoUrl = await uploadPhoto(formData.photo, photoFileName);
-
-            const issuedDate = new Date().toISOString().split('T')[0];
-            
-            const metadata: NFTMetadata = {
-              name: `Honorary Citizenship #${formData.name}`,
-              description: `Honorary citizenship certificate for ${formData.name}`,
-              image: photoUrl,
-              attributes: [
-                { trait_type: 'Name', value: formData.name },
-                { trait_type: 'Date of Birth', value: formData.dateOfBirth || 'Not provided' },
-                { trait_type: 'Citizenship', value: formData.citizenship },
-                { trait_type: 'Issued Date', value: issuedDate },
-              ],
-              properties: {
-                ownerAddress: address,
-                name: formData.name,
-                dateOfBirth: formData.dateOfBirth || undefined,
-                citizenship: formData.citizenship,
-                issuedDate: issuedDate,
-                photoUrl: photoUrl,
-                photoFileName: photoFileName,
-              },
-            };
-
-            // Create metadata first, then update with tokenId
-            await createMetadata(address, metadata);
-            await updateMetadataWithTokenId(tokenId, address, metadata);
-            console.log('✅✅✅ Successfully updated metadata with tokenId:', tokenId);
-            
-            // Invalidate queries to refresh UI
-            queryClient.invalidateQueries();
-            
-            setIsMinting(false);
-            onSuccess();
-          } else {
-            console.warn('MemberMinted event not found in transaction logs');
-            onError('Mint successful, but could not extract tokenId. Please refresh the page.');
-            setIsMinting(false);
-          }
-        } catch (error) {
-          console.error('Error parsing event logs:', error);
-          onError('Mint successful, but failed to parse transaction. Please refresh the page.');
-          setIsMinting(false);
-        }
-      } catch (error: any) {
-        console.error('Error waiting for transaction receipt:', error);
-        onError(`Transaction sent but failed: ${error.message}`);
-        setIsMinting(false);
-      }
-    }
-
-    handleTransactionHash();
-  }, [hash, publicClient, address, formData, queryClient, onSuccess, onError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!address || !isConnected) {
-      onError('Please connect your wallet');
-      return;
-    }
 
-    // Check if on correct network
-    if (chainId !== sepolia.id) {
-      onError(`Please switch to Sepolia network. Current network: ${chainId}`);
-      return;
-    }
-
-    if (!formData.name.trim()) {
-      onError('Please enter your name');
-      return;
-    }
-
-    if (!formData.photo) {
-      onError('Please upload a photo');
-      return;
-    }
-
-    if (!formData.donationAmount) {
-      onError('Please enter a donation amount');
-      return;
-    }
+    if (!address || !isConnected) { onError('Please connect your wallet'); return; }
+    if (chainId !== sepolia.id) { onError(`Please switch to Sepolia network. Current network: ${chainId}`); return; }
+    if (!formData.name.trim()) { onError('Please enter your name'); return; }
+    if (!formData.photo) { onError('Please upload a photo'); return; }
+    if (!formData.donationAmount) { onError('Please enter a donation amount'); return; }
 
     const minDonationEth = minDonation ? formatEther(BigInt(minDonation.toString())) : '0';
-    const donationAmountEth = parseFloat(formData.donationAmount);
-    const minDonationFloat = parseFloat(minDonationEth);
-
-    if (donationAmountEth < minDonationFloat) {
+    if (parseFloat(formData.donationAmount) < parseFloat(minDonationEth)) {
       onError(`Donation must be at least ${minDonationEth} Sepolia ETH`);
       return;
     }
 
     setIsMinting(true);
+    const amountWei = parseEther(formData.donationAmount);
+    console.log('🚀 Starting mint…', { contract: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, value: amountWei.toString(), from: address });
 
     try {
-      const amountWei = parseEther(formData.donationAmount);
-      console.log('🚀 Starting mint transaction...', {
-        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-        value: amountWei.toString(),
-        userAddress: address,
-      });
-
-      // Estimate gas first, then cap it at 15M to avoid RPC limits
-      let gasLimit: bigint | undefined;
-      if (publicClient) {
-        try {
-          console.log('⛽ Estimating gas...');
-          const estimatedGas = await publicClient.estimateGas({
-            account: address as `0x${string}`,
-            to: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-            data: encodeFunctionData({
-              abi: MembershipNFT,
-              functionName: 'mint',
-            }),
-            value: amountWei,
-          });
-          gasLimit = estimatedGas > BigInt(15000000) ? BigInt(15000000) : estimatedGas;
-          console.log('⛽ Gas estimated:', gasLimit.toString());
-        } catch (estimateError: any) {
-          console.error('⛽ Gas estimation error:', estimateError);
-          if (estimateError?.message?.includes('Already minted') || (estimateError as any)?.shortMessage?.includes('Already minted')) {
-            onError('You have already minted a membership NFT. Please refresh the page.');
-            setIsMinting(false);
-            return;
-          }
-                if (estimateError?.message?.includes('insufficient funds') || (estimateError as any)?.shortMessage?.includes('insufficient')) {
-            onError('Insufficient balance. Please ensure you have enough Sepolia ETH to cover the donation and gas fees.');
-            setIsMinting(false);
-            return;
-          }
-          console.warn('Gas estimation failed, using default:', estimateError);
-          gasLimit = BigInt(15000000);
-        }
+      // ── Smart wallet path (email / Google login) ──────────────────────────
+      if (hasEmbeddedWallet && smartWalletClient) {
+        console.log('🔑 Using Privy smart wallet for gas-sponsored mint…');
+        const txHash = await smartWalletClient.writeContract({
+          address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
+          abi: MembershipNFT,
+          functionName: 'mint',
+          value: amountWei,
+          chain: sepolia,
+          account: smartWalletClient.account as any,
+        });
+        console.log('✅ Smart wallet tx hash:', txHash);
+        await processReceipt(txHash as `0x${string}`, smartWalletClient.account!.address as `0x${string}`);
+        return;
       }
 
-      // Verify wallet is still connected before calling writeContract
-      if (!address || !isConnected) {
-        throw new Error('Wallet disconnected. Please reconnect your wallet.');
-      }
-
-      console.log('📝 Calling writeContract with params:', {
-        address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
-        functionName: 'mint',
-        value: amountWei.toString(),
-        gas: gasLimit?.toString(),
-        chainId: chainId,
-        userAddress: address,
-      });
-
-      // writeContract doesn't throw synchronously - errors come via the hook's error state
-      // It should trigger MetaMask to open immediately
+      // ── External wallet path (MetaMask / Brave Wallet) ────────────────────
+      console.log('🦊 Using external wallet — sending via wagmi writeContract…');
       writeContract({
         address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
         abi: MembershipNFT,
         functionName: 'mint',
         value: amountWei,
-        ...(gasLimit && { gas: gasLimit }),
       });
-      
-      console.log('✅ writeContract called successfully');
-      console.log('⏳ MetaMask should open now. If it doesn\'t, check:');
-      console.log('   1. MetaMask extension is enabled');
-      console.log('   2. You are on Sepolia network');
-      console.log('   3. Browser console for errors');
-      
-      // Note: We don't set isMinting(false) here because we need to wait for either:
-      // 1. The hash to appear (user approved in MetaMask)
-      // 2. An error from the hook (user rejected or error occurred)
-      // The error handler useEffect will handle rejection cases
-      
+      console.log('✅ writeContract called — waiting for wallet approval…');
+      // receipt handling is done in the useEffect that watches `hash`
+
     } catch (error: any) {
-      console.error('❌ Unexpected error in handleSubmit:', error);
+      console.error('❌ Mint error:', error);
       setIsMinting(false);
-      onError(error?.message || 'Failed to initiate transaction. Please try again.');
+      const msg = error?.shortMessage || error?.message || 'Failed to initiate transaction.';
+      if (msg.toLowerCase().includes('rejected') || msg.toLowerCase().includes('denied')) {
+        onError('Transaction was rejected.');
+      } else {
+        onError(`Transaction failed: ${msg}`);
+      }
     }
   };
 
@@ -388,7 +304,7 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '...'} Sepolia ETH
+          Minimum: {minDonation ? formatEther(BigInt(minDonation.toString())) : '…'} Sepolia ETH
         </p>
       </div>
 
@@ -406,10 +322,15 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
           disabled={isUploading || isMinting || isConfirming || isWritePending}
           className="flex-1 px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
-          {isUploading ? 'Uploading Photo...' : isMinting || isWritePending ? 'Waiting for MetaMask...' : isConfirming ? 'Confirming Transaction...' : 'Mint Membership NFT'}
+          {isUploading
+            ? 'Uploading Photo…'
+            : isMinting || isWritePending
+            ? 'Waiting for approval…'
+            : isConfirming
+            ? 'Confirming Transaction…'
+            : 'Mint Membership NFT'}
         </button>
       </div>
     </form>
   );
 }
-
