@@ -4,6 +4,7 @@ import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useWallets } from '@privy-io/react-auth';
 
 // Common chain names mapping
 const CHAIN_NAMES: Record<number, string> = {
@@ -22,6 +23,7 @@ export function NetworkStatus() {
   const { isConnected, chainId: accountChainId } = useAccount();
   const chainId = useChainId();
   const { switchChain, isPending } = useSwitchChain();
+  const { wallets } = useWallets();
   const [mounted, setMounted] = useState(false);
   const [directChainId, setDirectChainId] = useState<number | null>(null);
   const lastKnownChainIdRef = useRef<number | null>(null);
@@ -118,13 +120,14 @@ export function NetworkStatus() {
   }, [accountChainId, chainId, currentChainId, mounted, isConnected]);
 
   // Don't render until mounted to avoid hydration mismatch
-  if (!mounted) {
-    return null;
-  }
+  if (!mounted) return null;
 
-  if (!isConnected) {
-    return null; // Don't show network status if wallet not connected
-  }
+  // Email/Google users have a Privy embedded wallet whose smart wallet is
+  // always routed to Sepolia — the wagmi chain ID is irrelevant for them.
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
+  if (hasEmbeddedWallet) return null;
+
+  if (!isConnected) return null;
 
   const isCorrectNetwork = currentChainId === sepolia.id;
   const chainName = CHAIN_NAMES[currentChainId] || `Chain ${currentChainId}`;
