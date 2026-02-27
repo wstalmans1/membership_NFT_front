@@ -67,16 +67,14 @@ export function NetworkWarningBanner() {
 
   return (
     <div className="bg-red-600 dark:bg-red-700 text-white px-4 py-3 shadow-lg">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium">
-              You are connected to the wrong network ({chainName}). Please switch to Sepolia to interact with the QAWL DAO.
-            </p>
-          </div>
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 sm:mt-0" />
+          <p className="font-medium flex-1 min-w-0">
+            You are connected to the wrong network ({chainName}). Please switch to Sepolia to interact with the QAWL DAO.
+          </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
           <button
             onClick={() => {
               try {
@@ -86,7 +84,7 @@ export function NetworkWarningBanner() {
               }
             }}
             disabled={isPending}
-            className="px-4 py-2 bg-gray-900 text-red-200 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium whitespace-nowrap"
+            className="px-4 py-2 bg-gray-900 text-red-200 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {isPending ? 'Switching...' : 'Switch to Sepolia'}
           </button>

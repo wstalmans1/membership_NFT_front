@@ -212,7 +212,7 @@ export function Navbar() {
                           <ChevronDown className={cn('w-4 h-4 transition-transform', moreMenuOpen && 'rotate-180')} />
                         </button>
                         {moreMenuOpen && (
-                          <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                          <div className="absolute top-full left-0 mt-1 w-48 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
                             <div className="py-1">
                               {moreMenuItems.map((item) => {
                                 const normalizedHref = item.href.replace(/\/$/, '') || '/';

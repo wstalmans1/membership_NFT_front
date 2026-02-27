@@ -107,7 +107,7 @@ export function BalanceCheck() {
               <p className="font-medium mb-1">How to use a faucet:</p>
               <ol className="list-decimal list-inside space-y-1 ml-2">
                 <li>Click on a faucet link above</li>
-                <li>Paste your wallet address: <code className="bg-yellow-200 dark:bg-yellow-800 px-1 rounded font-mono text-[10px]">{address}</code></li>
+                <li>Paste your wallet address: <code className="bg-yellow-200 dark:bg-yellow-800 px-1 rounded font-mono text-xs break-all">{address}</code></li>
                 <li>Complete any required verification (CAPTCHA, social login, etc.)</li>
                 <li>Wait a few minutes for the Sepolia ETH to arrive</li>
                 <li>Refresh this page to see your updated balance</li>

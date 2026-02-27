@@ -96,7 +96,7 @@ export function WalletButton() {
           className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 dark:bg-blue-700 text-white rounded-full hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors font-medium text-sm h-8"
         >
           {showBalanceInPill && (
-            <span className="font-semibold whitespace-nowrap">{balanceDisplay} Sepolia ETH</span>
+            <span className="hidden sm:inline font-semibold whitespace-nowrap">{balanceDisplay} Sepolia ETH</span>
           )}
           <span className="text-lg flex-shrink-0">🍉</span>
           <span className={`font-semibold whitespace-nowrap ${!emailAccount && !googleAccount ? 'font-mono' : ''}`}>

@@ -257,7 +257,7 @@ export function Dashboard() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Members</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Total Members</p>
                   <p className="text-gray-300">
                     The total number of unique addresses that have minted a membership NFT. Each member has one vote in governance proposals.
@@ -278,7 +278,7 @@ export function Dashboard() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Your Status</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Your Status</p>
                   <p className="text-gray-300">
                     Indicates whether your connected wallet address has minted a membership NFT. Members can vote on proposals and participate in <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> governance.
@@ -305,7 +305,7 @@ export function Dashboard() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Treasury Balance</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Treasury Balance</p>
                   <p className="text-gray-300">
                     The total amount of Sepolia ETH held by the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> treasury. Funds come from membership donations and can be spent through governance proposals to allowed recipients.
@@ -326,7 +326,7 @@ export function Dashboard() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Proposals</h3>
               <div className="relative group" tabIndex={0} data-tooltip-anchor>
                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                   <p className="mb-2 font-semibold">Active Proposals</p>
                   <p className="text-gray-300">
                     The number of governance proposals currently in the voting period. Members can vote on active proposals to decide <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> actions.

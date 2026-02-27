@@ -1964,7 +1964,7 @@ export function GovernancePage() {
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Proposal Threshold</p>
                 <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Proposal Threshold</p>
                     <p className="text-gray-300">
                       The minimum number of votes (voting power) required to create a proposal. This prevents spam and ensures only serious proposals are submitted.
@@ -1986,7 +1986,7 @@ export function GovernancePage() {
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Delay</p>
                 <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Delay</p>
                     <p className="text-gray-300">
                       The number of blocks that must pass after a proposal is created before voting can begin. This gives members time to review proposals before voting starts.
@@ -2005,7 +2005,7 @@ export function GovernancePage() {
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Voting Period</p>
                 <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Period</p>
                     <p className="text-gray-300">
                       The number of blocks during which members can cast their votes on a proposal. After this period ends, the proposal is finalized based on the vote results.
@@ -2024,7 +2024,7 @@ export function GovernancePage() {
                 <p className="text-[11px] text-gray-600 dark:text-gray-400">Timelock Delay</p>
                 <div className="relative group" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Timelock Delay</p>
                     <p className="text-gray-300">
                       The minimum time (in seconds) that must pass after a proposal is queued before it can be executed. This review/opposition window allows the community to detect and cancel malicious proposals before they take effect.
@@ -2063,7 +2063,7 @@ export function GovernancePage() {
                 </div>
                 <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Vote Types</p>
                     <p className="text-gray-300">
                       <strong>For:</strong> You support the proposal. <strong>Against:</strong> You oppose the proposal. <strong>Abstain:</strong> You choose not to take a position, but your vote still counts toward quorum.
@@ -2080,7 +2080,7 @@ export function GovernancePage() {
                 </div>
                 <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Voting Power</p>
                     <p className="text-gray-300">
                       Each membership NFT grants 1 vote, but you must delegate your votes (to yourself or another address) before you can vote on proposals. Delegation activates your voting power.
@@ -2097,7 +2097,7 @@ export function GovernancePage() {
                 </div>
                 <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Quorum</p>
                     <p className="text-gray-300">
                       The minimum number of votes required for a proposal to be valid. Quorum is calculated as a percentage of total membership supply at the proposal snapshot. Both "For" and "Abstain" votes count toward quorum.
@@ -2114,7 +2114,7 @@ export function GovernancePage() {
                 </div>
                 <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Proposal Success</p>
                     <p className="text-gray-300">
                       A proposal succeeds only if both conditions are met: (1) enough members vote to reach quorum, and (2) "For" votes exceed "Against" votes. If either condition fails, the proposal is defeated.
@@ -2131,7 +2131,7 @@ export function GovernancePage() {
                 </div>
                 <div className="relative group flex-shrink-0" tabIndex={0} data-tooltip-anchor>
                   <HelpCircle className="w-3 h-3 text-gray-400 dark:text-gray-500 cursor-help mt-0.5" />
-                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                  <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                     <p className="mb-2 font-semibold">Snapshot</p>
                     <p className="text-gray-300">
                       The snapshot is the block number when voting starts. Your voting power is calculated based on your membership NFT ownership and delegation status at that specific block, not when you actually cast your vote. This prevents manipulation by buying/selling NFTs during voting.
@@ -2256,7 +2256,7 @@ export function GovernancePage() {
                         </label>
                         <div className="relative group" tabIndex={0} data-tooltip-anchor>
                           <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                             <p className="mb-2 font-semibold">Proposal Description</p>
                             <p className="text-gray-300">
                               A clear description of what the proposal aims to achieve. This is required and will be visible to all members when voting.
@@ -2288,7 +2288,7 @@ export function GovernancePage() {
                         </span>
                         <div className="relative group" tabIndex={0} data-tooltip-anchor>
                           <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                          <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                             <p className="mb-2 font-semibold">On-chain Execution</p>
                             <p className="text-gray-300">
                               Check this box if your proposal requires executing actions on smart contracts (e.g., treasury payouts, parameter changes). Uncheck for description-only proposals (signaling proposals).
@@ -2306,7 +2306,7 @@ export function GovernancePage() {
                             </label>
                             <div className="relative group" tabIndex={0} data-tooltip-anchor>
                               <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                 <p className="mb-2 font-semibold">Target Contracts</p>
                                 <p className="text-gray-300">
                                   The smart contract addresses that the proposal will interact with. Leave empty for description-only proposals (e.g., signaling proposals). If provided, you must also provide matching calldatas.
@@ -2335,7 +2335,7 @@ export function GovernancePage() {
                               </label>
                               <div className="relative group" tabIndex={0} data-tooltip-anchor>
                                 <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                                <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                   <p className="mb-2 font-semibold">Values</p>
                                   <p className="text-gray-300">
                                     Amount of ETH to send with each call. Pick the unit (wei or ETH) for the values you enter.
@@ -2398,7 +2398,7 @@ export function GovernancePage() {
                             </label>
                             <div className="relative group" tabIndex={0} data-tooltip-anchor>
                               <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
+                              <div data-tooltip className="absolute bottom-full mb-2 left-0 w-[80vw] sm:w-64 max-w-[calc(100vw-2rem)] p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 border border-gray-700">
                                 <p className="mb-2 font-semibold">Calldata</p>
                                 <p className="text-gray-300">
                                   The encoded function calls (in hex format) that will be executed on each target contract if the proposal passes. Each calldata corresponds to one target address. Must match the number of targets provided.

@@ -142,9 +142,9 @@ export function NetworkStatus() {
   if (isCorrectNetwork) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 rounded-lg text-xs font-medium whitespace-nowrap h-6">
+    <div className="flex items-center justify-center gap-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 rounded-lg text-xs font-medium h-6 max-w-full">
       <AlertCircle className="w-3 h-3 flex-shrink-0" />
-      <span className="text-xs">Wrong Network ({chainName})</span>
+      <span className="text-xs truncate">Wrong Network</span>
       <button
         onClick={() => {
           try {
