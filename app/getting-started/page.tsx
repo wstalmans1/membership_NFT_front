@@ -33,117 +33,94 @@ export default function GettingStarted() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Getting Started Guide</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Step-by-step instructions to set up your wallet and start using the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>
+              Two ways to join the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>: email (easiest) or wallet (MetaMask, Brave)
             </p>
           </div>
 
-          {/* Step 1: Install Wallet */}
+          {/* Option A: Email (simplest) */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
-                1
+              <div className="w-8 h-8 bg-green-600 dark:bg-green-500 text-white rounded-full flex items-center justify-center font-bold">
+                A
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Install a Crypto Wallet</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Option A: Login with Email (Easiest)</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              A crypto wallet is like a digital bank account that lets you interact with blockchain applications. 
-              You'll need one to connect to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> and mint your membership NFT.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* MetaMask */}
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-2xl">🦊</span>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">MetaMask</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Most popular choice</p>
-                  </div>
-                </div>
-                <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 mb-4 ml-2">
-                  <li>1. Visit <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" suppressHydrationWarning>metamask.io</a></li>
-                  <li>2. Download the extension for the adequate browser</li>
-                  <li>3. Follow the installation instructions</li>
-                  <li>4. Create a new wallet (for decentralization purposes, it's recommended to do it through a passphrase) or import an existing one</li>
-                  <li>5. Save your recovery phrase securely!</li>
-                </ol>
-                <a
-                  href="https://metamask.io/download/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                  suppressHydrationWarning
-                >
-                  <Download className="w-4 h-4" />
-                  Install MetaMask
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-
-              {/* Brave Wallet */}
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                    <span className="text-2xl">🦁</span>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Brave Wallet</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Built into Brave browser</p>
-                  </div>
-                </div>
-                <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 mb-4 ml-2">
-                  <li>1. Download <a href="https://brave.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline" suppressHydrationWarning>Brave browser</a> if needed</li>
-                  <li>2. Open Brave and look for the wallet icon in the toolbar</li>
-                  <li>3. Click it and follow the setup</li>
-                  <li>4. Create a new wallet or import an existing one</li>
-                  <li>5. Save your recovery phrase securely!</li>
-                </ol>
-                <a
-                  href="https://brave.com/wallet/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                  suppressHydrationWarning
-                >
-                  <Download className="w-4 h-4" />
-                  Get Brave Browser
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Step 2: Connect Wallet */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
-                2
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Connect Your Wallet</h2>
-            </div>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Once your wallet is installed, connect it to the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>:
+              No wallet or crypto required. Gas fees are sponsored.
             </p>
             <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
-              <li>1. Look for the wallet connection button in the top right corner of the page</li>
-              <li>2. Click "Connect MetaMask" or "Connect Brave"</li>
-              <li>3. Approve the connection request in your wallet popup</li>
-              <li>4. Your wallet address will appear in the top right when connected</li>
+              <li>1. Click <strong>Login</strong> in the top right corner</li>
+              <li>2. Choose <strong>Email</strong> and enter your email address</li>
+              <li>3. Enter the one-time code we send you</li>
+              <li>4. Go to Membership and mint your membership NFT — no Sepolia ETH needed</li>
+            </ol>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+              A smart wallet is created for you behind the scenes. You can connect MetaMask or Brave later if you prefer.
+            </p>
+          </div>
+
+          {/* Option B: Wallet */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
+                B
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Option B: Login with a Crypto Wallet</h2>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Use MetaMask or Brave Wallet. You will need Sepolia test ETH for gas (free from faucets).
+            </p>
+
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">1. Install a Wallet</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">🦊</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">MetaMask</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Most popular</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Download at <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">metamask.io</a>. Create or import a wallet. Save your recovery phrase securely.</p>
+                <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium" suppressHydrationWarning>
+                  <Download className="w-4 h-4" /> Install MetaMask <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl">🦁</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Brave Wallet</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Built into Brave</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Get Brave at <a href="https://brave.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">brave.com</a>. Open the wallet icon in the toolbar and follow setup.</p>
+                <a href="https://brave.com/wallet/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium" suppressHydrationWarning>
+                  <Download className="w-4 h-4" /> Get Brave <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">2. Connect Your Wallet</h3>
+            <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
+              <li>1. Click <strong>Login</strong> in the top right corner</li>
+              <li>2. Choose <strong>Wallet</strong> (MetaMask or Brave)</li>
+              <li>3. Approve the connection in your wallet popup</li>
+              <li>4. Your address will appear in the top right when connected</li>
             </ol>
           </div>
 
-          {/* Step 3: Switch to Sepolia */}
+          {/* Step 3: Switch to Sepolia (Wallet users only) */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 3
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Switch to Sepolia Network</h2>
+              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">Wallet users only</span>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs currently for testing purposes on Sepolia testnet (not Ethereum mainnet). You need to switch your wallet to Sepolia:
+              The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs on Sepolia testnet. If you use a wallet (Option B), switch it to Sepolia:
             </p>
             
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
@@ -198,16 +175,17 @@ export default function GettingStarted() {
             </div>
           </div>
 
-          {/* Step 4: Get Sepolia ETH */}
+          {/* Step 4: Get Sepolia ETH (Wallet users only) */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 bg-blue-800 dark:bg-blue-700 text-white rounded-full flex items-center justify-center font-bold">
                 4
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Get Sepolia ETH from a Faucet</h2>
+              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">Wallet users only</span>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              You need Sepolia ETH (test ETH, not real ETH) to pay for transactions. Get it free from these faucets:
+              Wallet users need Sepolia ETH (test ETH, not real) to pay for transactions. Email users (Option A) do not—gas is sponsored. Get free Sepolia ETH from these faucets:
             </p>
 
             <div className="space-y-3 mb-4">
@@ -261,7 +239,7 @@ export default function GettingStarted() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">You're Ready!</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Once you've completed all the steps above, you're ready to interact with the <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span>:
+              <strong>Email users:</strong> After Option A you can mint immediately. <strong>Wallet users:</strong> Complete steps 3 and 4 (Sepolia + faucet), then you can:
             </p>
             <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
               <li>• Mint your membership NFT</li>
@@ -285,6 +263,12 @@ export default function GettingStarted() {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Frequently Asked Questions</h2>
             <div className="space-y-4">
               <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Email or wallet—which should I choose?</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>Email (Option A):</strong> Fastest way to get started. No wallet, no Sepolia ETH, no faucet. Best if you are new to crypto. — <strong>Wallet (Option B):</strong> Use your own MetaMask or Brave wallet. You control the keys and need Sepolia ETH for gas. Best if you already have a wallet.
+                </p>
+              </div>
+              <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Is this safe?</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Yes! You're using test ETH on a test network. No real money is involved. However, always be careful 
@@ -294,8 +278,8 @@ export default function GettingStarted() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Do I need real ETH?</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  No! The <span className="font-bold">QAWL</span> <span className="text-sm font-normal">DAO</span> runs currently for testing purposes on Sepolia testnet, which uses free test ETH. You can get test ETH from faucets 
-                  without spending any real money.
+                  No! If you use email login (Option A), you do not need any ETH—gas is sponsored. If you use a wallet (Option B), 
+                  you need free Sepolia test ETH from faucets; no real money required.
                 </p>
               </div>
               <div>

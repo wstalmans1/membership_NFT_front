@@ -68,7 +68,7 @@ export function PhilosophyPage() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Frontend</h3>
             <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-4">
               <li><strong>IPFS-Ready:</strong> The frontend is designed to be deployed to IPFS for decentralized hosting.</li>
-              <li><strong>Direct Wallet Connection:</strong> We use direct injected wallet connections (MetaMask, Brave) instead of centralized wallet services.</li>
+              <li><strong>Dual Auth:</strong> Email login (Privy smart wallet, gas-sponsored) for low-friction onboarding, plus direct injected wallet (MetaMask, Brave) for crypto-native users.</li>
               <li><strong>Client-Side Rendering:</strong> To avoid SSR/CSR mismatches and ensure consistent behavior across environments.</li>
               <li><strong>Dark Theme:</strong> A single, consistent dark theme for better UX and reduced complexity.</li>
             </ul>
