@@ -1370,7 +1370,7 @@ export function GovernancePage() {
 
   // Handle queue confirmation - fetch actual ETA from contract when queue is confirmed
   useEffect(() => {
-    if ((isQueueConfirmed && (queueHash || swQueueHash)) && publicClient && queueingProposalId) {
+    if (((isQueueConfirmed && queueHash) || (isSwQueueConfirmed && swQueueHash)) && publicClient && queueingProposalId) {
       const fetchActualETA = async () => {
         try {
           // Wait a moment for the transaction to be mined and state to update

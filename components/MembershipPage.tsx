@@ -39,6 +39,7 @@ export function MembershipPage() {
   const [nftRefreshKey, setNftRefreshKey] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isBurnCleaningUp, setIsBurnCleaningUp] = useState(false);
   const [delegationReturnedNotification, setDelegationReturnedNotification] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<NFTMetadata | null>(null);
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
@@ -153,9 +154,10 @@ export function MembershipPage() {
     },
   });
 
-  // Handle burn success
+  // Handle burn success (MetaMask / external wallet path)
   useEffect(() => {
     if (isBurnSuccess && burnHash) {
+      setIsBurnCleaningUp(true);
       if (tokenId && address) {
         deleteMetadata(Number(tokenId), address).catch(err => console.error('Failed to delete metadata after burn:', err));
       }
@@ -176,7 +178,70 @@ export function MembershipPage() {
     }, 2000);
   };
 
+  // ── Burn overlay ─────────────────────────────────────────────────────────
+  const isBurnBusy = isDeleting || isBurnPending || isBurnConfirming || isBurnCleaningUp;
+
+  type BurnStep = { label: string; detail: string };
+  const burnSteps: BurnStep[] = hasEmbeddedWallet
+    ? [
+        { label: 'Submitting burn transaction', detail: 'Confirm the transaction in the Privy popup' },
+        { label: 'Removing membership record',  detail: 'Cleaning up your membership data' },
+      ]
+    : [
+        { label: 'Approve in wallet',       detail: 'Confirm the transaction in your wallet (MetaMask)' },
+        { label: 'Confirming on blockchain', detail: 'Your NFT is being permanently burned' },
+        { label: 'Removing membership record', detail: 'Cleaning up your membership data' },
+      ];
+
+  const burnActiveStep = hasEmbeddedWallet
+    ? isBurnCleaningUp ? 1 : 0
+    : isBurnCleaningUp ? 2 : isBurnConfirming ? 1 : 0;
+
   return (
+    <>
+    {/* Full-screen overlay during burn */}
+    {isBurnBusy && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mx-4 w-full max-w-sm border border-red-200 dark:border-red-800">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 rounded-full border-4 border-red-200 dark:border-red-900 border-t-red-600 dark:border-t-red-400 animate-spin" />
+          </div>
+          <h2 className="text-center text-lg font-semibold text-gray-900 dark:text-white mb-1">
+            Burning your membership NFT…
+          </h2>
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
+            {burnSteps[burnActiveStep].detail}
+          </p>
+          <ol className="space-y-3">
+            {burnSteps.map((step, i) => {
+              const done   = i < burnActiveStep;
+              const active = i === burnActiveStep;
+              return (
+                <li key={i} className="flex items-center gap-3">
+                  <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors
+                    ${done   ? 'bg-green-500 text-white'
+                    : active ? 'bg-red-600 text-white animate-pulse'
+                             : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'}`}
+                  >
+                    {done ? '✓' : i + 1}
+                  </span>
+                  <span className={`text-sm transition-colors
+                    ${done   ? 'text-green-600 dark:text-green-400 line-through'
+                    : active ? 'text-gray-900 dark:text-white font-medium'
+                             : 'text-gray-400 dark:text-gray-500'}`}
+                  >
+                    {step.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
+            Please do not close this tab
+          </p>
+        </div>
+      </div>
+    )}
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Membership</h1>
@@ -573,12 +638,13 @@ export function MembershipPage() {
                                   chain: sepolia,
                                   account: smartWalletClient.account as any,
                                 });
-                                // Smart wallet: writeContract resolves after confirmation — clean up directly
+                                // Transaction confirmed — move to cleanup step then reload
+                                setIsBurnCleaningUp(true);
                                 await deleteMetadata(Number(tokenId), address).catch(err =>
                                   console.error('Failed to delete metadata after burn:', err)
                                 );
-                                setIsDeleting(false);
                                 setShowDeleteConfirm(false);
+                                // Keep overlay visible (isDeleting stays true) until page reloads
                                 setTimeout(() => window.location.reload(), 2000);
                               } else {
                                 writeBurn({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'burn' });
@@ -674,5 +740,6 @@ export function MembershipPage() {
             ) : null}
       </div>
     </div>
+    </>
   );
 }
