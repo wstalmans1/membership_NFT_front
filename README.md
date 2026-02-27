@@ -1,163 +1,246 @@
 # QAWL DAO Frontend
 
-A Next.js frontend for the QAWL DAO, built with TypeScript, Tailwind CSS, and Wagmi for Ethereum interactions.
+A Next.js frontend for the QAWL DAO—a decentralized autonomous organization for "World Citizens for Palestine." Built with TypeScript, Tailwind CSS, Privy (auth), Wagmi/Viem (Ethereum), and Supabase (off-chain metadata).
 
-## Features
+---
 
-- **Dashboard**: Overview of DAO status, treasury balance, and quick actions
-- **Membership**: Mint and view membership NFTs
-- **Governance**: Create proposals and vote on DAO decisions
-- **Treasury**: View treasury balance and execute payouts
-- **Constitution**: View all governance parameters and contract addresses
+## Architecture Overview
 
-## Tech Stack
-
-- **Framework**: Next.js 16 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Ethereum**: Wagmi + Viem
-- **Wallet Connection**: Injected wallets only (MetaMask, Frame, Brave, etc.) - **No centralized services**
-- **Metadata Storage**: Supabase (off-chain NFT metadata and photos) - See [DECENTRALIZATION.md](./DECENTRALIZATION.md) for details
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- A wallet (MetaMask recommended)
-- Supabase account (for NFT metadata storage) - [Sign up here](https://supabase.com)
-
-### Installation
-
-```bash
-npm install
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              QAWL DAO FRONTEND                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────────────┐   │
+│  │   PRIVY      │    │   WAGMI      │    │         SUPABASE                  │   │
+│  │  (Auth)      │───▶│  (Ethereum)  │    │  (Off-chain metadata & photos)    │   │
+│  │              │    │              │    │                                    │   │
+│  │ • Email      │    │ • Reads      │    │ • member_metadata table           │   │
+│  │ • Wallet     │    │ • Writes     │    │ • member_photos bucket             │   │
+│  │ • Smart      │    │ • Sepolia    │    │ • CRUD for name, photo, DoB        │   │
+│  │   Wallets    │    │              │    │                                    │   │
+│  └──────────────┘    └──────┬───────┘    └──────────────────────────────────┘   │
+│         │                   │                              │                     │
+│         │                   ▼                              │                     │
+│         │           ┌───────────────┐                        │                     │
+│         │           │   SEPOLIA    │                        │                     │
+│         │           │  (Testnet)   │                        │                     │
+│         │           │              │                        │                     │
+│         │           │ • Constitution│◀───────────────────────┘                     │
+│         └──────────▶│ • Membership │   (metadata linked by owner_address          │
+│                     │   NFT        │    and token_id)                             │
+│                     │ • Governor   │                                              │
+│                     │ • Treasury   │                                              │
+│                     │ • Timelock   │                                              │
+│                     └──────────────┘                                              │
+│                                                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Environment Variables
+### Two Authentication Paths
 
-Create a `.env.local` file:
+| Path | Login Method | Wallet Type | Gas | Use Case |
+|------|--------------|-------------|-----|----------|
+| **Email** | Email OTP | Privy embedded EOA → ZeroDev Kernel smart account | Sponsored (Pimlico) | Low-friction onboarding |
+| **Wallet** | MetaMask / Brave | Injected EOA | User pays | Crypto-native users |
 
-```env
-# Required: Supabase credentials for NFT metadata storage
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+Email users get an embedded wallet created by Privy; transactions are gas-sponsored via Privy’s SmartWalletsProvider (ZeroDev + Pimlico). Wallet users connect an external wallet and pay their own gas.
 
-# Optional: Use your own RPC endpoint for maximum decentralization
-NEXT_PUBLIC_RPC_URL=https://your-node.example.com:8545
-```
+---
 
-**Note**: 
-- Supabase credentials are required for membership NFT metadata and photo storage
-- If RPC URL is not provided, the app will use public RPC endpoints (no API keys required)
+## Smart Contracts (Sepolia)
 
-### Supabase Setup
+All interactions go through these proxies:
 
-**Why Supabase instead of IPFS?**
-- IPFS is immutable—once data is stored, it cannot be updated or deleted (only new versions can be added, but old data remains)
-- We need to allow users to update and delete their personal information (name, photo, date of birth)
-- Supabase provides CRUD (Create, Read, Update, Delete) operations essential for user data control
-- This is a pragmatic choice that balances user rights with decentralization goals
+| Contract | Role |
+|----------|------|
+| **Constitution** | Governance parameters (min donation, spend caps, epochs, allowlist) |
+| **MembershipNFT** | Mint membership NFTs; 1 NFT = 1 vote |
+| **Governor** | Create proposals, vote, queue, execute |
+| **TreasuryExecutor** | Execute approved payouts |
+| **Timelock** | Delay between proposal approval and execution |
 
-1. **Create a Supabase Project**
-   - Go to [supabase.com](https://supabase.com) and create a new project
-   - Note your project URL and anon key from the project settings
+Addresses live in `config/contracts.ts`.
 
-2. **Set Up Database Table**
-   - Create a table named `member_metadata` with columns:
-     - `token_id` (bigint, nullable)
-     - `name` (text)
-     - `date_of_birth` (date)
-     - `citizenship` (text, nullable)
-     - `image` (text) - URL to photo in storage
-     - `created_at` (timestamp)
-     - `updated_at` (timestamp)
+---
 
-3. **Set Up Storage Bucket**
-   - Create a storage bucket named `member_photos`
-   - Configure bucket policies for public read access
+## Data Flow
 
-4. **Add Environment Variables**
-   - Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your `.env.local`
+### On-Chain
 
-See [documentation/BASEURI_SUPABASE_EXPLANATION.md](./documentation/BASEURI_SUPABASE_EXPLANATION.md) for detailed information about how Supabase integrates with the NFT metadata system.
+- **Membership**: ERC-721 NFTs; `mint()` creates a new membership; `tokenURI()` returns metadata URL
+- **Governance**: Proposals, votes, delegation, queue, execute
+- **Treasury**: Balances, payouts, allowlist
 
-### Development
+### Off-Chain (Supabase)
 
-```bash
-npm run dev
-```
+- **Metadata**: Name, date of birth, citizenship, photo URL, issued date—stored in `member_metadata` and keyed by `owner_address` and `token_id`
+- **Photos**: Uploaded to `member_photos` bucket; URLs stored in metadata
+- **Why Supabase**: Supports updates and deletes (unlike IPFS), so users can edit or remove personal data
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Mint flow: (1) Create metadata in Supabase (no `token_id` yet) → (2) Mint NFT on-chain → (3) Parse `MemberMinted` event for `tokenId` → (4) Update Supabase with `token_id` and upload photo.
 
-### Build
+---
 
-```bash
-npm run build
-npm start
-```
+## Build Variants
 
-## Contract Addresses
+Controlled by `NEXT_PUBLIC_BUILD_VARIANT`:
 
-Contract addresses are configured in `config/contracts.ts`. Currently set to Sepolia testnet addresses.
+| Variant | Pages | Purpose |
+|---------|-------|---------|
+| **full** | Dashboard, Membership, Community, Governance, Treasury, Constitution, Philosophy, DAO Architecture, Trilemma, Getting Started | Complete DApp |
+| **community** | Membership, Community only | Lightweight portal; link to Extended DAO for governance |
+
+Feature flags in `config/features.ts` drive navigation and behavior.
+
+---
 
 ## Project Structure
 
 ```
 qawl2-frontend/
-├── app/                    # Next.js app router pages
-│   ├── page.tsx           # Dashboard (home)
-│   ├── membership/        # Membership page
-│   ├── governance/        # Governance page
-│   ├── treasury/          # Treasury page
-│   └── constitution/       # Constitution page
-├── components/            # React components
+├── app/                      # Next.js App Router
+│   ├── layout.tsx            # Root layout, providers
+│   ├── page.tsx              # Dashboard (home)
+│   ├── providers.tsx         # Privy, Wagmi, QueryClient, DataContext, ViewMode
+│   ├── membership/
+│   ├── governance/
+│   ├── treasury/
+│   ├── constitution/
+│   ├── community/
+│   ├── philosophy/
+│   ├── dao-architecture/
+│   ├── trilemma/
+│   └── getting-started/
+├── components/
 │   ├── Dashboard.tsx
-│   ├── MembershipPage.tsx
-│   ├── GovernancePage.tsx
+│   ├── MembershipPage.tsx    # Mint, view, update, delete, download card
+│   ├── MintMembershipForm.tsx
+│   ├── UpdateMembershipForm.tsx
+│   ├── NFTDisplay.tsx        # Membership card (SVG flags, QR, photo)
+│   ├── GovernancePage.tsx    # Proposals, vote, queue, execute
 │   ├── TreasuryPage.tsx
 │   ├── ConstitutionPage.tsx
 │   ├── Navbar.tsx
-│   └── WalletConnect.tsx
-├── config/                # Configuration files
-│   ├── contracts.ts      # Contract addresses
-│   └── wagmi.ts          # Wagmi configuration
-├── abis/                  # Contract ABIs
-│   ├── Constitution.json
-│   ├── DAOGovernor.json
-│   ├── MembershipNFT.json
-│   └── TreasuryExecutor.json
-└── lib/                   # Utility functions
-    ├── utils.ts
-    ├── supabase.ts        # Supabase client configuration
-    ├── metadata.ts        # NFT metadata CRUD operations
-    └── storage.ts         # Photo upload/delete to Supabase Storage
+│   ├── WalletButton.tsx
+│   ├── NetworkWarningBanner.tsx
+│   ├── BalanceCheck.tsx
+│   └── ...
+├── config/
+│   ├── contracts.ts          # Sepolia contract addresses
+│   ├── privy.ts              # Login methods (email, wallet)
+│   ├── wagmi.ts              # RPC transports
+│   ├── features.ts           # Build-variant flags
+│   └── smartAccount.ts       # ZeroDev/Pimlico (legacy; now via Privy)
+├── contexts/
+│   ├── DataContext.tsx       # Proposals & payouts cache
+│   └── ViewModeContext.tsx   # community vs full
+├── hooks/
+│   ├── useWalletAddress.ts   # Resolves effective address (smart wallet or EOA)
+│   └── useFeatures.ts
+├── lib/
+│   ├── metadata.ts           # Supabase CRUD for NFT metadata
+│   ├── storage.ts            # Photo upload/delete
+│   ├── supabase.ts
+│   └── utils.ts
+├── abis/                     # Contract ABIs
+└── scripts/
+    ├── fix-ipfs-routes.js    # Post-build for IPFS deployment
+    └── dev-arm64.sh
 ```
 
-## Features in Development
+---
 
-- Proposal creation form with calldata encoding
-- Proposal voting interface
-- Proposal queue/execute functionality
-- Real-time proposal tracking (via events or subgraph)
-- Treasury payout history
-- Allowed recipients management
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Auth | Privy (email, wallet) |
+| Smart wallets | Privy SmartWalletsProvider (ZeroDev) |
+| Ethereum | Wagmi 3, Viem |
+| Data fetching | TanStack Query |
+| Off-chain storage | Supabase (DB + Storage) |
+| Card export | html2canvas (PNG download) |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm (or npm)
+- Supabase project
+- Privy app (dashboard.privy.io)
+- Optional: Pimlico API key (for gas sponsorship; Privy may provide this)
+
+### Installation
+
+```bash
+pnpm install
+```
+
+### Environment Variables
+
+Create `.env.local`:
+
+```env
+# Required
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_PRIVY_APP_ID=your-privy-app-id
+
+# Optional: RPC (defaults to public Sepolia RPC)
+NEXT_PUBLIC_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-key
+NEXT_PUBLIC_PIMLICO_API_KEY=your-pimlico-key  # if not via Privy
+```
+
+### Supabase Setup
+
+1. Create project at [supabase.com](https://supabase.com)
+2. Create table `member_metadata` with columns: `token_id` (bigint nullable), `owner_address` (text), `metadata_json` (jsonb), `created_at`, `updated_at`
+3. Create storage bucket `member_photos` with public read access
+4. Add RLS policies as needed for your use case
+
+See `documentation/BASEURI_SUPABASE_EXPLANATION.md` for details.
+
+### Development
+
+```bash
+pnpm dev           # Full build
+pnpm dev:community # Community-only build
+```
+
+### Build
+
+```bash
+pnpm build        # Default (full)
+pnpm build:full
+pnpm build:community
+pnpm start
+```
+
+The build runs `fix-ipfs-routes.js` to generate `index.html` in route folders for IPFS-style routing.
+
+---
 
 ## Decentralization
 
-This frontend is designed to minimize reliance on centralized infrastructure:
+- **Wallets**: Injected only (MetaMask, Brave); no WalletConnect
+- **RPC**: Public Sepolia RPC by default; custom URL supported
+- **Hosting**: Static output; suitable for IPFS, Arweave, ENS
+- **Metadata**: Supabase used for user-editable data; IPFS is immutable and does not support updates/deletes
 
-- ✅ **No WalletConnect**: Uses only injected browser wallets (direct connection)
-- ✅ **No API Keys Required**: Works with public RPC endpoints by default
-- ✅ **Custom RPC Support**: Users can provide their own RPC endpoint
-- ✅ **Static Build**: Can be hosted on IPFS, Arweave, or any static host
-- ✅ **Blockchain Interactions**: All on-chain interactions go directly to blockchain
-- ⚠️ **Supabase for Metadata**: NFT metadata and photos are stored in Supabase (off-chain) to enable user updates and deletions. IPFS is immutable (data cannot be updated or deleted), so we use Supabase to provide users with control over their personal data. This is a pragmatic choice with a path toward greater decentralization.
+See [DECENTRALIZATION.md](./DECENTRALIZATION.md) for more detail.
 
-See [DECENTRALIZATION.md](./DECENTRALIZATION.md) for detailed information.
+---
 
 ## Notes
 
-- The frontend connects to contracts deployed on Sepolia testnet
-- Make sure you're connected to Sepolia network in your wallet
-- Some features require membership NFT (mint one first)
-- For maximum decentralization, consider hosting on IPFS and accessing via ENS
+- Contracts run on Sepolia testnet
+- Connect wallet to Sepolia to interact
+- Membership NFT required for proposal creation and voting
+- For IPFS deployment, build and serve the `out` directory (if configured) or use the static export from `.next`
