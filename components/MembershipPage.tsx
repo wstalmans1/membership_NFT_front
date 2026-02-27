@@ -178,13 +178,33 @@ export function MembershipPage() {
     }, 2000);
   };
 
+  // ── Delegation overlay phase tracker ─────────────────────────────────────
+  // isDelegating stays true for the full smart-wallet call (approval + on-chain
+  // confirmation). Auto-advance the message after 7 s so it no longer tells
+  // the user to "confirm in Privy" once they already have.
+  const isDelegationBusy = isDelegating || isDelegatePending || isDelegateConfirming;
+  const [delegationOverlayApproved, setDelegationOverlayApproved] = useState(false);
+  useEffect(() => {
+    if (!isDelegationBusy) { setDelegationOverlayApproved(false); return; }
+    setDelegationOverlayApproved(false);
+    const t = setTimeout(() => setDelegationOverlayApproved(true), 7000);
+    return () => clearTimeout(t);
+  }, [isDelegationBusy]);
+
   // ── Burn overlay ─────────────────────────────────────────────────────────
   const isBurnBusy = isDeleting || isBurnPending || isBurnConfirming || isBurnCleaningUp;
+  const [burnOverlayApproved, setBurnOverlayApproved] = useState(false);
+  useEffect(() => {
+    if (!isBurnBusy) { setBurnOverlayApproved(false); return; }
+    setBurnOverlayApproved(false);
+    const t = setTimeout(() => setBurnOverlayApproved(true), 7000);
+    return () => clearTimeout(t);
+  }, [isBurnBusy]);
 
   type BurnStep = { label: string; detail: string };
   const burnSteps: BurnStep[] = hasEmbeddedWallet
     ? [
-        { label: 'Submitting burn transaction', detail: 'Confirm the transaction in the Privy popup' },
+        { label: 'Submitting burn transaction', detail: burnOverlayApproved ? 'Transaction submitted — waiting for blockchain confirmation…' : 'Confirm the transaction in the Privy popup' },
         { label: 'Removing membership record',  detail: 'Cleaning up your membership data' },
       ]
     : [
@@ -254,7 +274,9 @@ export function MembershipPage() {
           </h2>
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
             {hasEmbeddedWallet
-              ? 'Confirm the transaction in the Privy popup'
+              ? delegationOverlayApproved
+                ? 'Transaction submitted — waiting for blockchain confirmation…'
+                : 'Confirm the transaction in the Privy popup'
               : isDelegateConfirming
                 ? 'Transaction submitted — waiting for confirmation'
                 : 'Confirm the transaction in your wallet (MetaMask)'}

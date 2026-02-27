@@ -1856,6 +1856,20 @@ export function GovernancePage() {
       ? { title: 'Executing the proposal…',   isPending: isExecuting || isSwExecutePending, isConfirming: isExecuteConfirming || isSwExecuteConfirming }
     : null;
 
+  // Auto-advance overlay message for embedded wallet users:
+  // smartWalletClient.writeContract() resolves only after on-chain confirmation,
+  // so isSwXxxPending stays true through both the Privy approval AND the
+  // confirmation wait. Switch the message after 7 s — enough time for the
+  // Privy popup to be approved.
+  const [govOverlayApproved, setGovOverlayApproved] = useState(false);
+  const isGovOpActive = govOp !== null;
+  useEffect(() => {
+    if (!isGovOpActive) { setGovOverlayApproved(false); return; }
+    setGovOverlayApproved(false);
+    const t = setTimeout(() => setGovOverlayApproved(true), 7000);
+    return () => clearTimeout(t);
+  }, [isGovOpActive]);
+
   return (
     <>
     {govOp && (
@@ -1869,9 +1883,9 @@ export function GovernancePage() {
           </h2>
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
             {hasEmbeddedWallet
-              ? govOp.isPending
-                ? 'Confirm the transaction in the Privy popup'
-                : 'Waiting for blockchain confirmation…'
+              ? govOverlayApproved
+                ? 'Transaction submitted — waiting for blockchain confirmation…'
+                : 'Confirm the transaction in the Privy popup'
               : govOp.isConfirming
                 ? 'Transaction submitted — waiting for confirmation'
                 : 'Confirm the transaction in your wallet (MetaMask)'}
@@ -3247,6 +3261,15 @@ function VoteCountsWithDirectRead({
 
   const isVoteBusy = isVoting || isVoteConfirming || isSwVotePanelPending || isSwVotePanelConfirming;
 
+  // Auto-advance message after 7 s (same logic as governance overlay)
+  const [voteOverlayApproved, setVoteOverlayApproved] = useState(false);
+  useEffect(() => {
+    if (!isVoteBusy) { setVoteOverlayApproved(false); return; }
+    setVoteOverlayApproved(false);
+    const t = setTimeout(() => setVoteOverlayApproved(true), 7000);
+    return () => clearTimeout(t);
+  }, [isVoteBusy]);
+
   return (
     <>
     {/* Vote overlay */}
@@ -3261,9 +3284,9 @@ function VoteCountsWithDirectRead({
           </h2>
           <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
             {hasEmbeddedWallet
-              ? isSwVotePanelPending
-                ? 'Confirm the transaction in the Privy popup'
-                : 'Waiting for blockchain confirmation…'
+              ? voteOverlayApproved
+                ? 'Transaction submitted — waiting for blockchain confirmation…'
+                : 'Confirm the transaction in the Privy popup'
               : isVoteConfirming
                 ? 'Transaction submitted — waiting for confirmation'
                 : 'Confirm the transaction in your wallet (MetaMask)'}
