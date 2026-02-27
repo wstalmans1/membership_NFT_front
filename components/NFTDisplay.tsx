@@ -165,26 +165,14 @@ export function NFTDisplay({ tokenId, ownerAddress, onCardRef }: NFTDisplayProps
           {/* Plus sign */}
           <div className="text-cyan-300 font-bold text-xs flex-shrink-0">+</div>
 
-          {/* Palestinian flag */}
+          {/* Palestinian flag - SVG for html2canvas compatibility (clip-path not supported) */}
           <div className="relative w-10 h-7 rounded overflow-hidden shadow flex-shrink-0">
-            <div className="relative w-full h-full">
-              {/* Three equal horizontal stripes: black, white, green */}
-              <div className="absolute inset-0 flex flex-col">
-                <div className="flex-1" style={{ backgroundColor: '#000000' }}></div>
-                <div className="flex-1" style={{ backgroundColor: '#FFFFFF' }}></div>
-                <div className="flex-1" style={{ backgroundColor: '#009736' }}></div>
-              </div>
-              {/* Red triangle extending from the hoist (left) side - overlaying the stripes */}
-              {/* Triangle: base on left edge (full height), apex at right side center (1/3 width) */}
-              <div 
-                className="absolute inset-0"
-                style={{
-                  background: '#EE2A35',
-                  clipPath: 'polygon(0 0, 0 100%, 33.33% 50%)',
-                  zIndex: 10
-                }}
-              />
-            </div>
+            <svg className="w-full h-full" viewBox="0 0 40 28" preserveAspectRatio="none">
+              <rect x="0" y="0" width="40" height="28" fill="#000000" />
+              <rect x="0" y="9.33" width="40" height="9.33" fill="#FFFFFF" />
+              <rect x="0" y="18.67" width="40" height="9.33" fill="#009736" />
+              <polygon points="0,0 0,28 13.33,14" fill="#EE2A35" />
+            </svg>
           </div>
           
           <div className="flex-1 min-w-0">
