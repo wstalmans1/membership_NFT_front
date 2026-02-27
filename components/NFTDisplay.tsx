@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getMetadata, NFTMetadata } from '@/lib/metadata';
 import { CONTRACTS } from '@/config/contracts';
 import { QRCodeSVG } from 'qrcode.react';
@@ -8,12 +8,25 @@ import { QRCodeSVG } from 'qrcode.react';
 interface NFTDisplayProps {
   tokenId: number;
   ownerAddress: string;
+  /** Callback with the card DOM element when rendered (null when loading/error) */
+  onCardRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
+export function NFTDisplay({ tokenId, ownerAddress, onCardRef }: NFTDisplayProps) {
   const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Notify parent when the card is ready for capture (or cleared)
+  useEffect(() => {
+    if (metadata) {
+      onCardRef?.(cardRef.current);
+    } else {
+      onCardRef?.(null);
+    }
+    return () => { onCardRef?.(null); };
+  }, [metadata, onCardRef]);
 
   useEffect(() => {
     async function fetchMetadata() {
@@ -90,7 +103,10 @@ export function NFTDisplay({ tokenId, ownerAddress }: NFTDisplayProps) {
   const cardId = `WC-${new Date().getFullYear()}-${tokenId.toString().padStart(4, '0')}-HONOR`;
 
   return (
-    <div className="relative bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 rounded shadow-2xl overflow-hidden border border-cyan-500/30 mx-auto flex flex-col" style={{
+    <div
+      ref={cardRef}
+      className="relative bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 rounded shadow-2xl overflow-hidden border border-cyan-500/30 mx-auto flex flex-col"
+      style={{
       boxShadow: '0 0 15px rgba(6, 182, 212, 0.15), inset 0 0 15px rgba(6, 182, 212, 0.05)',
       width: '110mm', // Increased from 85.60mm (about 28% larger)
       height: '72mm', // Slightly taller to accommodate content

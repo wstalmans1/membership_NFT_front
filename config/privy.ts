@@ -2,8 +2,8 @@ import type { PrivyClientConfig } from '@privy-io/react-auth';
 import { sepolia, mainnet } from 'viem/chains';
 
 export const privyConfig: PrivyClientConfig = {
-  // Login methods: email first (low barrier), then social, then external wallets
-  loginMethods: ['email', 'google', 'wallet'],
+  // Login methods: email and external wallets only (no Google)
+  loginMethods: ['email', 'wallet'],
 
   // Create an embedded wallet only for users who have no wallet yet (email/social logins).
   // MetaMask/external wallet logins are skipped — they already have a wallet.

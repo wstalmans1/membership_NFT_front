@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import html2canvas from 'html2canvas';
 import { usePrivy } from '@privy-io/react-auth';
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useWallets } from '@privy-io/react-auth';
@@ -16,7 +17,7 @@ import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
 import { NFTMetadata, deleteMetadata, getMetadata } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useFeatures } from '@/hooks/useFeatures';
@@ -45,6 +46,8 @@ export function MembershipPage() {
   const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false);
   const [hasUserToggledPrivacy, setHasUserToggledPrivacy] = useState(false);
+  const [cardEl, setCardEl] = useState<HTMLDivElement | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Delegation state
   const [delegationMode, setDelegationMode] = useState<'self' | 'other'>('self');
@@ -396,27 +399,56 @@ export function MembershipPage() {
                   {/* NFT Display with Update/Delete */}
                   <div className="flex flex-col md:flex-row gap-4 md:items-start">
                     <div className="flex-1 min-w-0">
-                      <NFTDisplay key={nftRefreshKey} tokenId={Number(tokenId)} ownerAddress={address!} />
+                      <NFTDisplay key={nftRefreshKey} tokenId={Number(tokenId)} ownerAddress={address!} onCardRef={setCardEl} />
                     </div>
                     {!showUpdateForm && !showDeleteConfirm && (
-                      <div className="flex flex-row md:flex-col gap-2 md:pt-0 pt-2">
+                      <div className="flex flex-col gap-2 md:pt-0 pt-2">
+                        <div className="flex flex-row gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const metadata = await getMetadata(Number(tokenId));
+                                if (metadata) { setCurrentMetadata(metadata); setShowUpdateForm(true); }
+                                else setError('Could not load current metadata');
+                              } catch (err: any) { setError(err.message || 'Failed to load metadata'); }
+                            }}
+                            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                          >
+                            Update
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                          >
+                            Delete
+                          </button>
+                        </div>
                         <button
                           onClick={async () => {
+                            if (!cardEl) return;
+                            setIsDownloading(true);
                             try {
-                              const metadata = await getMetadata(Number(tokenId));
-                              if (metadata) { setCurrentMetadata(metadata); setShowUpdateForm(true); }
-                              else setError('Could not load current metadata');
-                            } catch (err: any) { setError(err.message || 'Failed to load metadata'); }
+                              const canvas = await html2canvas(cardEl, {
+                                scale: 2,
+                                useCORS: true,
+                                backgroundColor: null,
+                                logging: false,
+                              });
+                              const link = document.createElement('a');
+                              link.download = `qawl-membership-${tokenId}.png`;
+                              link.href = canvas.toDataURL('image/png');
+                              link.click();
+                            } catch (err: any) {
+                              setError(err.message || 'Failed to download membership card');
+                            } finally {
+                              setIsDownloading(false);
+                            }
                           }}
-                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                          disabled={!cardEl || isDownloading}
+                          className="flex items-center justify-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Update
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                        >
-                          Delete
+                          <Download className="w-4 h-4" />
+                          {isDownloading ? 'Preparing…' : 'Download PNG'}
                         </button>
                       </div>
                     )}
