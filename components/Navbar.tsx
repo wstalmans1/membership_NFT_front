@@ -246,7 +246,7 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:h-16 sm:gap-1">
+            <div className="flex flex-col items-center justify-center h-16 gap-1">
               <WalletButton />
               <NetworkStatus />
             </div>
@@ -346,15 +346,6 @@ export function Navbar() {
               </div>
             )}
 
-            {/* Mobile Wallet and Network Status */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
-              <div className="sm:hidden">
-                <NetworkStatus />
-              </div>
-              <div className="sm:hidden">
-                <WalletButton />
-              </div>
-            </div>
           </div>
         )}
       </div>
