@@ -33,6 +33,7 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
   const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -133,9 +134,14 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
       },
     };
 
-    await createMetadata(fromAddress, metadata);
-    await updateMetadataWithTokenId(tokenId, fromAddress, metadata);
-    console.log('✅ Metadata saved, token ID:', tokenId);
+    setIsSavingMetadata(true);
+    try {
+      await createMetadata(fromAddress, metadata);
+      await updateMetadataWithTokenId(tokenId, fromAddress, metadata);
+      console.log('✅ Metadata saved, token ID:', tokenId);
+    } finally {
+      setIsSavingMetadata(false);
+    }
 
     queryClient.invalidateQueries();
     setIsMinting(false);
@@ -231,26 +237,42 @@ export function MintMembershipForm({ onSuccess, onError, onCancel }: MintMembers
   };
 
   // ── Minting overlay ──────────────────────────────────────────────────────
-  const isBusy = isWritePending || isMinting || isConfirming || isUploading;
+  const isBusy = isWritePending || isMinting || isConfirming || isUploading || isSavingMetadata;
+
+  // For email users, isMinting stays true for the entire smart-wallet call
+  // (Privy approval + bundler + on-chain confirmation). Auto-advance from
+  // "Approve transaction" to "Registering on blockchain" after 7 s so the
+  // message doesn't stay stuck at "Confirm in Privy popup" after approval.
+  const [mintOverlayApproved, setMintOverlayApproved] = useState(false);
+  useEffect(() => {
+    if (!isBusy) { setMintOverlayApproved(false); return; }
+    setMintOverlayApproved(false);
+    const t = setTimeout(() => setMintOverlayApproved(true), 7000);
+    return () => clearTimeout(t);
+  }, [isBusy]);
 
   type Step = { label: string; detail: string };
   const steps: Step[] = hasEmbeddedWallet
     ? [
-        { label: 'Approve transaction',         detail: 'Confirm the transaction in the Privy popup' },
-        { label: 'Registering on blockchain',   detail: 'Your membership is being recorded on-chain' },
-        { label: 'Saving your profile',         detail: 'Uploading photo and saving your membership card' },
+        { label: 'Approve transaction',       detail: 'Confirm the transaction in the Privy popup' },
+        { label: 'Registering on blockchain', detail: 'Your membership is being recorded on-chain' },
+        { label: 'Saving your profile',       detail: 'Uploading photo and saving your membership card' },
       ]
     : [
-        { label: 'Approve transaction',         detail: 'Confirm the transaction in your wallet (MetaMask)' },
-        { label: 'Registering on blockchain',   detail: 'Your membership is being recorded on-chain' },
-        { label: 'Saving your profile',         detail: 'Uploading photo and saving your membership card' },
+        { label: 'Approve transaction',       detail: 'Confirm the transaction in your wallet (MetaMask)' },
+        { label: 'Registering on blockchain', detail: 'Your membership is being recorded on-chain' },
+        { label: 'Saving your profile',       detail: 'Uploading photo and saving your membership card' },
       ];
 
-  const activeStep = isUploading
+  // Step logic:
+  // - Step 2 (Saving profile): photo upload OR metadata DB write
+  // - Step 1 (On blockchain):  email → after 7 s timer; MetaMask → isConfirming
+  // - Step 0 (Approve):        everything else (initial wait / wallet popup)
+  const activeStep = (isUploading || isSavingMetadata)
     ? 2
-    : isConfirming || (isMinting && !isWritePending)
-    ? 1
-    : 0;
+    : hasEmbeddedWallet
+      ? mintOverlayApproved ? 1 : 0
+      : isConfirming ? 1 : 0;
 
   return (
     <>
