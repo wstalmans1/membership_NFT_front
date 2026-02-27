@@ -498,6 +498,14 @@ export function MembershipPage() {
                                               chain: sepolia,
                                               account: smartWalletClient.account as any,
                                             });
+                                            // Smart wallet: writeContract resolves after confirmation — update UI directly
+                                            setIsDelegating(false);
+                                            setShowDelegationForm(false);
+                                            setDelegateToAddress('');
+                                            setDelegationSuccess(true);
+                                            refetchDelegate();
+                                            refetchVotingPower();
+                                            setTimeout(() => { setDelegationSuccess(false); setError(null); }, 5000);
                                           } else {
                                             writeDelegate({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'delegate', args: [target as `0x${string}`] });
                                           }
@@ -565,6 +573,13 @@ export function MembershipPage() {
                                   chain: sepolia,
                                   account: smartWalletClient.account as any,
                                 });
+                                // Smart wallet: writeContract resolves after confirmation — clean up directly
+                                await deleteMetadata(Number(tokenId), address).catch(err =>
+                                  console.error('Failed to delete metadata after burn:', err)
+                                );
+                                setIsDeleting(false);
+                                setShowDeleteConfirm(false);
+                                setTimeout(() => window.location.reload(), 2000);
                               } else {
                                 writeBurn({ address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY, abi: MembershipNFT, functionName: 'burn' });
                               }
