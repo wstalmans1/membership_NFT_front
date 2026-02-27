@@ -394,7 +394,7 @@ export function MembershipPage() {
                   })()}
 
                   {/* NFT Display with Update/Delete */}
-                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                  <div className="flex flex-col md:flex-row gap-4 md:items-start">
                     <div className="flex-1 min-w-0">
                       <NFTDisplay key={nftRefreshKey} tokenId={Number(tokenId)} ownerAddress={address!} />
                     </div>
