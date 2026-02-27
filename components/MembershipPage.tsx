@@ -448,7 +448,7 @@ export function MembershipPage() {
                           className="flex items-center justify-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Download className="w-4 h-4" />
-                          {isDownloading ? 'Preparing…' : 'Download PNG'}
+                          {isDownloading ? 'Preparing…' : 'Download card'}
                         </button>
                       </div>
                     )}
