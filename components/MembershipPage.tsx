@@ -17,7 +17,7 @@ import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
 import { NFTMetadata, deleteMetadata, getMetadata } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
-import { HelpCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useFeatures } from '@/hooks/useFeatures';
@@ -403,26 +403,24 @@ export function MembershipPage() {
                     </div>
                     {!showUpdateForm && !showDeleteConfirm && (
                       <div className="flex flex-col gap-2 md:pt-0 pt-2">
-                        <div className="flex flex-row gap-2">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const metadata = await getMetadata(Number(tokenId));
-                                if (metadata) { setCurrentMetadata(metadata); setShowUpdateForm(true); }
-                                else setError('Could not load current metadata');
-                              } catch (err: any) { setError(err.message || 'Failed to load metadata'); }
-                            }}
-                            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                          >
-                            Update
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const metadata = await getMetadata(Number(tokenId));
+                              if (metadata) { setCurrentMetadata(metadata); setShowUpdateForm(true); }
+                              else setError('Could not load current metadata');
+                            } catch (err: any) { setError(err.message || 'Failed to load metadata'); }
+                          }}
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        >
+                          Update
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
                         <button
                           onClick={async () => {
                             if (!cardEl) return;
@@ -445,10 +443,9 @@ export function MembershipPage() {
                             }
                           }}
                           disabled={!cardEl || isDownloading}
-                          className="flex items-center justify-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Download className="w-4 h-4" />
-                          {isDownloading ? 'Preparing…' : 'Download card'}
+                          {isDownloading ? 'Preparing…' : 'Download'}
                         </button>
                       </div>
                     )}
