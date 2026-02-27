@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useBalance } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { formatEther } from '@/lib/utils';
 import { Copy, ChevronDown, X, LogOut } from 'lucide-react';
@@ -10,6 +11,7 @@ import { Copy, ChevronDown, X, LogOut } from 'lucide-react';
 export function WalletButton() {
   const { login, logout, ready, authenticated, user } = usePrivy();
   const { address } = useWalletAddress();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -169,10 +171,10 @@ export function WalletButton() {
                     setShowModal(false);
                     try {
                       await logout();
+                      queryClient.invalidateQueries();
                     } catch (err) {
                       console.error('Logout error:', err);
                     }
-                    window.location.reload();
                   }}
                   className="flex-1 flex flex-col items-center gap-2 px-4 py-3 bg-white dark:bg-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
                 >
