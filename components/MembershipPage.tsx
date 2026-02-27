@@ -242,6 +242,53 @@ export function MembershipPage() {
         </div>
       </div>
     )}
+    {/* Delegation overlay */}
+    {(isDelegating || isDelegatePending || isDelegateConfirming) && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mx-4 w-full max-w-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 rounded-full border-4 border-blue-200 dark:border-blue-900 border-t-blue-600 dark:border-t-blue-400 animate-spin" />
+          </div>
+          <h2 className="text-center text-lg font-semibold text-gray-900 dark:text-white mb-1">
+            Updating your delegation…
+          </h2>
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
+            {hasEmbeddedWallet
+              ? 'Confirm the transaction in the Privy popup'
+              : isDelegateConfirming
+                ? 'Transaction submitted — waiting for confirmation'
+                : 'Confirm the transaction in your wallet (MetaMask)'}
+          </p>
+          {!hasEmbeddedWallet && (
+            <ol className="space-y-3">
+              {[
+                { label: 'Approve in wallet',        done: isDelegateConfirming },
+                { label: 'Confirming on blockchain', done: false },
+              ].map((step, i) => {
+                const active = i === 0 ? !isDelegateConfirming : isDelegateConfirming;
+                return (
+                  <li key={i} className="flex items-center gap-3">
+                    <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors
+                      ${step.done ? 'bg-green-500 text-white' : active ? 'bg-blue-600 text-white animate-pulse' : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500'}`}
+                    >
+                      {step.done ? '✓' : i + 1}
+                    </span>
+                    <span className={`text-sm transition-colors
+                      ${step.done ? 'text-green-600 dark:text-green-400 line-through' : active ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-400 dark:text-gray-500'}`}
+                    >
+                      {step.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
+            Please do not close this tab
+          </p>
+        </div>
+      </div>
+    )}
     <div className="space-y-8 w-full min-w-0 overflow-hidden">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Membership</h1>
