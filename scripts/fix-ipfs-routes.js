@@ -14,12 +14,14 @@ const outDir = path.join(__dirname, '..', 'out');
 // Routes that need index.html files
 const routes = [
   'membership',
+  'community',
   'governance',
   'treasury',
   'constitution',
   'dao-architecture',
   'philosophy',
   'getting-started',
+  'trilemma',
 ];
 
 console.log('🔧 Fixing IPFS routes...');
