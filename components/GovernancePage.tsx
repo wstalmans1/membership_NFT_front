@@ -2177,7 +2177,7 @@ export function GovernancePage() {
       )}
 
       {/* Create Proposal Section and Current Block */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {isConnected && isCorrectNetwork && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -2439,7 +2439,9 @@ export function GovernancePage() {
             </div>
           )}
         </div>
-        <CurrentBlockBanner />
+        <div className="flex-shrink-0 self-start sm:self-auto">
+          <CurrentBlockBanner />
+        </div>
       </div>
 
       {/* Proposals List */}
