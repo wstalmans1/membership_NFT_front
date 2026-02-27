@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useChainId, useBalance } from 'wagmi';
+import { useChainId, useBalance } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { CheckCircle, Circle, AlertCircle, ExternalLink } from 'lucide-react';
 import { formatEther } from '@/lib/utils';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
+import { useWallets } from '@privy-io/react-auth';
 
 const SEPOLIA_FAUCETS = [
   { name: 'Alchemy', url: 'https://sepoliafaucet.com/' },
@@ -13,13 +15,17 @@ const SEPOLIA_FAUCETS = [
 ];
 
 export function OnboardingChecklist() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
+  const { wallets } = useWallets();
   const chainId = useChainId();
+
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
+
   const { data: balance, isLoading: isLoadingBalance } = useBalance({
     address: address,
+    query: { enabled: !hasEmbeddedWallet && !!address },
   });
-  
-  // Stabilize connection state to prevent flickering (similar to Dashboard)
+
   const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
   
@@ -38,6 +44,9 @@ export function OnboardingChecklist() {
     }
   }, [isConnected, hasInitialized]);
   
+  // Email/Google users are fully onboarded via Privy — checklist is irrelevant.
+  if (hasEmbeddedWallet) return null;
+
   const isConnectedStable = stableIsConnected ?? false;
 
   const hasWallet = typeof window !== 'undefined' && !!(window as any).ethereum;

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useReadContract, useChainId } from 'wagmi';
+import { useReadContract, useChainId } from 'wagmi';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { sepolia } from 'wagmi/chains';
 import { CONTRACTS } from '@/config/contracts';
 import { Constitution } from '@/abis/Constitution';
@@ -14,7 +15,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export function ConstitutionPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
   const chainId = useChainId();
   const router = useRouter();
   

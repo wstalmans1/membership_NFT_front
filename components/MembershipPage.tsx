@@ -36,6 +36,7 @@ export function MembershipPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [nftRefreshKey, setNftRefreshKey] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [delegationReturnedNotification, setDelegationReturnedNotification] = useState<string | null>(null);
@@ -261,7 +262,7 @@ export function MembershipPage() {
                   {/* NFT Display with Update/Delete */}
                   <div className="flex flex-col md:flex-row gap-4 items-start">
                     <div className="flex-1">
-                      <NFTDisplay tokenId={Number(tokenId)} ownerAddress={address!} />
+                      <NFTDisplay key={nftRefreshKey} tokenId={Number(tokenId)} ownerAddress={address!} />
                     </div>
                     {!showUpdateForm && !showDeleteConfirm && (
                       <div className="flex flex-row md:flex-col gap-2 md:pt-0 pt-2">
@@ -295,7 +296,11 @@ export function MembershipPage() {
                         tokenId={Number(tokenId)}
                         ownerAddress={address!}
                         currentMetadata={currentMetadata}
-                        onSuccess={() => { setShowUpdateForm(false); setCurrentMetadata(null); window.location.reload(); }}
+                        onSuccess={(updatedMetadata) => {
+                          setCurrentMetadata(updatedMetadata);
+                          setShowUpdateForm(false);
+                          setNftRefreshKey(k => k + 1);
+                        }}
                         onError={(err) => setError(err)}
                         onCancel={() => { setShowUpdateForm(false); setCurrentMetadata(null); }}
                       />

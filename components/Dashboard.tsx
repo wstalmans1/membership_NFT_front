@@ -1,6 +1,7 @@
 'use client';
 
-import { useAccount, useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { sepolia } from 'wagmi/chains';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
@@ -19,7 +20,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 
 export function Dashboard() {
   const features = useFeatures();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const router = useRouter();

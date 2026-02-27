@@ -1,34 +1,48 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useSignTypedData, useChainId } from 'wagmi';
+import { useSignTypedData, useChainId } from 'wagmi';
+import { sepolia } from 'viem/chains';
+import { createWalletClient, custom } from 'viem';
+import { useWallets } from '@privy-io/react-auth';
 import { uploadPhoto, deletePhoto } from '@/lib/storage';
 import { updateMetadata, getMetadata, NFTMetadata } from '@/lib/metadata';
 import { getUpdateMembershipDomain, UpdateMembershipTypes, createUpdateMembershipMessage } from '@/lib/signature';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 
 interface UpdateMembershipFormProps {
   tokenId: number;
   ownerAddress: string;
   currentMetadata: NFTMetadata;
-  onSuccess: () => void;
+  onSuccess: (updatedMetadata: NFTMetadata) => void;
   onError: (error: string) => void;
   onCancel: () => void;
 }
 
-export function UpdateMembershipForm({ 
-  tokenId, 
-  ownerAddress, 
-  currentMetadata, 
-  onSuccess, 
-  onError, 
-  onCancel 
+export function UpdateMembershipForm({
+  tokenId,
+  ownerAddress,
+  currentMetadata,
+  onSuccess,
+  onError,
+  onCancel,
 }: UpdateMembershipFormProps) {
-  const { address } = useAccount();
-  const chainId = useChainId();
+  // Use useWalletAddress so email/Google users get their smart wallet address,
+  // which matches the ownerAddress stored in Supabase.
+  const { address } = useWalletAddress();
+  const wagmiChainId = useChainId();
+  const { wallets } = useWallets();
+  const embeddedWallet = wallets.find(w => w.walletClientType === 'privy');
+
+  // For embedded wallet users, always use Sepolia (their smart wallet is locked to it).
+  const chainId = embeddedWallet ? sepolia.id : wagmiChainId;
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
-  
+
+  // wagmi hook — MetaMask path only
   const { signTypedDataAsync, isPending: isSigningPending } = useSignTypedData();
+
   const [formData, setFormData] = useState({
     name: currentMetadata.properties.name || '',
     dateOfBirth: currentMetadata.properties.dateOfBirth || '',
@@ -38,7 +52,6 @@ export function UpdateMembershipForm({
   });
 
   useEffect(() => {
-    // Pre-fill form with current metadata
     setFormData({
       name: currentMetadata.properties.name || '',
       dateOfBirth: currentMetadata.properties.dateOfBirth || '',
@@ -51,55 +64,37 @@ export function UpdateMembershipForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        onError('Please select an image file');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        onError('Image size must be less than 5MB');
-        return;
-      }
+      if (!file.type.startsWith('image/')) { onError('Please select an image file'); return; }
+      if (file.size > 5 * 1024 * 1024) { onError('Image size must be less than 5MB'); return; }
       setFormData({ ...formData, photo: file, keepExistingPhoto: false });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!address || address.toLowerCase() !== ownerAddress.toLowerCase()) {
       onError('Please connect the correct wallet');
       return;
     }
-
-    if (!formData.name.trim()) {
-      onError('Please enter your name');
-      return;
-    }
+    if (!formData.name.trim()) { onError('Please enter your name'); return; }
 
     setIsUpdating(true);
 
     try {
+      // Photo handling
       let photoUrl = currentMetadata.image;
       let photoFileName = currentMetadata.properties.photoFileName;
 
-      // If new photo uploaded, delete old one and upload new
       if (formData.photo && !formData.keepExistingPhoto) {
-        // Delete old photo if it exists
         if (currentMetadata.properties.photoFileName) {
-          try {
-            await deletePhoto(currentMetadata.properties.photoFileName);
-          } catch (deleteError) {
-            console.warn('Failed to delete old photo:', deleteError);
-            // Continue anyway - old photo deletion is not critical
-          }
+          try { await deletePhoto(currentMetadata.properties.photoFileName); }
+          catch (e) { console.warn('Failed to delete old photo:', e); }
         }
-
-        // Upload new photo
         photoFileName = `token-${Date.now()}-${address.slice(2, 10)}.${formData.photo.name.split('.').pop()}`;
         photoUrl = await uploadPhoto(formData.photo, photoFileName);
       }
 
-      // Create updated metadata object
       const updatedMetadata: NFTMetadata = {
         name: `Honorary Citizenship #${formData.name}`,
         description: `Honorary citizenship certificate for ${formData.name}`,
@@ -115,33 +110,53 @@ export function UpdateMembershipForm({
           name: formData.name,
           dateOfBirth: formData.dateOfBirth || undefined,
           citizenship: formData.citizenship,
-          photoUrl: photoUrl,
-          photoFileName: photoFileName,
+          photoUrl,
+          photoFileName,
         },
       };
 
-      // Step 1: Request EIP-712 signature
+      // ── EIP-712 signature ──────────────────────────────────────────────────
       setIsSigning(true);
       const timestamp = Math.floor(Date.now() / 1000);
-      const message = createUpdateMembershipMessage(
-        tokenId,
-        address!,
-        formData.name,
-        timestamp
-      );
+      // The message uses ownerAddress (smart wallet) — that is what's embedded
+      // in the signed payload. The signer may differ for email users (see below).
+      const message = createUpdateMembershipMessage(tokenId, address as `0x${string}`, formData.name, timestamp);
 
       let signature: `0x${string}`;
+      let signerAddress: string = address; // defaults to ownerAddress for MetaMask path
+
       try {
-        signature = await signTypedDataAsync({
-          domain: getUpdateMembershipDomain(chainId),
-          types: UpdateMembershipTypes,
-          primaryType: 'UpdateMembership',
-          message,
-        });
+        if (embeddedWallet) {
+          // ── Privy embedded wallet (email / Google) ───────────────────────
+          // Sign with the EOA that controls the smart wallet.
+          console.log('🔑 Signing with Privy embedded wallet EOA…');
+          const provider = await embeddedWallet.getEthereumProvider();
+          const walletClient = createWalletClient({ chain: sepolia, transport: custom(provider) });
+          const [eoaAddress] = await walletClient.getAddresses();
+          signerAddress = eoaAddress;
+          console.log('📋 EOA signer:', eoaAddress);
+
+          signature = await walletClient.signTypedData({
+            account: eoaAddress,
+            domain: getUpdateMembershipDomain(chainId),
+            types: UpdateMembershipTypes,
+            primaryType: 'UpdateMembership',
+            message,
+          });
+        } else {
+          // ── External wallet (MetaMask / Brave) ───────────────────────────
+          console.log('🦊 Signing with MetaMask / external wallet…');
+          signature = await signTypedDataAsync({
+            domain: getUpdateMembershipDomain(chainId),
+            types: UpdateMembershipTypes,
+            primaryType: 'UpdateMembership',
+            message,
+          });
+        }
         console.log('✅ Signature received:', signature);
-        console.log('📋 Message signed:', message);
       } catch (signError: any) {
         setIsSigning(false);
+        setIsUpdating(false);
         console.error('❌ Signature error:', signError);
         if (signError.message?.includes('User rejected') || signError.message?.includes('rejected')) {
           onError('Signature rejected. Update cancelled.');
@@ -153,30 +168,29 @@ export function UpdateMembershipForm({
         setIsSigning(false);
       }
 
-      // Step 2: Update metadata in Supabase with signature
-      // Pass the exact message and timestamp used for signing
-      console.log('🚀 Calling updateMetadata with signature...');
-      setIsUpdating(true);
-      
-      try {
-        await updateMetadata(tokenId, ownerAddress, updatedMetadata, signature, chainId, message, timestamp);
-        console.log('✅ Metadata updated successfully!');
-        onSuccess();
-      } catch (updateError: any) {
-        console.error('❌ Error updating metadata:', updateError);
-        throw updateError; // Re-throw to be caught by outer catch
-      } finally {
-        setIsUpdating(false);
-      }
+      // ── Save to Supabase ───────────────────────────────────────────────────
+      console.log('🚀 Saving updated metadata…');
+      await updateMetadata(
+        tokenId,
+        ownerAddress,
+        updatedMetadata,
+        signature,
+        chainId,
+        message,
+        timestamp,
+        signerAddress, // EOA for email users, same as ownerAddress for MetaMask
+      );
+      console.log('✅ Metadata updated successfully!');
+      onSuccess(updatedMetadata);
     } catch (error: any) {
       console.error('❌ Error in handleSubmit:', error);
       setIsUpdating(false);
       setIsSigning(false);
-      const errorMessage = error?.message || error?.toString() || 'Failed to update metadata. Please try again.';
-      console.error('Error message:', errorMessage);
-      onError(errorMessage);
+      onError(error?.message || 'Failed to update membership. Please try again.');
     }
   };
+
+  const isBusy = isUpdating || isSigning || isSigningPending;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -224,7 +238,7 @@ export function UpdateMembershipForm({
 
       <div>
         <label htmlFor="update-photo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Photo (Optional - leave empty to keep current)
+          Photo <span className="text-gray-400 font-normal">(optional — leave empty to keep current)</span>
         </label>
         <input
           id="update-photo"
@@ -239,33 +253,32 @@ export function UpdateMembershipForm({
           </p>
         )}
         {formData.keepExistingPhoto && !formData.photo && (
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Current photo will be kept
-          </p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Current photo will be kept</p>
         )}
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Maximum file size: 5MB. Supported formats: JPG, PNG, GIF
-        </p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Maximum 5 MB. JPG, PNG, GIF.</p>
       </div>
 
       <div className="flex gap-3">
         <button
           type="button"
           onClick={onCancel}
-          disabled={isUpdating}
+          disabled={isBusy}
           className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={isUpdating || isSigning || isSigningPending}
+          disabled={isBusy}
           className="flex-1 px-4 py-3 bg-blue-800 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-900 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
-          {isSigning || isSigningPending ? 'Sign Message...' : isUpdating ? 'Updating...' : 'Update Membership'}
+          {isSigning || isSigningPending
+            ? 'Sign to confirm…'
+            : isUpdating
+            ? 'Updating…'
+            : 'Update Membership'}
         </button>
       </div>
     </form>
   );
 }
-

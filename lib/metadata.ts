@@ -226,7 +226,11 @@ export async function updateMetadata(
   signature: `0x${string}`,
   chainId: number,
   signedMessage?: any,
-  signedTimestamp?: number
+  signedTimestamp?: number,
+  /** For Privy email/Google users the actual signer is the EOA, not the smart wallet.
+   *  Pass the EOA address here so signature verification uses the correct address.
+   *  Falls back to ownerAddress when omitted (MetaMask / external wallet path). */
+  signerAddress?: string
 ): Promise<void> {
   try {
     console.log('🔍 updateMetadata called with:', { tokenId, ownerAddress, chainId, hasSignature: !!signature });
@@ -272,15 +276,16 @@ export async function updateMetadata(
       console.log('🔐 Created new message for verification:', message);
     }
 
+    const effectiveSigner = (signerAddress || ownerAddress).toLowerCase();
     console.log('🔐 Verifying signature with message:', message);
     console.log('🔐 Signature:', signature);
-    console.log('🔐 Signer address:', ownerAddress.toLowerCase());
+    console.log('🔐 Signer address:', effectiveSigner);
     console.log('🔐 Chain ID:', chainId);
-    
+
     const isValid = await verifyUpdateMembershipSignature(
       signature,
       message,
-      ownerAddress.toLowerCase() as `0x${string}`,
+      effectiveSigner as `0x${string}`,
       chainId
     );
 

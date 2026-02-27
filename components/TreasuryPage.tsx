@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useAccount, useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { useBalance, useReadContract, usePublicClient, useChainId } from 'wagmi';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
 import { sepolia } from 'wagmi/chains';
 import { useQuery } from '@tanstack/react-query';
 import { CONTRACTS } from '@/config/contracts';
@@ -17,7 +18,7 @@ import { useRouter } from 'next/navigation';
 import { useDataContext } from '@/contexts/DataContext';
 
 export function TreasuryPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWalletAddress();
   const chainId = useChainId();
   const router = useRouter();
   const publicClient = usePublicClient();

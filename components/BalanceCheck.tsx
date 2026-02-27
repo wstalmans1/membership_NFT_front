@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useBalance, useChainId, useReadContract } from 'wagmi';
+import { useBalance, useChainId, useReadContract } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { formatEther } from '@/lib/utils';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { CONTRACTS } from '@/config/contracts';
 import { MembershipNFT } from '@/abis/MembershipNFT';
+import { useWalletAddress } from '@/hooks/useWalletAddress';
+import { useWallets } from '@privy-io/react-auth';
 
 const SEPOLIA_FAUCETS = [
   { name: 'Alchemy Sepolia Faucet', url: 'https://sepoliafaucet.com/' },
@@ -16,32 +18,28 @@ const SEPOLIA_FAUCETS = [
 ];
 
 export function BalanceCheck() {
-  const { address, isConnected } = useAccount();
+  // ── All hooks first — no early returns before this block ─────────────────
+  const { address, isConnected } = useWalletAddress();
+  const { wallets } = useWallets();
   const chainId = useChainId();
+  const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy');
+
   const { data: balance, isLoading } = useBalance({
     address: address,
+    query: { enabled: !hasEmbeddedWallet && !!address },
   });
-  
-  // Check membership status
+
   const { data: membershipBalance, isLoading: isLoadingMembership } = useReadContract({
     address: CONTRACTS.SEPOLIA.MEMBERSHIP_PROXY,
     abi: MembershipNFT,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !hasEmbeddedWallet && !!address },
   });
-  
-  const isMember = address && !isLoadingMembership && membershipBalance !== undefined
-    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
-    : undefined;
-  
-  // Only show balance check when on the correct network (Sepolia)
-  const isCorrectNetwork = chainId === sepolia.id;
-  
-  // Stabilize connection state to prevent flickering (similar to Dashboard)
+
   const [stableIsConnected, setStableIsConnected] = useState<boolean | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
-  
+
   useEffect(() => {
     if (!hasInitialized) {
       const initTimer = setTimeout(() => {
@@ -56,34 +54,27 @@ export function BalanceCheck() {
       return () => clearTimeout(updateTimer);
     }
   }, [isConnected, hasInitialized]);
-  
+
+  // ── Conditional returns after all hooks ───────────────────────────────────
+
+  // Embedded wallet users have gas sponsored by Pimlico — balance warning irrelevant.
+  if (hasEmbeddedWallet) return null;
+
+  const isCorrectNetwork = chainId === sepolia.id;
   const isConnectedStable = stableIsConnected ?? false;
 
-  // Don't show if not on correct network
-  if (!isCorrectNetwork) {
-    return null;
-  }
+  if (!isCorrectNetwork) return null;
+  if (!hasInitialized || !isConnectedStable || !address) return null;
 
-  if (!hasInitialized || !isConnectedStable || !address) {
-    return null;
-  }
+  const isMember = address && !isLoadingMembership && membershipBalance !== undefined
+    ? Boolean(membershipBalance && Number(membershipBalance) > 0)
+    : undefined;
 
-  // Don't show if not a member
-  if (isMember === false) {
-    return null;
-  }
-
-  // Don't render anything until balance and membership are loaded to avoid false positives
-  if (isLoading || balance === undefined || isLoadingMembership || isMember === undefined) {
-    return null;
-  }
+  if (isMember === false) return null;
+  if (isLoading || balance === undefined || isLoadingMembership || isMember === undefined) return null;
 
   const balanceEth = parseFloat(formatEther(BigInt(balance.value.toString())));
-  const hasLowBalance = balanceEth < 0.001; // Less than 0.001 ETH
-
-  if (!hasLowBalance) {
-    return null;
-  }
+  if (balanceEth >= 0.001) return null;
 
   return (
     <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
@@ -123,7 +114,7 @@ export function BalanceCheck() {
               </ol>
             </div>
             <button
-              onClick={() => navigator.clipboard.writeText(address)}
+              onClick={() => navigator.clipboard.writeText(address!)}
               className="mt-2 px-3 py-1.5 text-xs bg-yellow-600 dark:bg-yellow-700 text-white rounded hover:bg-yellow-700 dark:hover:bg-yellow-800 transition-colors"
             >
               Copy My Address
@@ -134,4 +125,3 @@ export function BalanceCheck() {
     </div>
   );
 }
-
