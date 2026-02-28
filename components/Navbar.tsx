@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { WalletButton } from './WalletButton';
 import { NetworkStatus } from './NetworkStatus';
 import { Menu, X, ChevronDown } from 'lucide-react';
@@ -64,11 +64,11 @@ export function Navbar() {
   const features = useFeatures();
   const { canToggle } = useViewMode();
   const pathnameFromHook = usePathname();
-  const router = useRouter();
   const [pathname, setPathname] = useState(pathnameFromHook || '/');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
 
   // Compute visible nav items reactively from feature flags
   const navItems = allNavItems.filter(item =>
@@ -92,10 +92,14 @@ export function Navbar() {
     return () => window.removeEventListener('popstate', updatePathname);
   }, [pathnameFromHook]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (must check BOTH desktop and mobile refs—
+  // moreMenuRef only wraps desktop; mobile items were wrongly treated as "outside")
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideDesktop = moreMenuRef.current?.contains(target);
+      const insideMobile = mobileMoreMenuRef.current?.contains(target);
+      if (!insideDesktop && !insideMobile) {
         setMoreMenuOpen(false);
       }
     }
@@ -289,7 +293,7 @@ export function Navbar() {
 
               {/* More menu in mobile */}
               {moreMenuItems.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-2" ref={mobileMoreMenuRef}>
                   {(() => {
                     const normalizedPathname = pathname.split('?')[0].replace(/\/$/, '') || '/';
                     const isMoreMenuActive = moreMenuItems.some(
@@ -315,13 +319,13 @@ export function Navbar() {
                               const normalizedHref = item.href.replace(/\/$/, '') || '/';
                               const isItemActive = (pathname.split('?')[0].replace(/\/$/, '') || '/') === normalizedHref;
                               return (
-                                <button
+                                <Link
                                   key={item.href}
-                                  type="button"
+                                  href={item.href}
+                                  prefetch={true}
                                   onClick={() => {
                                     setMobileMenuOpen(false);
                                     setMoreMenuOpen(false);
-                                    router.push(item.href);
                                   }}
                                   className={cn(
                                     'block w-full text-left px-3 py-2 text-sm transition-colors rounded-md cursor-pointer',
@@ -331,7 +335,7 @@ export function Navbar() {
                                   )}
                                 >
                                   {item.label}
-                                </button>
+                                </Link>
                               );
                             })}
                           </div>
