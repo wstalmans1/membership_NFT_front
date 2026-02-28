@@ -315,19 +315,23 @@ export function Navbar() {
                               const normalizedHref = item.href.replace(/\/$/, '') || '/';
                               const isItemActive = (pathname.split('?')[0].replace(/\/$/, '') || '/') === normalizedHref;
                               return (
-                                <Link
+                                <button
                                   key={item.href}
-                                  href={item.href}
-                                  onClick={() => { setMobileMenuOpen(false); setMoreMenuOpen(false); }}
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileMenuOpen(false);
+                                    setMoreMenuOpen(false);
+                                    router.push(item.href);
+                                  }}
                                   className={cn(
-                                    'block px-3 py-2 text-sm transition-colors rounded-md cursor-pointer',
+                                    'block w-full text-left px-3 py-2 text-sm transition-colors rounded-md cursor-pointer',
                                     isItemActive
                                       ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
                                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800',
                                   )}
                                 >
                                   {item.label}
-                                </Link>
+                                </button>
                               );
                             })}
                           </div>
