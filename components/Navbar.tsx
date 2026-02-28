@@ -315,7 +315,7 @@ export function Navbar() {
                               const normalizedHref = item.href.replace(/\/$/, '') || '/';
                               const isItemActive = (pathname.split('?')[0].replace(/\/$/, '') || '/') === normalizedHref;
                               return (
-                                <a
+                                <Link
                                   key={item.href}
                                   href={item.href}
                                   onClick={() => { setMobileMenuOpen(false); setMoreMenuOpen(false); }}
@@ -327,7 +327,7 @@ export function Navbar() {
                                   )}
                                 >
                                   {item.label}
-                                </a>
+                                </Link>
                               );
                             })}
                           </div>

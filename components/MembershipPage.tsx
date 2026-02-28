@@ -17,7 +17,7 @@ import { MintMembershipForm } from './MintMembershipForm';
 import { UpdateMembershipForm } from './UpdateMembershipForm';
 import { NFTMetadata, deleteMetadata, getMetadata } from '@/lib/metadata';
 import { NFTDisplay } from './NFTDisplay';
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { BalanceCheck } from './BalanceCheck';
 import Link from 'next/link';
 import { useFeatures } from '@/hooks/useFeatures';
@@ -354,7 +354,7 @@ export function MembershipPage() {
                         >
                           <div className="flex-shrink-0">
                             <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                              <span className="text-lg">🔒</span>
+                              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                             </div>
                           </div>
                           <div className="flex-1 flex items-center justify-between">
@@ -367,29 +367,24 @@ export function MembershipPage() {
                         <div className={`overflow-hidden transition-all duration-300 ease-in-out ${privacyExpanded ? 'max-h-[1000px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
                           <div className="ml-11 space-y-2">
                             <p className="text-xs text-blue-800 dark:text-blue-300">
-                              The personal information shown on your membership card is stored off-chain in a database hosted by{' '}
+                              <strong>Public visibility:</strong> All information on your membership card (name, photo, date of birth, citizenship, issued date) is publicly visible. It is shown on the Community page alongside other members.
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              <strong>Your control:</strong> You have full agency to edit or delete your name, date of birth, and photo at any time through this page. Changes take effect immediately.
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                              Your name, photo, date of birth, and citizenship are stored off-chain in a database hosted by{' '}
                               <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">Supabase</a>
-                              , a third-party provider who can access the personal information stored there, including the link between your personal data, your wallet address, and your token ID. Only your wallet address, token ID, and governance records are stored permanently on-chain.
+                              , together with your wallet address and token ID (so the card can be linked to your membership). Supabase can access all of this. Your wallet address, token ID, and governance records are also stored permanently on-chain and cannot be changed.
                             </p>
                             <p className="text-xs text-blue-800 dark:text-blue-300">
-                              <strong>What You Can Edit/Delete:</strong> Your name, photo and date of birth at any time through this page.
+                              <strong>Blockchain vs. database:</strong> Someone viewing only the blockchain cannot link your wallet address to your personal information—that link exists only in the off-chain database.
                             </p>
                             <p className="text-xs text-blue-800 dark:text-blue-300">
-                              <strong>What You Cannot Edit/Delete:</strong> Your wallet address, token ID, issued date, and governance records are permanent.
-                            </p>
-                            <p className="text-xs text-blue-800 dark:text-blue-300">
-                              <strong>Blockchain privacy:</strong> Someone viewing only the blockchain cannot link your wallet address to your personal information—this link exists only in the off-chain database.
-                            </p>
-                            <p className="text-xs text-blue-800 dark:text-blue-300">
-                              <strong>Email / Google login:</strong> If you log in via email or Google, your login identity is held by Privy (our authentication provider), who can link it to your wallet address. Privy operates under its own{' '}
+                              <strong>Email login:</strong> If you log in via email, your login identity is held by Privy (our authentication provider), who can link it to your wallet address. Privy operates under its own{' '}
                               <a href="https://privy.io/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">privacy policy</a>.
-                              Users who log in directly with MetaMask are not affected by this.
+                              Users who log in with MetaMask are not affected.
                             </p>
-                            {features.showMorePages && (
-                              <a href="/philosophy#data-privacy" onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block">
-                                Learn more about data privacy and storage →
-                              </a>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -798,11 +793,6 @@ export function MembershipPage() {
                           <li><strong>Blockchain privacy:</strong> Someone viewing only the blockchain cannot link your wallet address to your personal information—this link exists only in the off-chain database</li>
                           <li><strong>Email / Google login:</strong> If you log in via email or Google, your login identity is held by Privy (our authentication provider), who can link it to your wallet address. Privy operates under its own <a href="https://privy.io/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">privacy policy</a>. Users who log in directly with MetaMask are not affected by this.</li>
                         </ul>
-                        {features.showMorePages && (
-                          <a href="/philosophy#data-privacy" className="text-blue-600 dark:text-blue-400 hover:underline font-medium inline-block">
-                            Learn more about data privacy and storage →
-                          </a>
-                        )}
                       </div>
                       <label className="flex items-start gap-2 cursor-pointer">
                         <input type="checkbox" checked={privacyNoticeAccepted} onChange={(e) => setPrivacyNoticeAccepted(e.target.checked)} className="mt-0.5 w-4 h-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
