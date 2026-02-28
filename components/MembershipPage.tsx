@@ -335,8 +335,9 @@ export function MembershipPage() {
         </div>
       )}
 
+      {isLoggedIn && address && (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-        {(!isLoggedIn || !address) ? null : balance === undefined || isMember === undefined ? (
+        {balance === undefined || isMember === undefined ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <p>Loading membership status...</p>
               </div>
@@ -827,6 +828,7 @@ export function MembershipPage() {
               </div>
             ) : null}
       </div>
+      )}
     </div>
     </>
   );
